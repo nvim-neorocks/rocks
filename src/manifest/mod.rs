@@ -1,7 +1,8 @@
 mod metadata;
 mod pull_manifest;
 
-pub use pull_manifest::manifest_from_server;
+pub use metadata::*;
+pub use pull_manifest::*;
 
 #[cfg(test)]
 mod tests {
