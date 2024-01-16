@@ -1,2 +1,7 @@
 zig-out
 zig-cache
+
+
+# Added by cargo
+
+/target
