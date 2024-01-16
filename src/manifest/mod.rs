@@ -14,11 +14,6 @@ mod tests {
                 .await
                 .unwrap();
 
-        println!(
-            "{:?}",
-            metadata::ManifestMetadata::new(&manifest)
-                .unwrap()
-                .repository
-        );
+        metadata::ManifestMetadata::new(&manifest).unwrap();
     }
 }
