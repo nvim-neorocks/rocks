@@ -4,4 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.79"
 clap = { version = "4.4.17", features = ["derive"] }
+nucleo-matcher = "0.3.0"
+text_trees = "0.1.2"

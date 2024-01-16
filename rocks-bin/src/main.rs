@@ -2,6 +2,9 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
+mod search;
+
+/// An small and efficient Lua package manager.
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
@@ -99,7 +102,7 @@ enum Commands {
     /// Uninstall a rock.
     Remove,
     /// Query the Luarocks servers.
-    Search,
+    Search(search::Search),
     /// Show information about an installed rock.
     Show,
     /// Run the test suite in the current directory.
@@ -115,5 +118,15 @@ enum Commands {
 }
 
 fn main() {
-    let _cli = Cli::parse();
+    let cli = Cli::parse();
+
+    match cli.command {
+        Some(command) => match command {
+            Commands::Search(search_data) => search::search(search_data).unwrap(),
+            _ => unimplemented!(),
+        },
+        None => {
+            println!("TODO: Display configuration information here. Consider supplying a command instead.");
+        }
+    }
 }
