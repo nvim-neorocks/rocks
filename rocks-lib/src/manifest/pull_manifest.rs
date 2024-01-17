@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+// TODO(vhyrro): Perhaps cache the manifest somewhere on disk?
 pub async fn manifest_from_server(url: String, lua_version: Option<&String>) -> Result<String> {
     Ok(
         reqwest::get(url + &lua_version.map(|s| format!("-{}", s)).unwrap_or_default())
