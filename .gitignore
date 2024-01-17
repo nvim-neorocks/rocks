@@ -1,7 +1,9 @@
-zig-out
-zig-cache
-
+.direnv
 
 # Added by cargo
 
 /target
+
+# Added by nix
+
+/result
