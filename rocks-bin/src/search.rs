@@ -1,6 +1,9 @@
 use anyhow::Result;
 use clap::Args;
-use text_trees::{StringTreeNode, FormatCharacters, TreeFormatting};
+use itertools::Itertools;
+use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
+
+use rocks_lib::manifest::{manifest_from_server, ManifestMetadata};
 
 #[derive(Args)]
 pub struct Search {
@@ -8,16 +11,31 @@ pub struct Search {
     name: String,
     /// Rocks version to search for.
     version: Option<String>,
-
     // TODO(vhyrro): Add options.
 }
 
-pub fn search(data: Search) -> Result<()> {
-    let mut tree = StringTreeNode::new("Root Manifest".into());
+pub async fn search(data: Search) -> Result<()> {
+    let formatting = TreeFormatting::dir_tree(FormatCharacters::box_chars());
 
-    tree.push("Something cool".into());
+    // TODO(vhyrro): Pull in global configuration in the form of a second parameter (including which server to use for the manifest).
 
-    println!("{}", tree.to_string_with_format(&TreeFormatting::dir_tree(FormatCharacters::box_chars()))?);
+    let manifest = manifest_from_server("https://luarocks.org/manifest".into(), None).await?;
+
+    let metadata = ManifestMetadata::new(&manifest)?;
+
+    for key in metadata.repository.keys().collect::<Vec<&String>>() {
+        // TODO(vhyrro): Use fuzzy matching here instead.
+        if key.find(&data.name).is_some() {
+            let mut tree = StringTreeNode::new(key.to_owned());
+
+            metadata.repository[key]
+                .keys()
+                .sorted_by(|a, b| Ord::cmp(b, a))
+                .for_each(|version| tree.push(version.to_owned()));
+
+            println!("{}", tree.to_string_with_format(&formatting)?);
+        }
+    }
 
     Ok(())
 }

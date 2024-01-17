@@ -117,12 +117,13 @@ enum Commands {
     WriteRockspec,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
 
     match cli.command {
         Some(command) => match command {
-            Commands::Search(search_data) => search::search(search_data).unwrap(),
+            Commands::Search(search_data) => search::search(search_data).await.unwrap(),
             _ => unimplemented!(),
         },
         None => {

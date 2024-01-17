@@ -6,5 +6,8 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.79"
 clap = { version = "4.4.17", features = ["derive"] }
-nucleo-matcher = "0.3.0"
 text_trees = "0.1.2"
+rocks-lib = { path = "../rocks-lib/" }
+tokio = { version = "1.35.1", features = ["macros", "rt-multi-thread"] }
+nucleo = "0.3.0"
+itertools = "0.12.0"
