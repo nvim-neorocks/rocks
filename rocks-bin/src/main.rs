@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
+mod download;
 mod search;
 
 /// An small and efficient Lua package manager.
@@ -80,7 +81,7 @@ enum Commands {
     /// Show documentation for an installed rock.
     Doc,
     /// Download a specific rock file from a rocks server.
-    Download,
+    Download(download::Download),
     /// Initialize a directory for a Lua project using Rocks.
     Init,
     /// Install a rock.
@@ -124,6 +125,7 @@ async fn main() {
     match cli.command {
         Some(command) => match command {
             Commands::Search(search_data) => search::search(search_data).await.unwrap(),
+            Commands::Download(download_data) => download::download(download_data).await.unwrap(),
             _ => unimplemented!(),
         },
         None => {
