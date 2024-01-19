@@ -12,6 +12,9 @@ pub struct Search {
     /// Rocks version to search for.
     version: Option<String>,
     // TODO(vhyrro): Add options.
+    /// Return a machine readable format.
+    #[arg(long)]
+    porcelain: bool,
 }
 
 pub async fn search(data: Search) -> Result<()> {
@@ -25,15 +28,25 @@ pub async fn search(data: Search) -> Result<()> {
 
     for key in metadata.repository.keys().collect::<Vec<&String>>() {
         // TODO(vhyrro): Use fuzzy matching here instead.
-        if key.find(&data.name).is_some() {
-            let mut tree = StringTreeNode::new(key.to_owned());
-
-            metadata.repository[key]
+        if key.contains(&data.name) {
+            let versions = metadata.repository[key]
                 .keys()
-                .sorted_by(|a, b| Ord::cmp(b, a))
-                .for_each(|version| tree.push(version.to_owned()));
+                .sorted_by(|a, b| Ord::cmp(b, a));
 
-            println!("{}", tree.to_string_with_format(&formatting)?);
+            if data.porcelain {
+                versions.for_each(|version| {
+                    println!(
+                        "{} {} {} {}",
+                        key, version, "src|rockspec", "https://luarocks.org/"
+                    )
+                });
+            } else {
+                let mut tree = StringTreeNode::new(key.to_owned());
+
+                versions.for_each(|version| tree.push(version.to_owned()));
+
+                println!("{}", tree.to_string_with_format(&formatting)?);
+            }
         }
     }
 
