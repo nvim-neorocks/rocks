@@ -137,7 +137,7 @@ async fn main() {
         .server(cli.server)
         .tree(cli.tree)
         .global(cli.global)
-        .cache_path(cli.cache_path)
+        // .cache_path(cli.cache_path)
         .local(cli.local)
         .timeout(
             cli.timeout

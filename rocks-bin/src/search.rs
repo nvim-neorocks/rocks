@@ -1,5 +1,5 @@
-use eyre::Result;
 use clap::Args;
+use eyre::Result;
 use itertools::Itertools;
 use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
 
