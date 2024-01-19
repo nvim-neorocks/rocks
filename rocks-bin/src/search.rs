@@ -3,7 +3,10 @@ use clap::Args;
 use itertools::Itertools;
 use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
 
-use rocks_lib::manifest::{manifest_from_server, ManifestMetadata};
+use rocks_lib::{
+    config::Config,
+    manifest::{manifest_from_server, ManifestMetadata},
+};
 
 #[derive(Args)]
 pub struct Search {
@@ -17,16 +20,21 @@ pub struct Search {
     porcelain: bool,
 }
 
-pub async fn search(data: Search) -> Result<()> {
+pub async fn search(data: Search, config: &Config) -> Result<()> {
     let formatting = TreeFormatting::dir_tree(FormatCharacters::box_chars());
 
     // TODO(vhyrro): Pull in global configuration in the form of a second parameter (including which server to use for the manifest).
 
-    let manifest = manifest_from_server("https://luarocks.org".into(), None, None).await?;
+    let manifest = manifest_from_server(config.server.to_owned(), &config).await?;
 
     let metadata = ManifestMetadata::new(&manifest)?;
 
-    for key in metadata.repository.keys().collect::<Vec<&String>>() {
+    for key in metadata
+        .repository
+        .keys()
+        .sorted()
+        .collect::<Vec<&String>>()
+    {
         // TODO(vhyrro): Use fuzzy matching here instead.
         if key.contains(&data.name) {
             let versions = metadata.repository[key]
@@ -35,10 +43,7 @@ pub async fn search(data: Search) -> Result<()> {
 
             if data.porcelain {
                 versions.for_each(|version| {
-                    println!(
-                        "{} {} {} {}",
-                        key, version, "src|rockspec", "https://luarocks.org/"
-                    )
+                    println!("{} {} {} {}", key, version, "src|rockspec", config.server)
                 });
             } else {
                 let mut tree = StringTreeNode::new(key.to_owned());

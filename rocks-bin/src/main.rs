@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
+use rocks_lib::config::Config;
 
 mod download;
 mod search;
@@ -122,9 +123,11 @@ enum Commands {
 async fn main() {
     let cli = Cli::parse();
 
+    let config = Config::default();
+
     match cli.command {
         Some(command) => match command {
-            Commands::Search(search_data) => search::search(search_data).await.unwrap(),
+            Commands::Search(search_data) => search::search(search_data, &config).await.unwrap(),
             Commands::Download(download_data) => download::download(download_data).await.unwrap(),
             _ => unimplemented!(),
         },
