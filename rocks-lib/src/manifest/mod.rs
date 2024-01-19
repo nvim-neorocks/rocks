@@ -11,7 +11,7 @@ mod tests {
     #[tokio::test]
     pub async fn parse_metadata() {
         let manifest =
-            pull_manifest::manifest_from_server("https://luarocks.org/manifest".into(), None)
+            pull_manifest::manifest_from_server("https://luarocks.org/".into(), None, None)
                 .await
                 .unwrap();
 

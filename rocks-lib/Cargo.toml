@@ -7,6 +7,8 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.79"
+directories = "5.0.1"
+httpdate = "1.0.3"
 mlua = { version = "0.9.4", features = ["luajit52", "serialize"] }
 reqwest = "0.11.23"
 serde = { version = "1.0.195", features = ["derive"] }
