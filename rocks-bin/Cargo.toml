@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.79"
 clap = { version = "4.4.17", features = ["derive"] }
-text_trees = "0.1.2"
-rocks-lib = { path = "../rocks-lib/" }
-tokio = { version = "1.35.1", features = ["macros", "rt-multi-thread"] }
-nucleo = "0.3.0"
+eyre = "0.6.11"
 itertools = "0.12.0"
+nucleo = "0.3.0"
+rocks-lib = { path = "../rocks-lib/" }
+text_trees = "0.1.2"
+tokio = { version = "1.35.1", features = ["macros", "rt-multi-thread"] }

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use eyre::Result;
 
 use crate::config::Config;
 

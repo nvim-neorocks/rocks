@@ -1,4 +1,4 @@
-use anyhow::Result;
+use eyre::Result;
 use clap::Args;
 use itertools::Itertools;
 use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};

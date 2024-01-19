@@ -1,4 +1,4 @@
-use anyhow::Result;
+use eyre::Result;
 use mlua::{Lua, LuaSerdeExt};
 use std::collections::HashMap;
 

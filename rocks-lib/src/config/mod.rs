@@ -1,4 +1,6 @@
 use std::{path::PathBuf, time::Duration};
+use eyre::{eyre, Result};
+use directories::ProjectDirs;
 
 pub struct Config {
     pub enable_development_rockspecs: bool,
@@ -17,8 +19,22 @@ pub struct Config {
     pub verbose: bool,
     pub timeout: Duration,
 
-    // Rocks-specific options (unavailable in luarocks)
-    pub cache_path: PathBuf,
+    // Non-luarocks configs
+    pub qualifier: String,
+    pub org_name: String,
+    pub app_name: String,
+}
+
+impl Config {
+    pub fn get_project_dirs(&self) -> Result<ProjectDirs> {
+        directories::ProjectDirs::from(&self.qualifier, &self.org_name, &self.app_name)
+            .ok_or(eyre!("Could not find a valid home directory"))
+    }
+
+    pub fn get_default_cache_path(&self) -> Result<PathBuf> {
+        let project_dirs = self.get_project_dirs()?;
+        Ok(project_dirs.cache_dir().to_path_buf())
+    }
 }
 
 impl Default for Config {
@@ -37,11 +53,9 @@ impl Default for Config {
             no_project: false,
             verbose: false,
             timeout: Duration::from_secs(30),
-
-            cache_path: directories::ProjectDirs::from("org", "neorocks", "rocks")
-                .unwrap()
-                .cache_dir()
-                .to_path_buf(),
+            qualifier: "org".into(),
+            org_name: "neorocks".into(),
+            app_name: "rocks".into(),
         }
     }
 }

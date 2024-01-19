@@ -1,4 +1,4 @@
-use anyhow::Result;
+use eyre::Result;
 use reqwest::Client;
 
 use crate::config::Config;
@@ -16,7 +16,7 @@ pub async fn manifest_from_server(url: String, config: &Config) -> Result<String
 
     // Stores a path to the manifest cache (this allows us to operate on a manifest without
     // needing to pull it from the luarocks servers each time).
-    let cache = config.cache_path.join(&manifest_filename);
+    let cache = config.get_default_cache_path()?.join(&manifest_filename);
 
     // Ensure all intermediate directories for the cache file are created (e.g. `~/.cache/rocks/manifest`)
     fs::create_dir_all(cache.parent().unwrap())?;
@@ -57,19 +57,31 @@ pub async fn manifest_from_server(url: String, config: &Config) -> Result<String
 
 #[cfg(test)]
 mod tests {
+    use serial_test::serial;
+
     use super::*;
 
-    #[tokio::test]
-    pub async fn get_manifest() {
+    fn reset_cache() {
         let config = Config::default();
+        let cache_path = config.get_default_cache_path().unwrap();
+        let _ = fs::remove_dir_all(&cache_path);
+        fs::create_dir_all(cache_path).unwrap();
+    }
 
+    #[tokio::test]
+    #[serial]
+    pub async fn get_manifest() {
+        reset_cache();
+        let config = Config::default();
         manifest_from_server("https://luarocks.org".into(), &config)
             .await
             .unwrap();
     }
 
     #[tokio::test]
+    #[serial]
     pub async fn get_manifest_for_5_1() {
+        reset_cache();
         let mut config = Config::default();
 
         config.lua_version = Some("5.1".into());
@@ -77,5 +89,21 @@ mod tests {
         manifest_from_server("https://luarocks.org".into(), &config)
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    #[serial]
+    pub async fn get_cached_manifest() {
+        reset_cache();
+        let manifest_content = "dummy content";
+        let config = Config::default();
+        let cache_dir = config.get_default_cache_path().unwrap();
+        let cache = cache_dir.join("manifest");
+        fs::write(&cache, manifest_content).unwrap();
+        let _metadata = fs::metadata(&cache).unwrap();
+        let result = manifest_from_server("https://luarocks.org".into(), &config)
+            .await
+            .unwrap();
+        assert_eq!(result, manifest_content);
     }
 }
