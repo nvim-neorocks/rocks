@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 use clap::{Parser, Subcommand};
 use rocks_lib::config::Config;
@@ -45,6 +45,10 @@ struct Cli {
     /// Which tree to operate on.
     #[arg(long, value_name = "tree")]
     tree: Option<PathBuf>,
+
+    /// Specifies the cache directory for e.g. luarocks manifests.
+    #[arg(long, value_name = "path")]
+    cache_path: Option<PathBuf>,
 
     /// Use the tree in the user's home directory.
     /// To enable it, see `rocks help path`.
@@ -123,7 +127,24 @@ enum Commands {
 async fn main() {
     let cli = Cli::parse();
 
-    let config = Config::default();
+    let config = Config::new()
+        .dev(cli.dev)
+        .lua_dir(cli.lua_dir)
+        .lua_version(cli.lua_version)
+        .namespace(cli.namespace)
+        .only_server(cli.only_server)
+        .only_sources(cli.only_sources)
+        .server(cli.server)
+        .tree(cli.tree)
+        .global(cli.global)
+        .cache_path(cli.cache_path)
+        .local(cli.local)
+        .timeout(
+            cli.timeout
+                .map(|duration| Duration::from_secs(duration as u64)),
+        )
+        .no_project(cli.no_project)
+        .verbose(cli.verbose);
 
     match cli.command {
         Some(command) => match command {
