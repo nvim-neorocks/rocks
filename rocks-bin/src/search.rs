@@ -22,7 +22,7 @@ pub async fn search(data: Search) -> Result<()> {
 
     // TODO(vhyrro): Pull in global configuration in the form of a second parameter (including which server to use for the manifest).
 
-    let manifest = manifest_from_server("https://luarocks.org/manifest".into(), None).await?;
+    let manifest = manifest_from_server("https://luarocks.org".into(), None, None).await?;
 
     let metadata = ManifestMetadata::new(&manifest)?;
 
