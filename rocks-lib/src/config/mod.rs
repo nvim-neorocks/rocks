@@ -1,6 +1,6 @@
-use std::{path::PathBuf, time::Duration};
-use eyre::{eyre, Result};
 use directories::ProjectDirs;
+use eyre::{eyre, Result};
+use std::{path::PathBuf, time::Duration};
 
 pub struct Config {
     pub enable_development_rockspecs: bool,
@@ -119,13 +119,6 @@ impl Config {
     pub fn timeout(self, timeout: Option<Duration>) -> Config {
         Config {
             timeout: timeout.unwrap_or_else(|| Config::default().timeout),
-            ..self
-        }
-    }
-
-    pub fn cache_path(self, cache_path: Option<PathBuf>) -> Config {
-        Config {
-            cache_path: cache_path.unwrap_or_else(|| Config::default().cache_path),
             ..self
         }
     }
