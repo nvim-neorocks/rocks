@@ -1,8 +1,8 @@
 use anyhow::Result;
 use reqwest::Client;
-use std::fs;
 
 use crate::config::Config;
+use std::{fs, time::SystemTime};
 
 // TODO(vhyrro): Perhaps cache the manifest somewhere on disk?
 pub async fn manifest_from_server(url: String, config: &Config) -> Result<String> {
@@ -25,20 +25,20 @@ pub async fn manifest_from_server(url: String, config: &Config) -> Result<String
 
     // Read the metadata of the local cache and attempt to get the last modified date.
     if let Ok(metadata) = fs::metadata(&cache) {
-        let last_modified_local = metadata.modified()?;
+        let last_modified_local: SystemTime = metadata.modified()?;
 
         // Ask the server for the last modified date of its manifest.
-        let request = client.head(&url).send().await?;
+        let response = client.head(&url).send().await?;
 
-        if let Some(last_modified) = request.headers().get("Last-Modified") {
-            let server_last_modified = httpdate::parse_http_date(last_modified.to_str()?)?;
+        if let Some(last_modified_header) = response.headers().get("Last-Modified") {
+            let server_last_modified = httpdate::parse_http_date(last_modified_header.to_str()?)?;
 
             // If the server's version of the manifest is newer than ours then update out manifest.
             if server_last_modified > last_modified_local {
-                let new_manifest = request.text().await?;
-                fs::write(&cache, &new_manifest)?;
+                let new_manifest_content = response.text().await?;
+                fs::write(&cache, &new_manifest_content)?;
 
-                return Ok(new_manifest);
+                return Ok(new_manifest_content);
             }
 
             // Else return the cached manifest.
