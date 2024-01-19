@@ -6,14 +6,17 @@ pub use pull_manifest::*;
 
 #[cfg(test)]
 mod tests {
+    use crate::config::Config;
+
     use super::*;
 
     #[tokio::test]
     pub async fn parse_metadata() {
-        let manifest =
-            pull_manifest::manifest_from_server("https://luarocks.org/".into(), None, None)
-                .await
-                .unwrap();
+        let config = Config::default();
+
+        let manifest = pull_manifest::manifest_from_server("https://luarocks.org/".into(), &config)
+            .await
+            .unwrap();
 
         metadata::ManifestMetadata::new(&manifest).unwrap();
     }

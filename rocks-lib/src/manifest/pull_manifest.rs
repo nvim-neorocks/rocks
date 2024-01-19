@@ -1,6 +1,8 @@
 use anyhow::Result;
 use reqwest::Client;
-use std::{fs, path::PathBuf};
+use std::fs;
+
+use crate::config::Config;
 
 // TODO(vhyrro): Perhaps cache the manifest somewhere on disk?
 pub async fn manifest_from_server(
@@ -64,14 +66,20 @@ mod tests {
 
     #[tokio::test]
     pub async fn get_manifest() {
-        manifest_from_server("https://luarocks.org".into(), None, None)
+        let config = Config::default();
+
+        manifest_from_server("https://luarocks.org".into(), &config)
             .await
             .unwrap();
     }
 
     #[tokio::test]
     pub async fn get_manifest_for_5_1() {
-        manifest_from_server("https://luarocks.org".into(), Some(&"5.1".into()), None)
+        let config = Config::default();
+
+        config.lua_version = Some("5.1".into());
+
+        manifest_from_server("https://luarocks.org".into(), &config)
             .await
             .unwrap();
     }
