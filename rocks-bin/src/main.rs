@@ -128,7 +128,9 @@ async fn main() {
     match cli.command {
         Some(command) => match command {
             Commands::Search(search_data) => search::search(search_data, &config).await.unwrap(),
-            Commands::Download(download_data) => download::download(download_data).await.unwrap(),
+            Commands::Download(download_data) => {
+                download::download(download_data, &config).await.unwrap()
+            }
             _ => unimplemented!(),
         },
         None => {
