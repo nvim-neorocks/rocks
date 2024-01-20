@@ -18,5 +18,13 @@
         luajit
         openssl
       ];
+
+      nativeCheckInputs = [
+        cacert
+      ];
+
+      preCheck = ''
+        export HOME=$(realpath .)
+      '';
     };
 }
