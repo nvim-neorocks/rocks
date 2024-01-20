@@ -1,8 +1,8 @@
 use eyre::Result;
 use reqwest::Client;
+use std::{fs, time::SystemTime};
 
 use crate::config::Config;
-use std::{fs, time::SystemTime};
 
 // TODO(vhyrro): Perhaps cache the manifest somewhere on disk?
 pub async fn manifest_from_server(url: String, config: &Config) -> Result<String> {
@@ -57,6 +57,7 @@ pub async fn manifest_from_server(url: String, config: &Config) -> Result<String
 
 #[cfg(test)]
 mod tests {
+    use httptest::{matchers::*, responders::*, Expectation, Server};
     use serial_test::serial;
 
     use super::*;
@@ -68,42 +69,60 @@ mod tests {
         fs::create_dir_all(cache_path).unwrap();
     }
 
+    fn start_test_server(manifest_name: String) -> Server {
+        let server = Server::run();
+        let manifest_path = format!("/{}", manifest_name);
+        server.expect(
+            Expectation::matching(request::path(manifest_path.to_string()))
+                .times(1..)
+                .respond_with(
+                    status_code(200)
+                        .append_header("Last-Modified", "Sat, 20 Jan 2024 13:14:12 GMT")
+                        .body("dummy data"),
+                ),
+        );
+        server
+    }
+
     #[tokio::test]
     #[serial]
     pub async fn get_manifest() {
         reset_cache();
+        let server = start_test_server("manifest".into());
+        let mut url_str = server.url_str(""); // Remove trailing "/"
+        url_str.pop();
         let config = Config::default();
-        manifest_from_server("https://luarocks.org".into(), &config)
-            .await
-            .unwrap();
+        manifest_from_server(url_str, &config).await.unwrap();
     }
 
     #[tokio::test]
     #[serial]
     pub async fn get_manifest_for_5_1() {
         reset_cache();
+        let server = start_test_server("manifest-5.1".into());
+        let mut url_str = server.url_str(""); // Remove trailing "/"
+        url_str.pop();
         let mut config = Config::default();
 
         config.lua_version = Some("5.1".into());
 
-        manifest_from_server("https://luarocks.org".into(), &config)
-            .await
-            .unwrap();
+        manifest_from_server(url_str, &config).await.unwrap();
     }
 
     #[tokio::test]
     #[serial]
     pub async fn get_cached_manifest() {
         reset_cache();
+        let server = start_test_server("manifest".into());
+        let mut url_str = server.url_str(""); // Remove trailing "/"
+        url_str.pop();
         let manifest_content = "dummy content";
         let config = Config::default();
         let cache_dir = config.get_default_cache_path().unwrap();
         let cache = cache_dir.join("manifest");
         fs::write(&cache, manifest_content).unwrap();
         let _metadata = fs::metadata(&cache).unwrap();
-        let result = manifest_from_server("https://luarocks.org".into(), &config)
-            .await
-            .unwrap();
+        let result = manifest_from_server(url_str, &config).await.unwrap();
         assert_eq!(result, manifest_content);
     }
 }

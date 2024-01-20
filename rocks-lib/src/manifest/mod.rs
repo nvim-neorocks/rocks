@@ -6,30 +6,26 @@ pub use pull_manifest::*;
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
-    use crate::config::Config;
-    use serial_test::serial;
+    use std::{fs, path::PathBuf};
 
     use super::*;
 
-    fn reset_cache() {
-        let config = Config::default();
-        let cache_path = config.get_default_cache_path().unwrap();
-        let _ = fs::remove_dir_all(&cache_path);
-        fs::create_dir_all(cache_path).unwrap();
+    #[tokio::test]
+    pub async fn parse_metadata_from_empty_manifest() {
+        let manifest = "
+            commands = {}\n
+            modules = {}\n
+            repository = {}\n
+            "
+        .to_string();
+        metadata::ManifestMetadata::new(&manifest).unwrap();
     }
 
     #[tokio::test]
-    #[serial]
-    pub async fn parse_metadata() {
-        reset_cache();
-        let config = Config::default();
-
-        let manifest = pull_manifest::manifest_from_server("https://luarocks.org/".into(), &config)
-            .await
-            .unwrap();
-
+    pub async fn parse_metadata_from_test_manifest() {
+        let mut test_manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        test_manifest_path.push("resources/test/manifest");
+        let manifest = String::from_utf8(fs::read(&test_manifest_path).unwrap()).unwrap();
         metadata::ManifestMetadata::new(&manifest).unwrap();
     }
 }
