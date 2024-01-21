@@ -12,7 +12,7 @@ pub async fn manifest_from_server(url: String, config: &Config) -> Result<String
             .as_ref()
             .map(|s| format!("-{}", s))
             .unwrap_or_default();
-    let url = url + "/" + &manifest_filename;
+    let url = url.trim_end_matches('/').to_string() + "/" + &manifest_filename;
 
     // Stores a path to the manifest cache (this allows us to operate on a manifest without
     // needing to pull it from the luarocks servers each time).
