@@ -26,8 +26,7 @@ impl ManifestMetadata {
     }
 
     pub async fn from_config(config: &Config) -> Result<Self> {
-        let manifest =
-            crate::manifest::manifest_from_server(config.server.clone(), &config).await?;
+        let manifest = crate::manifest::manifest_from_server(config.server.clone(), config).await?;
 
         Self::new(&manifest)
     }

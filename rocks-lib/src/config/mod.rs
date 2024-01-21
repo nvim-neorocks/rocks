@@ -63,7 +63,7 @@ impl Config {
     pub fn only_server(self, server: Option<String>) -> Config {
         Config {
             only_server: server.clone(),
-            server: server.unwrap_or_else(|| self.server),
+            server: server.unwrap_or(self.server),
             ..self
         }
     }

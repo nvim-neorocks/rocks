@@ -12,7 +12,7 @@ pub async fn download(
 ) -> Result<(String, String)> {
     // TODO(vhyrro): Check if the rock has a `src` attribute, add better error checking. Make sure to use the latest version of a rock if the version is ommitted.
 
-    let manifest = crate::manifest::ManifestMetadata::from_config(&config).await?;
+    let manifest = crate::manifest::ManifestMetadata::from_config(config).await?;
 
     if !manifest.has_rock(rock_name) {
         return Err(eyre!(format!(

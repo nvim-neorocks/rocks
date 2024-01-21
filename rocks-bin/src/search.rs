@@ -25,7 +25,7 @@ pub async fn search(data: Search, config: &Config) -> Result<()> {
 
     // TODO(vhyrro): Pull in global configuration in the form of a second parameter (including which server to use for the manifest).
 
-    let manifest = manifest_from_server(config.server.to_owned(), &config).await?;
+    let manifest = manifest_from_server(config.server.to_owned(), config).await?;
 
     let metadata = ManifestMetadata::new(&manifest)?;
 
