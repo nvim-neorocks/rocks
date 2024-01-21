@@ -12,7 +12,7 @@ pub async fn download(dl_data: Download, config: &Config) -> Result<()> {
     println!("Downloading {}...", dl_data.name);
 
     let (name, version) =
-        rocks_lib::rocks::download(&dl_data.name, dl_data.version.as_ref(), None, &config).await?;
+        rocks_lib::rocks::download(&dl_data.name, dl_data.version.as_ref(), None, config).await?;
 
     println!("Succesfully downloaded {}@{}", name, version);
 
