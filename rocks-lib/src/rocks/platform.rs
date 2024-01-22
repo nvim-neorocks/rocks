@@ -20,6 +20,26 @@ pub enum PlatformIdentifier {
     FreeBSD,
 }
 
+pub fn get_platform() -> PlatformIdentifier {
+    if cfg!(linux) {
+        PlatformIdentifier::Linux
+    } else if cfg!(macos) {
+        PlatformIdentifier::MacOSX
+    } else if cfg!(cygwin) {
+        PlatformIdentifier::Cygwin
+    } else if cfg!(freebsd) {
+        PlatformIdentifier::FreeBSD
+    } else if cfg!(unix) {
+        PlatformIdentifier::Unix
+    } else if cfg!(target_os = "windows") && cfg!(target_arch = "x86") {
+        PlatformIdentifier::Win32
+    } else if cfg!(windows) {
+        PlatformIdentifier::Windows
+    } else {
+        panic!("Could not determine the platform.")
+    }
+}
+
 impl PlatformIdentifier {
     /// Get identifiers that are a subset of this identifier.
     /// For example, Unix is a subset of Linux
@@ -138,6 +158,10 @@ impl PlatformSupport {
 
     pub fn is_supported(&self, platform: &PlatformIdentifier) -> bool {
         *self.platform_map.get(platform).unwrap_or(&false)
+    }
+
+    pub fn is_current_platform_supported(&self) -> bool {
+        self.is_supported(&get_platform())
     }
 }
 
