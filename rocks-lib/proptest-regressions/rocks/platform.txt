@@ -1,0 +1,13 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc d1d870d91f553227250e0c3be3b80df33ce7ca2140bf4f0137c5c33358ba9a6c # shrinks to identifier = Unix
+cc ddec314bb066ea910bd40ba1068ccf5805bd21e4281a9bdd388471bc441ea8d8 # shrinks to unsupported = Linux, supported = Linux
+cc 5a57be9d0ac206dd1b323e2857da818cdea9e7762ffa0b96155a82092b685688 # shrinks to unsupported = Unix, supported = Windows
+cc e334a9bcf9efc1f044f2976f1b06d1dcd934af9f094b8b9b5fca50c5aeaa66d2 # shrinks to unsupported = Unix, supported = MacOSX
+cc 90127ef74cf8c3f5c74d359fbf5c27075fa3a3b4431cd5d4af22662fe16c8b24 # shrinks to unsupported = Unix, supported = Windows
+cc 4605925e57e279f6e0ef49b47cd9e45e43423b907452f5d3ade13373b2a44379 # shrinks to unsupported = Cygwin, unspecified = Unix
+cc 40216a918db9d95bd7bf77f5959fb58192344aef14f1be16065ae8143fa4f7e9 # shrinks to unsupported = Cygwin, supported = Unix

@@ -2,7 +2,8 @@ use eyre::{eyre, Result};
 use mlua::{Lua, LuaSerdeExt, Value};
 use serde::Deserialize;
 
-#[derive(Deserialize)]
+use crate::rocks::PlatformSupport;
+
 pub struct Rockspec {
     /// The file format version. Example: "1.0"
     pub rockspec_format: Option<String>,
@@ -11,6 +12,7 @@ pub struct Rockspec {
     /// The version of the package, plus a suffix indicating the revision of the rockspec. Example: "2.0.1-1"
     pub version: String,
     pub description: RockDescription,
+    pub supported_platforms: PlatformSupport,
 }
 
 impl Rockspec {
@@ -23,6 +25,14 @@ impl Rockspec {
             package: lua.from_value(lua.globals().get("package")?)?,
             version: lua.from_value(lua.globals().get("version")?)?,
             description: RockDescription::from_lua(&lua)?,
+            supported_platforms: match lua.globals().get("supported_platforms")? {
+                Value::Nil => PlatformSupport::default(),
+                value @ Value::Table(_) => PlatformSupport::new(&lua.from_value(value)?)?,
+                value => Err(eyre!(format!(
+                    "Could not parse supported_platforms. Expected table, but got {}",
+                    value.type_name()
+                )))?,
+            },
         };
 
         Ok(rockspec)
@@ -75,20 +85,10 @@ impl RockDescription {
     }
 }
 
-#[derive(Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum PlatformIdentifier {
-    Unix,
-    Windows,
-    Win32,
-    Cygwin,
-    MacOSX,
-    Linux,
-    FreeBSD,
-}
-
 #[cfg(test)]
 mod tests {
+
+    use crate::rocks::PlatformIdentifier;
 
     use super::*;
 
@@ -187,6 +187,7 @@ mod tests {
             maintainer = 'neorocks',
             labels = { 'package management', },
         }\n
+        supported_platforms = { 'unix', '!windows' }\n
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
@@ -203,5 +204,11 @@ mod tests {
             labels: vec!["package management".into()],
         };
         assert_eq!(rockspec.description, expected_description);
+        assert!(rockspec
+            .supported_platforms
+            .is_supported(&PlatformIdentifier::Unix));
+        assert!(!rockspec
+            .supported_platforms
+            .is_supported(&PlatformIdentifier::Windows));
     }
 }
