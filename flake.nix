@@ -58,6 +58,7 @@
           buildInputs =
             (with pkgs; [
               rust-analyzer
+              cargo-nextest
             ])
             ++ (with pre-commit-hooks.packages.${system}; [
               alejandra
