@@ -4,12 +4,18 @@ use eyre::{eyre, Result};
 
 use crate::config::Config;
 
+pub struct DownloadedRock {
+    pub name: String,
+    pub version: String,
+    pub path: PathBuf,
+}
+
 pub async fn download(
     rock_name: &String,
     rock_version: Option<&String>,
     destination_dir: Option<PathBuf>,
     config: &Config,
-) -> Result<(String, String)> {
+) -> Result<DownloadedRock> {
     // TODO(vhyrro): Check if the rock has a `src` attribute, add better error checking. Make sure to use the latest version of a rock if the version is ommitted.
 
     let manifest = crate::manifest::ManifestMetadata::from_config(config).await?;
@@ -33,9 +39,9 @@ pub async fn download(
     std::fs::write(
         destination_dir
             .map(|dest| dest.join(&full_rock_name))
-            .unwrap_or_else(|| full_rock_name.into()),
+            .unwrap_or_else(|| full_rock_name.clone().into()),
         &rock,
     )?;
 
-    Ok((rock_name.clone(), rock_version.clone()))
+    Ok(DownloadedRock { name: rock_name.clone(), version: rock_version.clone(), path: full_rock_name.into(), })
 }
