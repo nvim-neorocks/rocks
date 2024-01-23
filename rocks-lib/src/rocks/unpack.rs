@@ -3,7 +3,14 @@ use eyre::Result;
 use std::{fs::File, path::PathBuf};
 
 pub fn unpack_src_rock(rock_path: PathBuf, destination: Option<PathBuf>) -> Result<PathBuf> {
-    if !rock_path.ends_with(".src.rock") && destination.is_none() {
+    let stringified_rock_path = rock_path.to_str().ok_or_else(|| {
+        eyre!(
+            "Invalid UTF-8 found within rock path: {}",
+            rock_path.display()
+        )
+    })?;
+
+    if !stringified_rock_path.ends_with(".src.rock") && destination.is_none() {
         return Err(eyre!(
             "Unable to unpack a non-source rock: {}",
             rock_path.display()
@@ -14,9 +21,8 @@ pub fn unpack_src_rock(rock_path: PathBuf, destination: Option<PathBuf>) -> Resu
 
     let mut zip = zip::ZipArchive::new(file)?;
 
-    let destination = destination.unwrap_or_else(|| {
-        PathBuf::from(rock_path.to_str().unwrap().trim_end_matches(".src.rock"))
-    });
+    let destination = destination
+        .unwrap_or_else(|| PathBuf::from(stringified_rock_path.trim_end_matches(".src.rock")));
 
     zip.extract(&destination)?;
 
