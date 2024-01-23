@@ -1,16 +1,18 @@
 use eyre::Result;
 use std::{fs::File, path::PathBuf};
 
-pub fn unpack(rock_path: PathBuf, destination: Option<&PathBuf>) -> Result<PathBuf> {
+pub fn unpack(rock_path: PathBuf, destination: Option<PathBuf>) -> Result<PathBuf> {
     let file = File::open(&rock_path)?;
 
     let mut zip = zip::ZipArchive::new(file)?;
 
-    zip.extract(destination.unwrap_or(&PathBuf::from(
+    let destination = destination.unwrap_or_else(|| PathBuf::from(
         rock_path.to_str().unwrap().trim_end_matches(".src.rock"),
-    )))?;
+    ));
 
-    Ok(rock_path)
+    zip.extract(&destination)?;
+
+    Ok(destination)
 }
 
 #[cfg(test)]
