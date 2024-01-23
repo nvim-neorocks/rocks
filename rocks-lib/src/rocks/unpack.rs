@@ -2,7 +2,7 @@ use eyre::eyre;
 use eyre::Result;
 use std::{fs::File, path::PathBuf};
 
-pub fn unpack(rock_path: PathBuf, destination: Option<PathBuf>) -> Result<PathBuf> {
+pub fn unpack_src_rock(rock_path: PathBuf, destination: Option<PathBuf>) -> Result<PathBuf> {
     if !rock_path.ends_with(".src.rock") && destination.is_none() {
         return Err(eyre!(
             "Unable to unpack a non-source rock: {}",
@@ -33,6 +33,6 @@ mod tests {
             .join("resources")
             .join("test");
 
-        unpack(test_rock_path.join("luatest-0.2-1.src.rock"), None).unwrap();
+        unpack_src_rock(test_rock_path.join("luatest-0.2-1.src.rock"), None).unwrap();
     }
 }
