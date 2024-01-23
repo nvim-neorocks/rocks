@@ -5,6 +5,7 @@ use rocks_lib::config::Config;
 
 mod download;
 mod search;
+mod unpack;
 
 /// An small and efficient Lua package manager.
 #[derive(Parser)]
@@ -114,7 +115,7 @@ enum Commands {
     /// Run the test suite in the current directory.
     Test,
     /// Unpack the contents of a rock.
-    Unpack,
+    Unpack(unpack::Unpack),
     /// Upload a rockspec to the public rocks repository.
     Upload,
     /// Tell which file corresponds to a given module name.
@@ -152,6 +153,7 @@ async fn main() {
             Commands::Download(download_data) => {
                 download::download(download_data, &config).await.unwrap()
             }
+            Commands::Unpack(unpack_data) => unpack::unpack(unpack_data).await.unwrap(),
             _ => unimplemented!(),
         },
         None => {
