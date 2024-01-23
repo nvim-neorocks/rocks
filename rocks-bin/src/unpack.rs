@@ -27,7 +27,7 @@ pub struct UnpackRemote {
 }
 
 pub async fn unpack(data: Unpack) -> Result<()> {
-    let unpack_path = rocks_lib::rocks::unpack(data.path, data.destination)?;
+    let unpack_path = rocks_lib::rocks::unpack_src_rock(data.path, data.destination)?;
 
     println!("Done. You may now enter the following directory:");
     println!("{}", unpack_path.display());
@@ -43,7 +43,7 @@ pub async fn unpack_remote(data: UnpackRemote, config: &Config) -> Result<()> {
 
     println!("Unpacking {}...", rock.path.display());
 
-    let unpack_path = rocks_lib::rocks::unpack(rock.path.clone(), data.path)?;
+    let unpack_path = rocks_lib::rocks::unpack_src_rock(rock.path.clone(), data.path)?;
 
     println!("Done. You may now enter the following directory:");
     println!("{}", unpack_path.display());
