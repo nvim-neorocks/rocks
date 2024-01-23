@@ -43,5 +43,9 @@ pub async fn download(
         &rock,
     )?;
 
-    Ok(DownloadedRock { name: rock_name.clone(), version: rock_version.clone(), path: full_rock_name.into(), })
+    Ok(DownloadedRock {
+        name: rock_name.clone(),
+        version: rock_version.clone(),
+        path: full_rock_name.into(),
+    })
 }
