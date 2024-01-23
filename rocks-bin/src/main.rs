@@ -116,6 +116,8 @@ enum Commands {
     Test,
     /// Unpack the contents of a rock.
     Unpack(unpack::Unpack),
+    /// Download a rock and unpack it.
+    UnpackRemote(unpack::UnpackRemote),
     /// Upload a rockspec to the public rocks repository.
     Upload,
     /// Tell which file corresponds to a given module name.
@@ -154,6 +156,9 @@ async fn main() {
                 download::download(download_data, &config).await.unwrap()
             }
             Commands::Unpack(unpack_data) => unpack::unpack(unpack_data).await.unwrap(),
+            Commands::UnpackRemote(unpack_data) => {
+                unpack::unpack_remote(unpack_data, &config).await.unwrap()
+            }
             _ => unimplemented!(),
         },
         None => {
