@@ -57,7 +57,7 @@ impl LuaRock {
     pub fn new(name: String, version: String) -> Result<Self> {
         Ok(Self {
             name,
-            version: Version::parse(append_dot_zeros(version).as_str())?,
+            version: Version::parse(append_minor_patch_if_missing(version).as_str())?,
         })
     }
 }
@@ -87,7 +87,8 @@ fn parse_version_req(version_constraints: &str) -> Result<VersionReq> {
 fn parse_pessimistic_version_constraint(version_constraint: String) -> Result<String> {
     // pessimistic operator
     let min_version_str = &version_constraint[2..].trim();
-    let min_version = Version::parse(append_dot_zeros(min_version_str.to_string()).as_str())?;
+    let min_version =
+        Version::parse(append_minor_patch_if_missing(min_version_str.to_string()).as_str())?;
     let max_version = match min_version_str.matches(".").count() {
         0 => Version {
             major: &min_version.major + 1,
@@ -109,9 +110,9 @@ fn parse_pessimistic_version_constraint(version_constraint: String) -> Result<St
 }
 
 /// Recursively append .0 until the version string has a minor or patch version
-fn append_dot_zeros(version: String) -> String {
+fn append_minor_patch_if_missing(version: String) -> String {
     if version.matches(".").count() < 2 {
-        return append_dot_zeros(version + ".0");
+        return append_minor_patch_if_missing(version + ".0");
     }
     version
 }
