@@ -7,3 +7,7 @@
 # Added by nix
 
 /result
+
+# Temp test files
+/rocks-lib/resources/test/luatest-0.2-1/
+

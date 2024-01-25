@@ -115,7 +115,7 @@ mod tests {
         let neorg = LuaRock::new("neorg".into(), "1.5".into()).unwrap();
         assert!(dep.matches(&neorg));
         let dep: LuaDependency = "neorg &gt; 1.0, &lt; 2.0".parse().unwrap();
-        let neorg = LuaRock::new("neorg".into(), "2.0.0".into()).unwrap();
+        let neorg = LuaRock::new("neorg".into(), "1.11.0".into()).unwrap();
         assert!(dep.matches(&neorg));
         let neorg = LuaRock::new("neorg".into(), "3.0.0".into()).unwrap();
         assert!(!dep.matches(&neorg));
