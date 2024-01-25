@@ -48,17 +48,6 @@ impl LuaDependency {
     }
 }
 
-/// Transform LuaRocks constraints into constraints that can be parsed by the semver crate.
-fn parse_version_req(version_constraints: &str) -> Result<VersionReq> {
-    // TODO: Handle special Rockspec cases: ~>
-    let unescaped = decode_html_entities(version_constraints)
-        .to_string()
-        .as_str()
-        .to_owned();
-    let version_req = VersionReq::parse(&unescaped)?;
-    Ok(version_req)
-}
-
 // TODO(mrcjkb): Move this somewhere more suitable
 pub struct LuaRock {
     pub name: String,
@@ -69,15 +58,53 @@ impl LuaRock {
     pub fn new(name: String, version: String) -> Result<Self> {
         Ok(Self {
             name,
-            version: Version::parse(append_zeros(version).as_str())?,
+            version: Version::parse(append_dot_zeros(version).as_str())?,
         })
     }
 }
 
+/// Transform LuaRocks constraints into constraints that can be parsed by the semver crate.
+fn parse_version_req(version_constraints: &str) -> Result<VersionReq> {
+    let unescaped = decode_html_entities(version_constraints)
+        .to_string()
+        .as_str()
+        .to_owned();
+    let transformed = match unescaped {
+        s if s.starts_with("~>") => parse_pessimistic_version_constraint(s)?,
+        s => s,
+    };
+    let version_req = VersionReq::parse(&transformed)?;
+    Ok(version_req)
+}
+
+fn parse_pessimistic_version_constraint(version_constraint: String) -> Result<String> {
+    // pessimistic operator
+    let min_version_str = &version_constraint[2..].trim();
+    let min_version = Version::parse(append_dot_zeros(min_version_str.to_string()).as_str())?;
+    let max_version = match min_version_str.matches(".").count() {
+        0 => Version {
+            major: &min_version.major + 1,
+            ..min_version.clone()
+        },
+        1 => Version {
+            minor: &min_version.minor + 1,
+            ..min_version.clone()
+        },
+        _ => Version {
+            patch: &min_version.patch + 1,
+            ..min_version.clone()
+        },
+    };
+    Ok(">= ".to_string()
+        + &min_version.to_string()
+        + &", < ".to_string()
+        + &max_version.to_string())
+}
+
 /// Recursively append .0 until the version string has a minor or patch version
-fn append_zeros(version: String) -> String {
+fn append_dot_zeros(version: String) -> String {
     if version.matches(".").count() < 2 {
-        return append_zeros(version + ".0");
+        return append_dot_zeros(version + ".0");
     }
     version
 }
@@ -136,5 +163,12 @@ mod tests {
         assert!(dep.matches(&neorg));
         let neorg = LuaRock::new("neorg".into(), "1.4".into()).unwrap();
         assert!(dep.matches(&neorg));
+        let dep: LuaDependency = "neorg ~> 1.0.5".parse().unwrap();
+        let neorg = LuaRock::new("neorg".into(), "1.0.4".into()).unwrap();
+        assert!(!dep.matches(&neorg));
+        let neorg = LuaRock::new("neorg".into(), "1.0.5".into()).unwrap();
+        assert!(dep.matches(&neorg));
+        let neorg = LuaRock::new("neorg".into(), "1.0.6".into()).unwrap();
+        assert!(!dep.matches(&neorg));
     }
 }
