@@ -4,6 +4,7 @@ use eyre::{eyre, Result};
 use html_escape::decode_html_entities;
 use semver::{Version, VersionReq};
 
+#[derive(Debug)]
 pub struct LuaDependency {
     rock_name: String,
     rock_version_req: VersionReq,
@@ -59,6 +60,14 @@ impl LuaRock {
             version: Version::parse(append_dot_zeros(version).as_str())?,
         })
     }
+}
+
+pub fn parse_dependencies(dependencies: &Vec<String>) -> Result<Vec<LuaDependency>> {
+    let mut lua_dependencies: Vec<LuaDependency> = vec![];
+    for dep in dependencies {
+        lua_dependencies.push(LuaDependency::parse(&dep)?);
+    }
+    Ok(lua_dependencies)
 }
 
 /// Transform LuaRocks constraints into constraints that can be parsed by the semver crate.

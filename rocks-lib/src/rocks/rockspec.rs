@@ -4,6 +4,8 @@ use serde::Deserialize;
 
 use crate::rocks::PlatformSupport;
 
+use super::{parse_dependencies, LuaDependency};
+
 pub struct Rockspec {
     /// The file format version. Example: "1.0"
     pub rockspec_format: Option<String>,
@@ -13,6 +15,7 @@ pub struct Rockspec {
     pub version: String,
     pub description: RockDescription,
     pub supported_platforms: PlatformSupport,
+    pub dependencies: Vec<LuaDependency>,
 }
 
 impl Rockspec {
@@ -29,7 +32,15 @@ impl Rockspec {
                 Value::Nil => PlatformSupport::default(),
                 value @ Value::Table(_) => PlatformSupport::new(&lua.from_value(value)?)?,
                 value => Err(eyre!(format!(
-                    "Could not parse supported_platforms. Expected table, but got {}",
+                    "Could not parse supported_platforms. Expected list, but got {}",
+                    value.type_name()
+                )))?,
+            },
+            dependencies: match lua.globals().get("dependencies")? {
+                Value::Nil => Vec::default(),
+                value @ Value::Table(_) => parse_dependencies(&lua.from_value(value)?)?,
+                value => Err(eyre!(format!(
+                    "Could not parse dependencies. Expected list, but got {}",
                     value.type_name()
                 )))?,
             },
@@ -88,7 +99,7 @@ impl RockDescription {
 #[cfg(test)]
 mod tests {
 
-    use crate::rocks::PlatformIdentifier;
+    use crate::rocks::{LuaRock, PlatformIdentifier};
 
     use super::*;
 
@@ -188,6 +199,7 @@ mod tests {
             labels = { 'package management', },
         }\n
         supported_platforms = { 'unix', '!windows' }\n
+        dependencies = { 'neorg ~> 6' }\n
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
@@ -210,5 +222,10 @@ mod tests {
         assert!(!rockspec
             .supported_platforms
             .is_supported(&PlatformIdentifier::Windows));
+        let neorg = LuaRock::new("neorg".into(), "6.0.0".into()).unwrap();
+        assert!(rockspec
+            .dependencies
+            .into_iter()
+            .any(|dep| dep.matches(&neorg)));
     }
 }
