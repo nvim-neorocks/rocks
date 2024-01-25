@@ -13,21 +13,15 @@ impl FromStr for LuaDependency {
     type Err = eyre::Error;
 
     fn from_str(str: &str) -> Result<Self> {
-        Self::parse(&str.to_string())
-    }
-}
-
-impl LuaDependency {
-    pub fn parse(pkg_constraints: &String) -> Result<Self> {
-        let rock_name = pkg_constraints
+        let rock_name = str
             .split_whitespace()
             .next()
             .map(|str| str.to_string())
             .ok_or(eyre!(
                 "Could not parse dependency name from {}",
-                *pkg_constraints
+                str.to_string()
             ))?;
-        let rock_version_req = match pkg_constraints.trim_start_matches(&rock_name) {
+        let rock_version_req = match str.trim_start_matches(&rock_name) {
             "" => None,
             version_constraints => Some(parse_version_req(version_constraints.trim_start())?),
         };
@@ -35,6 +29,12 @@ impl LuaDependency {
             rock_name,
             rock_version_req,
         })
+    }
+}
+
+impl LuaDependency {
+    pub fn parse(pkg_constraints: &String) -> Result<Self> {
+        Self::from_str(&pkg_constraints.to_string())
     }
 
     pub fn matches(&self, rock: &LuaRock) -> bool {
