@@ -69,15 +69,35 @@ impl LuaRock {
     pub fn new(name: String, version: String) -> Result<Self> {
         Ok(Self {
             name,
-            version: Version::parse(version.as_str())?,
+            version: Version::parse(append_zeros(version).as_str())?,
         })
     }
+}
+
+/// Recursively append .0 until the version string has a minor or patch version
+fn append_zeros(version: String) -> String {
+    if version.matches(".").count() < 2 {
+        return append_zeros(version + ".0");
+    }
+    version
 }
 
 #[cfg(test)]
 mod tests {
 
     use super::*;
+
+    #[tokio::test]
+    async fn parse_luarock() {
+        let neorg = LuaRock::new("neorg".into(), "1.0.0".into()).unwrap();
+        let expected_version = Version::parse("1.0.0").unwrap();
+        assert_eq!(neorg.name, "neorg");
+        assert_eq!(neorg.version, expected_version);
+        let neorg = LuaRock::new("neorg".into(), "1.0".into()).unwrap();
+        assert_eq!(neorg.version, expected_version);
+        let neorg = LuaRock::new("neorg".into(), "1".into()).unwrap();
+        assert_eq!(neorg.version, expected_version);
+    }
 
     #[tokio::test]
     async fn parse_dependency() {
@@ -92,7 +112,6 @@ mod tests {
         let dep: LuaDependency = "neorg 2.0.0".parse().unwrap();
         assert!(dep.matches(&neorg));
         let dep: LuaDependency = "neorg >= 1.0, &lt; 2.0".parse().unwrap();
-        // FIXME: Version can't parse strings without a minor version
         let neorg = LuaRock::new("neorg".into(), "1.5".into()).unwrap();
         assert!(dep.matches(&neorg));
         let dep: LuaDependency = "neorg &gt; 1.0, &lt; 2.0".parse().unwrap();
