@@ -5,8 +5,8 @@ use html_escape::decode_html_entities;
 use semver::{Version, VersionReq};
 
 pub struct LuaDependency {
-    pub rock_name: String,
-    rock_version_req: Option<VersionReq>,
+    rock_name: String,
+    rock_version_req: VersionReq,
 }
 
 impl FromStr for LuaDependency {
@@ -21,9 +21,10 @@ impl FromStr for LuaDependency {
                 "Could not parse dependency name from {}",
                 str.to_string()
             ))?;
-        let rock_version_req = match str.trim_start_matches(&rock_name) {
-            "" => None,
-            version_constraints => Some(parse_version_req(version_constraints.trim_start())?),
+        let constraints = str.trim_start_matches(&rock_name);
+        let rock_version_req = match constraints {
+            "" => VersionReq::default(),
+            constraints => parse_version_req(constraints.trim_start())?,
         };
         Ok(Self {
             rock_name,
@@ -41,10 +42,7 @@ impl LuaDependency {
         if self.rock_name != rock.name {
             return false;
         }
-        self.rock_version_req
-            .as_ref()
-            .map(|ver| ver.matches(&rock.version))
-            .unwrap_or(true)
+        self.rock_version_req.matches(&rock.version)
     }
 }
 
