@@ -36,6 +36,7 @@ impl Rockspec {
                     value.type_name()
                 )))?,
             },
+            // TODO(mrcjkb): support per-platform overrides: https://github.com/luarocks/luarocks/wiki/platform-overrides
             dependencies: match lua.globals().get("dependencies")? {
                 Value::Nil => Vec::default(),
                 value @ Value::Table(_) => parse_dependencies(&lua.from_value(value)?)?,
