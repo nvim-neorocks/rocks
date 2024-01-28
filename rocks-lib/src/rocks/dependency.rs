@@ -3,6 +3,7 @@ use std::str::FromStr;
 use eyre::{eyre, Result};
 use html_escape::decode_html_entities;
 use semver::{Version, VersionReq};
+use serde::Deserialize;
 
 #[derive(Debug)]
 pub struct LuaDependency {
@@ -47,6 +48,16 @@ impl LuaDependency {
     }
 }
 
+/// Can be defined in a [platform-agnostic](https://github.com/luarocks/luarocks/wiki/platform-agnostic-external-dependencies) manner
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum ExternalDependency {
+    /// A header file, e.g. "foo.h"
+    Header(String),
+    /// A library file, e.g. "foo.lib"
+    Library(String),
+}
+
 // TODO(mrcjkb): Move this somewhere more suitable
 pub struct LuaRock {
     pub name: String,
@@ -62,7 +73,9 @@ impl LuaRock {
     }
 }
 
-pub fn parse_dependencies(dependencies: &Vec<String>) -> Result<Vec<LuaDependency>> {
+pub fn parse_lua_dependencies_from_vec_str(
+    dependencies: &Vec<String>,
+) -> Result<Vec<LuaDependency>> {
     let mut lua_dependencies: Vec<LuaDependency> = vec![];
     for dep in dependencies {
         lua_dependencies.push(LuaDependency::parse(&dep)?);
