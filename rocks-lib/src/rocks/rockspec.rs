@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use eyre::{eyre, Result};
 use mlua::{Lua, LuaSerdeExt, Value};
 use serde::Deserialize;
 
 use crate::rocks::PlatformSupport;
 
-use super::{parse_dependencies, LuaDependency};
+use super::{parse_lua_dependencies_from_vec_str, ExternalDependency, LuaDependency};
 
 pub struct Rockspec {
     /// The file format version. Example: "1.0"
@@ -17,6 +19,7 @@ pub struct Rockspec {
     pub supported_platforms: PlatformSupport,
     pub dependencies: Vec<LuaDependency>,
     pub build_dependencies: Vec<LuaDependency>,
+    pub external_dependencies: HashMap<String, ExternalDependency>,
     pub test_dependencies: Vec<LuaDependency>,
 }
 
@@ -42,6 +45,7 @@ impl Rockspec {
             dependencies: parse_lua_dependencies(&lua, "dependencies")?,
             build_dependencies: parse_lua_dependencies(&lua, "build_dependencies")?,
             test_dependencies: parse_lua_dependencies(&lua, "test_dependencies")?,
+            external_dependencies: parse_external_dependencies(&lua)?,
         };
 
         Ok(rockspec)
@@ -95,16 +99,33 @@ impl RockDescription {
 }
 
 fn parse_lua_dependencies(lua: &Lua, lua_var_name: &str) -> Result<Vec<LuaDependency>> {
-    let dependencies = match lua.globals().get(lua_var_name)? {
-        Value::Nil => Vec::default(),
-        value @ Value::Table(_) => parse_dependencies(&lua.from_value(value)?)?,
+    parse_lua_tbl(&lua, lua_var_name, |value| {
+        parse_lua_dependencies_from_vec_str(&lua.from_value(value)?)
+    })
+}
+
+fn parse_external_dependencies(lua: &Lua) -> Result<HashMap<String, ExternalDependency>> {
+    parse_lua_tbl(&lua, "external_dependencies", |value| {
+        let ret = lua.from_value(value)?;
+        Ok(ret)
+    })
+}
+
+fn parse_lua_tbl<T, Parser>(lua: &Lua, lua_var_name: &str, parser: Parser) -> Result<T>
+where
+    T: Default,
+    Parser: Fn(Value) -> Result<T>,
+{
+    let ret = match lua.globals().get(lua_var_name)? {
+        Value::Nil => T::default(),
+        value @ Value::Table(_) => parser(value)?,
         value => Err(eyre!(format!(
             "Could not parse {}. Expected list, but got {}",
             lua_var_name,
             value.type_name(),
         )))?,
     };
-    Ok(dependencies)
+    Ok(ret)
 }
 
 #[cfg(test)]
@@ -180,6 +201,7 @@ mod tests {
             maintainer = 'neorocks',
             labels = {},
         }\n
+        external_dependencies = { FOO = { library = 'foo' } }\n
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
@@ -196,6 +218,10 @@ mod tests {
             labels: Vec::new(),
         };
         assert_eq!(rockspec.description, expected_description);
+        assert_eq!(
+            *rockspec.external_dependencies.get("FOO").unwrap(),
+            ExternalDependency::Library("foo".into())
+        );
 
         let rockspec_content = "
         package = 'rocks'\n
@@ -212,6 +238,7 @@ mod tests {
         supported_platforms = { 'unix', '!windows' }\n
         dependencies = { 'neorg ~> 6' }\n
         build_dependencies = { 'foo' }\n
+        external_dependencies = { FOO = { header = 'foo.h' } }\n
         test_dependencies = { 'busted >= 2.0.0' }\n
         "
         .to_string();
@@ -246,6 +273,10 @@ mod tests {
             .into_iter()
             .any(|dep| dep.matches(&foo)));
         let busted = LuaRock::new("busted".into(), "2.2.0".into()).unwrap();
+        assert_eq!(
+            *rockspec.external_dependencies.get("FOO").unwrap(),
+            ExternalDependency::Header("foo.h".into())
+        );
         assert!(rockspec
             .test_dependencies
             .into_iter()
