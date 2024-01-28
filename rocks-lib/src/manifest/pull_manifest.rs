@@ -35,7 +35,9 @@ pub async fn manifest_from_server(url: String, config: &Config) -> Result<String
 
             // If the server's version of the manifest is newer than ours then update out manifest.
             if server_last_modified > last_modified_local {
-                let new_manifest_content = response.text().await?;
+                // Since we only pulled in the headers previously we must now request the entire
+                // manifest from scratch.
+                let new_manifest_content = client.get(&url).send().await?.text().await?;
                 fs::write(&cache, &new_manifest_content)?;
 
                 return Ok(new_manifest_content);
