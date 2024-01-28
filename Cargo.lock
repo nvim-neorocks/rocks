@@ -1433,6 +1433,7 @@ dependencies = [
  "itertools",
  "mlua",
  "proptest",
+ "regex",
  "reqwest",
  "semver",
  "serde",
