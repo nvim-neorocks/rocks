@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::rocks::PlatformSupport;
 
-use super::{parse_lua_dependencies_from_vec_str, ExternalDependency, LuaDependency};
+use super::{parse_lua_dependencies_from_vec_str, ExternalDependency, LuaDependency, RockSource};
 
 pub struct Rockspec {
     /// The file format version. Example: "1.0"
@@ -21,6 +21,7 @@ pub struct Rockspec {
     pub build_dependencies: Vec<LuaDependency>,
     pub external_dependencies: HashMap<String, ExternalDependency>,
     pub test_dependencies: Vec<LuaDependency>,
+    pub source: RockSource,
 }
 
 impl Rockspec {
@@ -46,6 +47,7 @@ impl Rockspec {
             build_dependencies: parse_lua_dependencies(&lua, "build_dependencies")?,
             test_dependencies: parse_lua_dependencies(&lua, "test_dependencies")?,
             external_dependencies: parse_external_dependencies(&lua)?,
+            source: lua.from_value(lua.globals().get("source")?)?,
         };
 
         Ok(rockspec)
@@ -141,6 +143,9 @@ mod tests {
         rockspec_format = '1.0'\n
         package = 'foo'\n
         version = '1.0.0-1'\n
+        source = {\n
+            url = 'https://github.com/nvim-neorocks/rocks.nvim/archive/1.0.0/rocks.nvim.zip',\n
+        }\n
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
@@ -153,6 +158,9 @@ mod tests {
         package = 'bar'\n
         version = '2.0.0-1'\n
         description = {}\n
+        source = {\n
+            url = 'https://github.com/nvim-neorocks/rocks.nvim/archive/1.0.0/rocks.nvim.zip',\n
+        }\n
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
@@ -171,6 +179,9 @@ mod tests {
             homepage = 'https://github.com/nvim-neorocks/rocks',
             issues_url = 'https://github.com/nvim-neorocks/rocks/issues',
             maintainer = 'neorocks',
+        }\n
+        source = {\n
+            url = 'https://github.com/nvim-neorocks/rocks.nvim/archive/1.0.0/rocks.nvim.zip',\n
         }\n
         "
         .to_string();
@@ -202,6 +213,9 @@ mod tests {
             labels = {},
         }\n
         external_dependencies = { FOO = { library = 'foo' } }\n
+        source = {\n
+            url = 'https://github.com/nvim-neorocks/rocks.nvim/archive/1.0.0/rocks.nvim.zip',\n
+        }\n
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
@@ -240,6 +254,10 @@ mod tests {
         build_dependencies = { 'foo' }\n
         external_dependencies = { FOO = { header = 'foo.h' } }\n
         test_dependencies = { 'busted >= 2.0.0' }\n
+        source = {\n
+            url = 'git://github.com/nvim-neorocks/rocks.nvim',\n
+            hash = 'sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek=',\n
+        }\n
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
