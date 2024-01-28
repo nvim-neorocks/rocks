@@ -17,6 +17,7 @@ pub struct Rockspec {
     pub supported_platforms: PlatformSupport,
     pub dependencies: Vec<LuaDependency>,
     pub build_dependencies: Vec<LuaDependency>,
+    pub test_dependencies: Vec<LuaDependency>,
 }
 
 impl Rockspec {
@@ -40,6 +41,7 @@ impl Rockspec {
             // TODO(mrcjkb): support per-platform overrides: https://github.com/luarocks/luarocks/wiki/platform-overrides
             dependencies: parse_lua_dependencies(&lua, "dependencies")?,
             build_dependencies: parse_lua_dependencies(&lua, "build_dependencies")?,
+            test_dependencies: parse_lua_dependencies(&lua, "test_dependencies")?,
         };
 
         Ok(rockspec)
@@ -210,6 +212,7 @@ mod tests {
         supported_platforms = { 'unix', '!windows' }\n
         dependencies = { 'neorg ~> 6' }\n
         build_dependencies = { 'foo' }\n
+        test_dependencies = { 'busted >= 2.0.0' }\n
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
@@ -242,5 +245,10 @@ mod tests {
             .build_dependencies
             .into_iter()
             .any(|dep| dep.matches(&foo)));
+        let busted = LuaRock::new("busted".into(), "2.2.0".into()).unwrap();
+        assert!(rockspec
+            .test_dependencies
+            .into_iter()
+            .any(|dep| dep.matches(&busted)));
     }
 }
