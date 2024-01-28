@@ -78,7 +78,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn parse_rock_source_url() {
+    async fn parse_source_url() {
         let url: SourceUrl = "cvs://foo".parse().unwrap();
         assert_eq!(url, SourceUrl::Cvs("cvs://foo".into()));
         let url: SourceUrl = "cvs://bar".parse().unwrap();
