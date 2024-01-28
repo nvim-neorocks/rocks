@@ -2,12 +2,17 @@ use eyre::{eyre, Result};
 use regex::RegexSet;
 use reqwest::Url;
 use serde::{de, Deserialize, Deserializer};
+use ssri::Integrity;
 use std::{path::PathBuf, str::FromStr};
 
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct RockSource {
     #[serde(deserialize_with = "source_url_from_str")]
-    url: SourceUrl,
+    pub url: SourceUrl,
+    #[serde(deserialize_with = "integrity_opt_from_hash_str")]
+    #[serde(rename = "hash")]
+    #[serde(default)]
+    pub integrity: Option<Integrity>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -68,6 +73,18 @@ where
 {
     let s = String::deserialize(deserializer)?;
     SourceUrl::from_str(&s).map_err(de::Error::custom)
+}
+
+fn integrity_opt_from_hash_str<'de, D>(deserializer: D) -> Result<Option<Integrity>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let str_opt: Option<String> = Option::deserialize(deserializer)?;
+    let integrity_opt = match str_opt {
+        Some(s) => Some(s.parse().map_err(de::Error::custom)?),
+        None => None,
+    };
+    Ok(integrity_opt)
 }
 
 #[cfg(test)]
