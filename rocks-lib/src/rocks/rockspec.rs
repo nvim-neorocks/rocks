@@ -16,6 +16,7 @@ pub struct Rockspec {
     pub description: RockDescription,
     pub supported_platforms: PlatformSupport,
     pub dependencies: Vec<LuaDependency>,
+    pub build_dependencies: Vec<LuaDependency>,
 }
 
 impl Rockspec {
@@ -37,14 +38,8 @@ impl Rockspec {
                 )))?,
             },
             // TODO(mrcjkb): support per-platform overrides: https://github.com/luarocks/luarocks/wiki/platform-overrides
-            dependencies: match lua.globals().get("dependencies")? {
-                Value::Nil => Vec::default(),
-                value @ Value::Table(_) => parse_dependencies(&lua.from_value(value)?)?,
-                value => Err(eyre!(format!(
-                    "Could not parse dependencies. Expected list, but got {}",
-                    value.type_name()
-                )))?,
-            },
+            dependencies: parse_lua_dependencies(&lua, "dependencies")?,
+            build_dependencies: parse_lua_dependencies(&lua, "build_dependencies")?,
         };
 
         Ok(rockspec)
@@ -95,6 +90,19 @@ impl RockDescription {
             ))),
         }
     }
+}
+
+fn parse_lua_dependencies(lua: &Lua, lua_var_name: &str) -> Result<Vec<LuaDependency>> {
+    let dependencies = match lua.globals().get(lua_var_name)? {
+        Value::Nil => Vec::default(),
+        value @ Value::Table(_) => parse_dependencies(&lua.from_value(value)?)?,
+        value => Err(eyre!(format!(
+            "Could not parse {}. Expected list, but got {}",
+            lua_var_name,
+            value.type_name(),
+        )))?,
+    };
+    Ok(dependencies)
 }
 
 #[cfg(test)]
@@ -201,6 +209,7 @@ mod tests {
         }\n
         supported_platforms = { 'unix', '!windows' }\n
         dependencies = { 'neorg ~> 6' }\n
+        build_dependencies = { 'foo' }\n
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
@@ -228,5 +237,10 @@ mod tests {
             .dependencies
             .into_iter()
             .any(|dep| dep.matches(&neorg)));
+        let foo = LuaRock::new("foo".into(), "1.0.0".into()).unwrap();
+        assert!(rockspec
+            .build_dependencies
+            .into_iter()
+            .any(|dep| dep.matches(&foo)));
     }
 }
