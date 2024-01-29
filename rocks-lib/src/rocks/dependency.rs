@@ -3,7 +3,7 @@ use std::str::FromStr;
 use eyre::{eyre, Result};
 use html_escape::decode_html_entities;
 use semver::{Version, VersionReq};
-use serde::Deserialize;
+use serde::{de, Deserialize, Deserializer};
 
 #[derive(Debug)]
 pub struct LuaDependency {
@@ -48,6 +48,16 @@ impl LuaDependency {
     }
 }
 
+impl<'de> Deserialize<'de> for LuaDependency {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(de::Error::custom)
+    }
+}
+
 /// Can be defined in a [platform-agnostic](https://github.com/luarocks/luarocks/wiki/platform-agnostic-external-dependencies) manner
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -71,16 +81,6 @@ impl LuaRock {
             version: Version::parse(append_minor_patch_if_missing(version).as_str())?,
         })
     }
-}
-
-pub fn parse_lua_dependencies_from_vec_str(
-    dependencies: &Vec<String>,
-) -> Result<Vec<LuaDependency>> {
-    let mut lua_dependencies: Vec<LuaDependency> = vec![];
-    for dep in dependencies {
-        lua_dependencies.push(LuaDependency::parse(&dep)?);
-    }
-    Ok(lua_dependencies)
 }
 
 /// Transform LuaRocks constraints into constraints that can be parsed by the semver crate.

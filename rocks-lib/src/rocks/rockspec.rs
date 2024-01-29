@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use eyre::{eyre, Result};
 use mlua::{Lua, LuaSerdeExt, Value};
-use serde::Deserialize;
+use serde::{de::DeserializeOwned, Deserialize};
 
 use crate::rocks::PlatformSupport;
 
@@ -29,28 +29,19 @@ impl Rockspec {
     pub fn new(rockspec_content: &String) -> Result<Self> {
         let lua = Lua::new();
         lua.load(rockspec_content).exec()?;
-
         let rockspec = Rockspec {
             rockspec_format: lua.from_value(lua.globals().get("rockspec_format")?)?,
             package: lua.from_value(lua.globals().get("package")?)?,
             version: lua.from_value(lua.globals().get("version")?)?,
-            description: RockDescription::from_lua(&lua)?,
-            supported_platforms: match lua.globals().get("supported_platforms")? {
-                Value::Nil => PlatformSupport::default(),
-                value @ Value::Table(_) => PlatformSupport::new(&lua.from_value(value)?)?,
-                value => Err(eyre!(format!(
-                    "Could not parse supported_platforms. Expected list, but got {}",
-                    value.type_name()
-                )))?,
-            },
+            description: parse_lua_tbl_or_default(&lua, "description")?,
+            supported_platforms: parse_lua_tbl_or_default(&lua, "supported_platforms")?,
             // TODO(mrcjkb): support per-platform overrides: https://github.com/luarocks/luarocks/wiki/platform-overrides
-            dependencies: parse_lua_dependencies(&lua, "dependencies")?,
-            build_dependencies: parse_lua_dependencies(&lua, "build_dependencies")?,
-            test_dependencies: parse_lua_dependencies(&lua, "test_dependencies")?,
-            external_dependencies: parse_external_dependencies(&lua)?,
+            dependencies: parse_lua_tbl_or_default(&lua, "dependencies")?,
+            build_dependencies: parse_lua_tbl_or_default(&lua, "build_dependencies")?,
+            test_dependencies: parse_lua_tbl_or_default(&lua, "test_dependencies")?,
+            external_dependencies: parse_lua_tbl_or_default(&lua, "external_dependencies")?,
             source: lua.from_value(lua.globals().get("source")?)?,
         };
-
         Ok(rockspec)
     }
 }
@@ -70,58 +61,18 @@ pub struct RockDescription {
     /// Contact information for the rockspec maintainer.
     pub maintainer: Option<String>,
     /// A list of short strings that specify labels for categorization of this rock.
+    #[serde(default)]
     pub labels: Vec<String>,
 }
 
-impl RockDescription {
-    fn from_lua(lua: &Lua) -> Result<RockDescription> {
-        match lua.globals().get("description")? {
-            Value::Nil => Ok(RockDescription::default()),
-            Value::Table(tbl) => {
-                let labels = if tbl.contains_key("labels")? {
-                    lua.from_value(tbl.get("labels")?)?
-                } else {
-                    Vec::new()
-                };
-                Ok(RockDescription {
-                    summary: lua.from_value(tbl.get("summary")?)?,
-                    detailed: lua.from_value(tbl.get("detailed")?)?,
-                    license: lua.from_value(tbl.get("license")?)?,
-                    homepage: lua.from_value(tbl.get("homepage")?)?,
-                    issues_url: lua.from_value(tbl.get("issues_url")?)?,
-                    maintainer: lua.from_value(tbl.get("maintainer")?)?,
-                    labels,
-                })
-            }
-            value => Err(eyre!(format!(
-                "Could not parse rockspec description. Expected table, but got {}",
-                value.type_name()
-            ))),
-        }
-    }
-}
-
-fn parse_lua_dependencies(lua: &Lua, lua_var_name: &str) -> Result<Vec<LuaDependency>> {
-    parse_lua_tbl(&lua, lua_var_name, |value| {
-        parse_lua_dependencies_from_vec_str(&lua.from_value(value)?)
-    })
-}
-
-fn parse_external_dependencies(lua: &Lua) -> Result<HashMap<String, ExternalDependency>> {
-    parse_lua_tbl(&lua, "external_dependencies", |value| {
-        let ret = lua.from_value(value)?;
-        Ok(ret)
-    })
-}
-
-fn parse_lua_tbl<T, Parser>(lua: &Lua, lua_var_name: &str, parser: Parser) -> Result<T>
+fn parse_lua_tbl_or_default<T>(lua: &Lua, lua_var_name: &str) -> Result<T>
 where
     T: Default,
-    Parser: Fn(Value) -> Result<T>,
+    T: DeserializeOwned,
 {
     let ret = match lua.globals().get(lua_var_name)? {
         Value::Nil => T::default(),
-        value @ Value::Table(_) => parser(value)?,
+        value @ Value::Table(_) => lua.from_value(value)?,
         value => Err(eyre!(format!(
             "Could not parse {}. Expected list, but got {}",
             lua_var_name,
