@@ -3,20 +3,182 @@ use regex::RegexSet;
 use reqwest::Url;
 use serde::{de, Deserialize, Deserializer};
 use ssri::Integrity;
-use std::{path::PathBuf, str::FromStr};
+use std::{borrow::Cow, path::PathBuf, str::FromStr};
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq)]
 pub struct RockSource {
-    #[serde(deserialize_with = "source_url_from_str")]
-    pub url: SourceUrl,
-    #[serde(deserialize_with = "integrity_opt_from_hash_str")]
-    #[serde(rename = "hash")]
-    #[serde(default)]
+    pub source_spec: RockSourceSpec,
     pub integrity: Option<Integrity>,
+    pub archive_name: String,
+    pub unpack_dir: String,
+}
+
+impl<'de> Deserialize<'de> for RockSource {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // The rockspec.source table allows invalid combinations
+        // This ensures that invalid combinations are caught while parsing.
+        let internal = RockSourceInternal::deserialize(deserializer)?;
+        let source_spec = match (
+            &internal.url,
+            internal.tag,
+            internal.branch,
+            internal.module,
+        ) {
+            (source, None, None, None) => Ok(RockSourceSpec::default_from_source_url(&source)),
+            (SourceUrl::Cvs(url), None, None, Some(module)) => Ok(RockSourceSpec::Cvs(CvsSource {
+                url: url.clone(),
+                module,
+            })),
+            (SourceUrl::Git(url), Some(tag), None, None) => Ok(RockSourceSpec::Git(GitSource {
+                url: url.clone(),
+                checkout_ref: Some(tag),
+            })),
+            (SourceUrl::Git(url), None, Some(branch), None) => Ok(RockSourceSpec::Git(GitSource {
+                url: url.clone(),
+                checkout_ref: Some(branch),
+            })),
+            (SourceUrl::Mercurial(url), Some(tag), None, None) => {
+                Ok(RockSourceSpec::Mercurial(MercurialSource {
+                    url: url.clone(),
+                    checkout_ref: Some(tag),
+                }))
+            }
+            (SourceUrl::Mercurial(url), None, Some(branch), None) => {
+                Ok(RockSourceSpec::Mercurial(MercurialSource {
+                    url: url.clone(),
+                    checkout_ref: Some(branch),
+                }))
+            }
+            (SourceUrl::Sscm(url), None, None, Some(module)) => {
+                Ok(RockSourceSpec::Sscm(SscmSource {
+                    url: url.clone(),
+                    module,
+                }))
+            }
+            (SourceUrl::Svn(url), tag, None, module) => Ok(RockSourceSpec::Svn(SvnSource {
+                url: url.clone(),
+                tag,
+                module,
+            })),
+            _ => Err(eyre!("invalid rockspec source field combination.")),
+        }
+        .map_err(de::Error::custom)?;
+        let archive_name = internal.file.unwrap_or(
+            (internal.url)
+                .derive_file_name()
+                .map_err(de::Error::custom)?,
+        );
+        let dir = internal.dir.unwrap_or(
+            PathBuf::from(&archive_name)
+                .file_stem()
+                .and_then(|name| name.to_str())
+                .map(|name| name.to_string())
+                .ok_or(eyre!("could not derive rockspec source.dir"))
+                .map_err(de::Error::custom)?,
+        );
+        Ok(RockSource {
+            source_spec,
+            integrity: internal.hash,
+            archive_name,
+            unpack_dir: dir,
+        })
+    }
 }
 
 #[derive(Debug, PartialEq)]
-pub enum SourceUrl {
+pub enum RockSourceSpec {
+    Cvs(CvsSource),
+    Git(GitSource),
+    File(PathBuf),
+    Url(Url),
+    Mercurial(MercurialSource),
+    Sscm(SscmSource),
+    Svn(SvnSource),
+}
+
+impl RockSourceSpec {
+    fn default_from_source_url(url: &SourceUrl) -> Self {
+        match &url {
+            SourceUrl::Cvs(url) => Self::Cvs(CvsSource {
+                url: url.clone(),
+                module: base_name(url.as_str()).into(),
+            }),
+            SourceUrl::File(path) => Self::File(path.clone()),
+            SourceUrl::Url(url) => Self::Url(url.clone()),
+            SourceUrl::Git(url) => Self::Git(GitSource {
+                url: url.clone(),
+                checkout_ref: None,
+            }),
+            SourceUrl::Mercurial(url) => Self::Mercurial(MercurialSource {
+                url: url.clone(),
+                checkout_ref: None,
+            }),
+            SourceUrl::Sscm(url) => Self::Sscm(SscmSource {
+                url: url.clone(),
+                module: base_name(url.as_str()).into(),
+            }),
+            SourceUrl::Svn(url) => Self::Svn(SvnSource {
+                url: url.clone(),
+                module: None,
+                tag: None,
+            }),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CvsSource {
+    pub url: String,
+    pub module: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct GitSource {
+    pub url: String,
+    pub checkout_ref: Option<String>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct MercurialSource {
+    pub url: String,
+    pub checkout_ref: Option<String>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct SscmSource {
+    pub url: String,
+    pub module: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct SvnSource {
+    pub url: String,
+    pub module: Option<String>,
+    pub tag: Option<String>,
+}
+
+/// Used as a helper for Deserialize,
+/// because the Rockspec schema allows invalid rockspecs (╯°□°)╯︵ ┻━┻
+#[derive(Debug, PartialEq, Deserialize)]
+struct RockSourceInternal {
+    #[serde(deserialize_with = "source_url_from_str")]
+    url: SourceUrl,
+    #[serde(deserialize_with = "integrity_opt_from_hash_str")]
+    #[serde(default)]
+    hash: Option<Integrity>,
+    file: Option<String>,
+    dir: Option<String>,
+    tag: Option<String>,
+    branch: Option<String>,
+    module: Option<String>,
+}
+
+/// Internal helper for parsing
+#[derive(Debug, PartialEq)]
+enum SourceUrl {
     /// For the CVS source control manager
     Cvs(String),
     /// For URLs in the local filesystem
@@ -31,6 +193,25 @@ pub enum SourceUrl {
     Sscm(String),
     /// or the Subversion source control manager
     Svn(String),
+}
+
+impl SourceUrl {
+    fn derive_file_name(&self) -> Result<String> {
+        let ret = match self {
+            SourceUrl::Cvs(str) => base_name(str.as_str()).to_string(),
+            SourceUrl::File(file) => file
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name.to_string())
+                .ok_or(eyre!("could not derive rockspec source.file"))?,
+            SourceUrl::Url(url) => base_name(url.to_string().as_str()).to_string(),
+            SourceUrl::Git(url) => base_name(url.to_string().as_str()).to_string(),
+            SourceUrl::Mercurial(url) => base_name(url.to_string().as_str()).to_string(),
+            SourceUrl::Sscm(url) => base_name(url.to_string().as_str()).to_string(),
+            SourceUrl::Svn(url) => base_name(url.to_string().as_str()).to_string(),
+        };
+        Ok(ret)
+    }
 }
 
 impl FromStr for SourceUrl {
@@ -85,6 +266,16 @@ where
         None => None,
     };
     Ok(integrity_opt)
+}
+
+/// Implementation of the luarocks base_name function
+/// Strips the path, so /a/b/c becomes c
+fn base_name<'a>(path: &'a str) -> Cow<'a, str> {
+    let mut pieces = path.rsplit('/');
+    match pieces.next() {
+        Some(p) => p.into(),
+        None => path.into(),
+    }
 }
 
 #[cfg(test)]

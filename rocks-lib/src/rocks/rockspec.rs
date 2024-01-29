@@ -6,8 +6,9 @@ use serde::Deserialize;
 
 use crate::rocks::PlatformSupport;
 
-use super::{parse_lua_dependencies_from_vec_str, ExternalDependency, LuaDependency, RockSource};
+use super::*;
 
+#[derive(Debug)]
 pub struct Rockspec {
     /// The file format version. Example: "1.0"
     pub rockspec_format: Option<String>,
@@ -299,5 +300,103 @@ mod tests {
             .test_dependencies
             .into_iter()
             .any(|dep| dep.matches(&busted)));
+
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
+            url = 'git://foo',\n
+            branch = 'bar',\n
+        }\n
+        "
+        .to_string();
+        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+        assert_eq!(
+            rockspec.source.source_spec,
+            RockSourceSpec::Git(GitSource {
+                url: "git://foo".into(),
+                checkout_ref: Some("bar".into())
+            })
+        );
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
+            url = 'git://foo',\n
+            tag = 'bar',\n
+        }\n
+        "
+        .to_string();
+        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+        assert_eq!(
+            rockspec.source.source_spec,
+            RockSourceSpec::Git(GitSource {
+                url: "git://foo".into(),
+                checkout_ref: Some("bar".into())
+            })
+        );
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
+            url = 'git://foo',\n
+            branch = 'bar',\n
+            tag = 'baz',\n
+        }\n
+        "
+        .to_string();
+        let _rockspec = Rockspec::new(&rockspec_content).unwrap_err();
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
+            url = 'git://foo',\n
+            module = 'bar',\n
+        }\n
+        "
+        .to_string();
+        let _rockspec = Rockspec::new(&rockspec_content).unwrap_err();
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
+            url = 'git://foo',\n
+            tag = 'bar',\n
+            file = 'foo.tar.gz',\n
+        }\n
+        "
+        .to_string();
+        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+        assert_eq!(rockspec.source.archive_name, "foo.tar.gz");
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
+            url = 'git://foo.zip',\n
+        }\n
+        "
+        .to_string();
+        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+        assert_eq!(rockspec.source.archive_name, "foo.zip");
+        assert_eq!(rockspec.source.unpack_dir, "foo");
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
+            url = 'git://foo.zip',\n
+            dir = 'baz',\n
+        }\n
+        "
+        .to_string();
+        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+        assert_eq!(rockspec.source.archive_name, "foo.zip");
+        assert_eq!(rockspec.source.unpack_dir, "baz");
     }
 }
