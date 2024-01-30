@@ -1,12 +1,16 @@
+mod dependency;
+mod platform;
+mod rock_source;
+
 use std::collections::HashMap;
 
 use eyre::{eyre, Result};
 use mlua::{Lua, LuaSerdeExt, Value};
 use serde::{de::DeserializeOwned, Deserialize};
 
-use crate::rocks::PlatformSupport;
-
-use super::*;
+pub use dependency::*;
+pub use platform::*;
+pub use rock_source::*;
 
 #[derive(Debug)]
 pub struct Rockspec {
@@ -85,7 +89,7 @@ where
 #[cfg(test)]
 mod tests {
 
-    use crate::rocks::{LuaRock, PlatformIdentifier};
+    use crate::rockspec::{LuaRock, PlatformIdentifier};
 
     use super::*;
 
