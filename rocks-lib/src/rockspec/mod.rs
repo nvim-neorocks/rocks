@@ -1,3 +1,4 @@
+mod build;
 mod dependency;
 mod platform;
 mod rock_source;
@@ -8,6 +9,7 @@ use eyre::{eyre, Result};
 use mlua::{Lua, LuaSerdeExt, Value};
 use serde::{de::DeserializeOwned, Deserialize};
 
+pub use build::*;
 pub use dependency::*;
 pub use platform::*;
 pub use rock_source::*;
@@ -27,6 +29,7 @@ pub struct Rockspec {
     pub external_dependencies: HashMap<String, ExternalDependency>,
     pub test_dependencies: Vec<LuaDependency>,
     pub source: RockSource,
+    pub build: BuildSpec,
 }
 
 impl Rockspec {
@@ -45,6 +48,7 @@ impl Rockspec {
             test_dependencies: parse_lua_tbl_or_default(&lua, "test_dependencies")?,
             external_dependencies: parse_lua_tbl_or_default(&lua, "external_dependencies")?,
             source: lua.from_value(lua.globals().get("source")?)?,
+            build: parse_lua_tbl_or_default(&lua, "build")?,
         };
         Ok(rockspec)
     }
@@ -340,6 +344,7 @@ mod tests {
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert_eq!(rockspec.source.archive_name, "foo.zip");
         assert_eq!(rockspec.source.unpack_dir, "foo");
+        assert_eq!(rockspec.build.build_type, BuildType::Builtin);
         let rockspec_content = "
         rockspec_format = '1.0'\n
         package = 'foo'\n
@@ -348,10 +353,14 @@ mod tests {
             url = 'git://foo.zip',\n
             dir = 'baz',\n
         }\n
+        build = {\n
+            type = 'make',\n
+        }\n
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert_eq!(rockspec.source.archive_name, "foo.zip");
         assert_eq!(rockspec.source.unpack_dir, "baz");
+        assert_eq!(rockspec.build.build_type, BuildType::Make);
     }
 }
