@@ -3,7 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, EnumString};
 
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
 
 #[derive(
     Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone, Display, EnumString, EnumIter,
@@ -101,8 +101,18 @@ impl Default for PlatformSupport {
     }
 }
 
+impl<'de> Deserialize<'de> for PlatformSupport {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let platforms: Vec<String> = Vec::deserialize(deserializer)?;
+        Self::parse(&platforms).map_err(de::Error::custom)
+    }
+}
+
 impl PlatformSupport {
-    pub fn new(platforms: &Vec<String>) -> Result<Self> {
+    fn parse(platforms: &Vec<String>) -> Result<Self> {
         let mut platform_map = HashMap::default();
         if platforms.is_empty() {
             return Ok(Self::default());
@@ -202,7 +212,7 @@ mod tests {
         fn supported_platforms(identifier in platform_identifier_strategy()) {
             let identifier_str = identifier.to_string();
             let platforms = vec![identifier_str];
-            let platform_support = PlatformSupport::new(&platforms).unwrap();
+            let platform_support = PlatformSupport::parse(&platforms).unwrap();
             prop_assert!(platform_support.is_supported(&identifier))
         }
 
@@ -214,7 +224,7 @@ mod tests {
             }
             let identifier_str = format!("!{}", unsupported);
             let platforms = vec![identifier_str];
-            let platform_support = PlatformSupport::new(&platforms).unwrap();
+            let platform_support = PlatformSupport::parse(&platforms).unwrap();
             prop_assert!(!platform_support.is_supported(&unsupported));
             prop_assert!(platform_support.is_supported(&supported))
         }
@@ -228,7 +238,7 @@ mod tests {
             let supported_str = unspecified.to_string();
             let unsupported_str = format!("!{}", unsupported);
             let platforms = vec![supported_str, unsupported_str];
-            let platform_support = PlatformSupport::new(&platforms).unwrap();
+            let platform_support = PlatformSupport::parse(&platforms).unwrap();
             prop_assert!(platform_support.is_supported(&unspecified));
             prop_assert!(!platform_support.is_supported(&unsupported));
         }
@@ -236,7 +246,7 @@ mod tests {
         #[test]
         fn all_platforms_supported_if_none_are_specified(identifier in platform_identifier_strategy()) {
             let platforms = vec![];
-            let platform_support = PlatformSupport::new(&platforms).unwrap();
+            let platform_support = PlatformSupport::parse(&platforms).unwrap();
             prop_assert!(platform_support.is_supported(&identifier))
         }
 
@@ -245,14 +255,14 @@ mod tests {
             let identifier_str = identifier.to_string();
             let identifier_str_negated = format!("!{}", identifier);
             let platforms = vec![identifier_str, identifier_str_negated];
-            let _ = PlatformSupport::new(&platforms).unwrap_err();
+            let _ = PlatformSupport::parse(&platforms).unwrap_err();
         }
 
         #[test]
         fn extended_platforms_supported_if_supported(identifier in platform_identifier_strategy()) {
             let identifier_str = identifier.to_string();
             let platforms = vec![identifier_str];
-            let platform_support = PlatformSupport::new(&platforms).unwrap();
+            let platform_support = PlatformSupport::parse(&platforms).unwrap();
             for identifier in identifier.get_extended_platforms() {
                 prop_assert!(platform_support.is_supported(&identifier))
             }
@@ -262,7 +272,7 @@ mod tests {
         fn sub_platforms_unsupported_if_unsupported(identifier in platform_identifier_strategy()) {
             let identifier_str = format!("!{}", identifier);
             let platforms = vec![identifier_str];
-            let platform_support = PlatformSupport::new(&platforms).unwrap();
+            let platform_support = PlatformSupport::parse(&platforms).unwrap();
             for identifier in identifier.get_subsets() {
                 prop_assert!(!platform_support.is_supported(&identifier))
             }
@@ -277,7 +287,7 @@ mod tests {
             let supported_str = identifier.to_string();
             let mut platforms: Vec<String> = extended_platforms.into_iter().map(|ident| format!("!{}", ident)).collect();
             platforms.push(supported_str);
-            let _ = PlatformSupport::new(&platforms).unwrap_err();
+            let _ = PlatformSupport::parse(&platforms).unwrap_err();
         }
     }
 }
