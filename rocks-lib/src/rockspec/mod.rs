@@ -93,6 +93,8 @@ where
 #[cfg(test)]
 mod tests {
 
+    use std::path::PathBuf;
+
     use crate::rockspec::{LuaRock, PlatformIdentifier};
 
     use super::*;
@@ -328,10 +330,17 @@ mod tests {
             tag = 'bar',\n
             file = 'foo.tar.gz',\n
         }\n
+        build = {\n
+            install = {\n
+                conf = {['foo.bar'] = 'config/bar.toml'},\n
+            }\n
+        }\n
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert_eq!(rockspec.source.archive_name, "foo.tar.gz");
+        let foo_bar_path = rockspec.build.install.conf.get("foo.bar").unwrap();
+        assert_eq!(*foo_bar_path, PathBuf::from("config/bar.toml"));
         let rockspec_content = "
         rockspec_format = '1.0'\n
         package = 'foo'\n
@@ -339,12 +348,22 @@ mod tests {
         source = {\n
             url = 'git://foo.zip',\n
         }\n
+        build = {\n
+            install = {\n
+                lua = {['foo.bar'] = 'src/bar.lua'},\n
+                bin = {['foo.bar'] = 'bin/bar'},\n
+            }\n
+        }\n
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert_eq!(rockspec.source.archive_name, "foo.zip");
         assert_eq!(rockspec.source.unpack_dir, "foo");
         assert_eq!(rockspec.build.build_type, BuildType::Builtin);
+        let foo_bar_path = rockspec.build.install.lua.get("foo.bar").unwrap();
+        assert_eq!(*foo_bar_path, PathBuf::from("src/bar.lua"));
+        let foo_bar_path = rockspec.build.install.bin.get("foo.bar").unwrap();
+        assert_eq!(*foo_bar_path, PathBuf::from("bin/bar"));
         let rockspec_content = "
         rockspec_format = '1.0'\n
         package = 'foo'\n
@@ -355,6 +374,9 @@ mod tests {
         }\n
         build = {\n
             type = 'make',\n
+            install = {\n
+                lib = {['foo.bar'] = 'lib/bar.so'},\n
+            }\n
         }\n
         "
         .to_string();
@@ -362,5 +384,7 @@ mod tests {
         assert_eq!(rockspec.source.archive_name, "foo.zip");
         assert_eq!(rockspec.source.unpack_dir, "baz");
         assert_eq!(rockspec.build.build_type, BuildType::Make);
+        let foo_bar_path = rockspec.build.install.lib.get("foo.bar").unwrap();
+        assert_eq!(*foo_bar_path, PathBuf::from("lib/bar.so"));
     }
 }
