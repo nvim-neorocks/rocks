@@ -11,6 +11,8 @@ pub struct BuildSpec {
     pub install: InstallSpec,
     #[serde(default, deserialize_with = "deserialize_copy_directories")]
     pub copy_directories: Vec<PathBuf>,
+    #[serde(default)]
+    pub patches: HashMap<PathBuf, String>,
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
