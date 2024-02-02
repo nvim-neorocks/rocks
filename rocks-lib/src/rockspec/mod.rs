@@ -441,6 +441,12 @@ mod tests {
                 'plugin',\n
                 'ftplugin',\n
             },\n
+            patches = {\n
+                ['lua51-support.diff'] = [[\n
+                    --- before.c\n
+                    +++ path/to/after.c\n
+                ]],\n
+            },\n
         }\n
         "
         .to_string();
@@ -455,5 +461,7 @@ mod tests {
             copy_directories,
             vec![PathBuf::from("plugin"), PathBuf::from("ftplugin")]
         );
+        let patches = rockspec.build.patches;
+        let _patch = patches.get(&PathBuf::from("lua51-support.diff")).unwrap();
     }
 }
