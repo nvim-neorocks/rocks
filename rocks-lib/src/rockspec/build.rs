@@ -1,6 +1,7 @@
+use eyre::eyre;
 use std::{collections::HashMap, path::PathBuf};
 
-use serde::{de::IntoDeserializer, Deserialize, Deserializer};
+use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
 #[derive(Debug, PartialEq, Deserialize, Default)]
 pub struct BuildSpec {
@@ -8,6 +9,8 @@ pub struct BuildSpec {
     pub build_type: BuildType,
     #[serde(default)]
     pub install: InstallSpec,
+    #[serde(default, deserialize_with = "deserialize_copy_directories")]
+    pub copy_directories: Vec<PathBuf>,
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
@@ -76,6 +79,27 @@ pub struct InstallSpec {
     /// Lua command-line scripts.
     #[serde(default)]
     pub bin: HashMap<String, PathBuf>,
+}
+
+fn deserialize_copy_directories<'de, D>(deserializer: D) -> Result<Vec<PathBuf>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let copy_directories: Vec<String> = Vec::deserialize(deserializer)?;
+    let special_directories: Vec<String> = vec!["lua".into(), "lib".into(), "rock_manifest".into()];
+    match special_directories
+        .into_iter()
+        .find(|dir| copy_directories.contains(&dir))
+    {
+        // NOTE(mrcjkb): There also shouldn't be a directory named the same as the rockspec,
+        // but I'm not sure how to (or if it makes sense to) enforce this here.
+        Some(d) => Err(eyre!(
+            "Directory '{}' in copy_directories clashes with the .rock format",
+            d
+        )),
+        _ => Ok(copy_directories.into_iter().map(PathBuf::from).collect()),
+    }
+    .map_err(de::Error::custom)
 }
 
 #[cfg(test)]

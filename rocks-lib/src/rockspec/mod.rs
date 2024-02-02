@@ -3,7 +3,7 @@ mod dependency;
 mod platform;
 mod rock_source;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use eyre::{eyre, Result};
 use mlua::{Lua, LuaSerdeExt, Value};
@@ -50,6 +50,14 @@ impl Rockspec {
             source: lua.from_value(lua.globals().get("source")?)?,
             build: parse_lua_tbl_or_default(&lua, "build")?,
         };
+        let rockspec_file_name = format!("{}-{}.rockspec", rockspec.package, rockspec.version);
+        if rockspec
+            .build
+            .copy_directories
+            .contains(&PathBuf::from(rockspec_file_name.clone()))
+        {
+            return Err(eyre!("copy_directories cannot contain the rockspec name!"));
+        }
         Ok(rockspec)
     }
 }
@@ -333,7 +341,7 @@ mod tests {
         build = {\n
             install = {\n
                 conf = {['foo.bar'] = 'config/bar.toml'},\n
-            }\n
+            },\n
         }\n
         "
         .to_string();
@@ -352,7 +360,7 @@ mod tests {
             install = {\n
                 lua = {['foo.bar'] = 'src/bar.lua'},\n
                 bin = {['foo.bar'] = 'bin/bar'},\n
-            }\n
+            },\n
         }\n
         "
         .to_string();
@@ -369,6 +377,58 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
+            url = 'git://foo',\n
+        }\n
+        build = {\n
+            copy_directories = { 'lua' },\n
+        }\n
+        "
+        .to_string();
+        let _rockspec = Rockspec::new(&rockspec_content).unwrap_err();
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
+            url = 'git://foo',\n
+        }\n
+        build = {\n
+            copy_directories = { 'lib' },\n
+        }\n
+        "
+        .to_string();
+        let _rockspec = Rockspec::new(&rockspec_content).unwrap_err();
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
+            url = 'git://foo',\n
+        }\n
+        build = {\n
+            copy_directories = { 'rock_manifest' },\n
+        }\n
+        "
+        .to_string();
+        let _rockspec = Rockspec::new(&rockspec_content).unwrap_err();
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
+            url = 'git://foo',\n
+        }\n
+        build = {\n
+            copy_directories = { 'foo-1.0.0-1.rockspec' },\n
+        }\n
+        "
+        .to_string();
+        let _rockspec = Rockspec::new(&rockspec_content).unwrap_err();
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
             url = 'git://foo.zip',\n
             dir = 'baz',\n
         }\n
@@ -376,7 +436,11 @@ mod tests {
             type = 'make',\n
             install = {\n
                 lib = {['foo.bar'] = 'lib/bar.so'},\n
-            }\n
+            },\n
+            copy_directories = {\n
+                'plugin',\n
+                'ftplugin',\n
+            },\n
         }\n
         "
         .to_string();
@@ -386,5 +450,10 @@ mod tests {
         assert_eq!(rockspec.build.build_type, BuildType::Make);
         let foo_bar_path = rockspec.build.install.lib.get("foo.bar").unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("lib/bar.so"));
+        let copy_directories = rockspec.build.copy_directories;
+        assert_eq!(
+            copy_directories,
+            vec![PathBuf::from("plugin"), PathBuf::from("ftplugin")]
+        );
     }
 }
