@@ -6,7 +6,7 @@ pub use builtin::*;
 pub use cmake::*;
 pub use make::*;
 
-use eyre::eyre;
+use eyre::{eyre, OptionExt as _};
 use std::{collections::HashMap, path::PathBuf};
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
@@ -48,7 +48,20 @@ impl<'de> Deserialize<'de> for BuildSpec {
                 cmake_lists_content: internal.cmake_lists_content,
                 variables: internal.variables,
             })),
-            BuildType::Command => todo!(),
+            BuildType::Command => {
+                let build_command = internal
+                    .build_command
+                    .ok_or_eyre("no 'build_command' specied")
+                    .map_err(de::Error::custom)?;
+                let install_command = internal
+                    .install_command
+                    .ok_or_eyre("no 'install_command' specied")
+                    .map_err(de::Error::custom)?;
+                Some(BuildBackendSpec::Command(CommandBuildSpec {
+                    build_command,
+                    install_command,
+                }))
+            }
             BuildType::None => None,
             BuildType::LuaRock(s) => Some(BuildBackendSpec::LuaRock(s)),
         };
@@ -72,10 +85,16 @@ pub enum BuildBackendSpec {
     Builtin(BuiltinBuildSpec),
     Make(MakeBuildSpec),
     CMake(CMakeBuildSpec),
-    Command,
+    Command(CommandBuildSpec),
     LuaRock(String),
     // TODO: /// "cargo" (rust)?
     // Cargo,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CommandBuildSpec {
+    pub build_command: String,
+    pub install_command: String,
 }
 
 /// For packages which don't provide means to install modules
@@ -147,6 +166,10 @@ struct BuildSpecInternal {
     variables: HashMap<String, String>,
     #[serde(rename = "cmake", default)]
     cmake_lists_content: Option<String>,
+    #[serde(default)]
+    build_command: Option<String>,
+    #[serde(default)]
+    install_command: Option<String>,
     #[serde(default)]
     install: InstallSpec,
     #[serde(default, deserialize_with = "deserialize_copy_directories")]

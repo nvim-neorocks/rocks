@@ -433,23 +433,6 @@ mod tests {
         version = '1.0.0-1'\n
         source = {\n
             url = 'git://foo.zip',\n
-        }\n
-        build = {\n
-            type = 'cmake',\n
-        }\n
-        "
-        .to_string();
-        let rockspec = Rockspec::new(&rockspec_content).unwrap();
-        assert_eq!(
-            rockspec.build.build_backend,
-            Some(BuildBackendSpec::CMake(CMakeBuildSpec::default()))
-        );
-        let rockspec_content = "
-        rockspec_format = '1.0'\n
-        package = 'foo'\n
-        version = '1.0.0-1'\n
-        source = {\n
-            url = 'git://foo.zip',\n
             dir = 'baz',\n
         }\n
         build = {\n
@@ -486,5 +469,69 @@ mod tests {
         );
         let patches = rockspec.build.patches;
         let _patch = patches.get(&PathBuf::from("lua51-support.diff")).unwrap();
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
+            url = 'git://foo.zip',\n
+        }\n
+        build = {\n
+            type = 'cmake',\n
+        }\n
+        "
+        .to_string();
+        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+        assert_eq!(
+            rockspec.build.build_backend,
+            Some(BuildBackendSpec::CMake(CMakeBuildSpec::default()))
+        );
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
+            url = 'git://foo.zip',\n
+        }\n
+        build = {\n
+            type = 'command',\n
+            build_command = 'foo',\n
+            install_command = 'bar',\n
+        }\n
+        "
+        .to_string();
+        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+        assert!(matches!(
+            rockspec.build.build_backend,
+            Some(BuildBackendSpec::Command(CommandBuildSpec { .. }))
+        ));
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
+            url = 'git://foo.zip',\n
+        }\n
+        build = {\n
+            type = 'command',\n
+            install_command = 'foo',\n
+        }\n
+        "
+        .to_string();
+        let _rockspec = Rockspec::new(&rockspec_content).unwrap_err();
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
+            url = 'git://foo.zip',\n
+        }\n
+        build = {\n
+            type = 'command',\n
+            build_command = 'foo',\n
+        }\n
+        "
+        .to_string();
+        let _rockspec = Rockspec::new(&rockspec_content).unwrap_err();
     }
 }
