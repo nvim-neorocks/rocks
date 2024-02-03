@@ -2,6 +2,7 @@ mod build;
 mod dependency;
 mod platform;
 mod rock_source;
+mod test_spec;
 
 use std::{collections::HashMap, path::PathBuf};
 
@@ -13,6 +14,7 @@ pub use build::*;
 pub use dependency::*;
 pub use platform::*;
 pub use rock_source::*;
+pub use test_spec::*;
 
 #[derive(Debug)]
 pub struct Rockspec {
@@ -30,6 +32,7 @@ pub struct Rockspec {
     pub test_dependencies: Vec<LuaDependency>,
     pub source: RockSource,
     pub build: BuildSpec,
+    pub test: TestSpec,
 }
 
 impl Rockspec {
@@ -49,6 +52,7 @@ impl Rockspec {
             external_dependencies: parse_lua_tbl_or_default(&lua, "external_dependencies")?,
             source: lua.from_value(lua.globals().get("source")?)?,
             build: parse_lua_tbl_or_default(&lua, "build")?,
+            test: parse_lua_tbl_or_default(&lua, "test")?,
         };
         let rockspec_file_name = format!("{}-{}.rockspec", rockspec.package, rockspec.version);
         if rockspec
@@ -288,6 +292,7 @@ mod tests {
                 checkout_ref: Some("bar".into())
             })
         );
+        assert_eq!(rockspec.test, TestSpec::default());
         let rockspec_content = "
         rockspec_format = '1.0'\n
         package = 'foo'\n
