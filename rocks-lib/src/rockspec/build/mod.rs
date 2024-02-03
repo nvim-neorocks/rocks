@@ -1,6 +1,8 @@
 mod builtin;
+mod make;
 
 pub use builtin::*;
+pub use make::*;
 
 use eyre::eyre;
 use std::{collections::HashMap, path::PathBuf};
@@ -25,7 +27,21 @@ impl<'de> Deserialize<'de> for BuildSpec {
             BuildType::Builtin => Some(BuildBackendSpec::Builtin(
                 internal.builtin_spec.unwrap_or_default(),
             )),
-            BuildType::Make => Some(BuildBackendSpec::Make),
+            BuildType::Make => {
+                let default = MakeBuildSpec::default();
+                Some(BuildBackendSpec::Make(MakeBuildSpec {
+                    makefile: internal.makefile.unwrap_or(default.makefile),
+                    build_target: internal.make_build_target,
+                    build_pass: internal.make_build_pass.unwrap_or(default.build_pass),
+                    install_target: internal
+                        .make_install_target
+                        .unwrap_or(default.install_target),
+                    install_pass: internal.make_install_pass.unwrap_or(default.install_pass),
+                    build_variables: internal.make_build_variables,
+                    install_variables: internal.make_install_variables,
+                    variables: internal.make_variables,
+                }))
+            }
             BuildType::CMake => todo!(),
             BuildType::Command => todo!(),
             BuildType::None => None,
@@ -49,7 +65,7 @@ impl Default for BuildBackendSpec {
 #[derive(Debug, PartialEq)]
 pub enum BuildBackendSpec {
     Builtin(BuiltinBuildSpec),
-    Make,
+    Make(MakeBuildSpec),
     CMake,
     Command,
     LuaRock(String),
@@ -108,6 +124,22 @@ struct BuildSpecInternal {
     build_type: BuildType,
     #[serde(rename = "modules", default)]
     builtin_spec: Option<BuiltinBuildSpec>,
+    #[serde(default)]
+    makefile: Option<PathBuf>,
+    #[serde(rename = "build_target", default)]
+    make_build_target: String,
+    #[serde(default)]
+    make_build_pass: Option<bool>,
+    #[serde(rename = "install_target", default)]
+    make_install_target: Option<String>,
+    #[serde(default)]
+    make_install_pass: Option<bool>,
+    #[serde(rename = "build_variables", default)]
+    make_build_variables: HashMap<String, String>,
+    #[serde(rename = "install_variables", default)]
+    make_install_variables: HashMap<String, String>,
+    #[serde(rename = "variables", default)]
+    make_variables: HashMap<String, String>,
     #[serde(default)]
     install: InstallSpec,
     #[serde(default, deserialize_with = "deserialize_copy_directories")]

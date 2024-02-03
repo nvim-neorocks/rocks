@@ -456,10 +456,10 @@ mod tests {
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert_eq!(rockspec.source.archive_name, "foo.zip");
         assert_eq!(rockspec.source.unpack_dir, "baz");
-        assert!(matches!(
+        assert_eq!(
             rockspec.build.build_backend,
-            Some(BuildBackendSpec::Make { .. })
-        ));
+            Some(BuildBackendSpec::Make(MakeBuildSpec::default()))
+        );
         let foo_bar_path = rockspec.build.install.lib.get("foo.bar").unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("lib/bar.so"));
         let copy_directories = rockspec.build.copy_directories;
