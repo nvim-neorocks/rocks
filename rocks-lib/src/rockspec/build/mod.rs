@@ -1,7 +1,9 @@
 mod builtin;
+mod cmake;
 mod make;
 
 pub use builtin::*;
+pub use cmake::*;
 pub use make::*;
 
 use eyre::eyre;
@@ -39,10 +41,13 @@ impl<'de> Deserialize<'de> for BuildSpec {
                     install_pass: internal.make_install_pass.unwrap_or(default.install_pass),
                     build_variables: internal.make_build_variables,
                     install_variables: internal.make_install_variables,
-                    variables: internal.make_variables,
+                    variables: internal.variables,
                 }))
             }
-            BuildType::CMake => todo!(),
+            BuildType::CMake => Some(BuildBackendSpec::CMake(CMakeBuildSpec {
+                cmake_lists_content: internal.cmake_lists_content,
+                variables: internal.variables,
+            })),
             BuildType::Command => todo!(),
             BuildType::None => None,
             BuildType::LuaRock(s) => Some(BuildBackendSpec::LuaRock(s)),
@@ -66,10 +71,10 @@ impl Default for BuildBackendSpec {
 pub enum BuildBackendSpec {
     Builtin(BuiltinBuildSpec),
     Make(MakeBuildSpec),
-    CMake,
+    CMake(CMakeBuildSpec),
     Command,
     LuaRock(String),
-    // TODO?: /// "cargo" (rust)
+    // TODO: /// "cargo" (rust)?
     // Cargo,
 }
 
@@ -138,8 +143,10 @@ struct BuildSpecInternal {
     make_build_variables: HashMap<String, String>,
     #[serde(rename = "install_variables", default)]
     make_install_variables: HashMap<String, String>,
-    #[serde(rename = "variables", default)]
-    make_variables: HashMap<String, String>,
+    #[serde(default)]
+    variables: HashMap<String, String>,
+    #[serde(rename = "cmake", default)]
+    cmake_lists_content: Option<String>,
     #[serde(default)]
     install: InstallSpec,
     #[serde(default, deserialize_with = "deserialize_copy_directories")]
@@ -163,7 +170,7 @@ enum BuildType {
     None,
     /// external Lua rock
     LuaRock(String),
-    // TODO?: /// "cargo" (rust)
+    // TODO: /// "cargo" (rust)?
     // Cargo,
 }
 
