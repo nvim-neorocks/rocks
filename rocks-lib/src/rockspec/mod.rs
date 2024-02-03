@@ -433,6 +433,23 @@ mod tests {
         version = '1.0.0-1'\n
         source = {\n
             url = 'git://foo.zip',\n
+        }\n
+        build = {\n
+            type = 'cmake',\n
+        }\n
+        "
+        .to_string();
+        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+        assert_eq!(
+            rockspec.build.build_backend,
+            Some(BuildBackendSpec::CMake(CMakeBuildSpec::default()))
+        );
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
+            url = 'git://foo.zip',\n
             dir = 'baz',\n
         }\n
         build = {\n
