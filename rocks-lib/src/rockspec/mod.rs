@@ -367,7 +367,10 @@ mod tests {
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert_eq!(rockspec.source.archive_name, "foo.zip");
         assert_eq!(rockspec.source.unpack_dir, "foo");
-        assert_eq!(rockspec.build.build_type, BuildType::Builtin);
+        assert!(matches!(
+            rockspec.build.build_backend,
+            Some(BuildBackendSpec::Builtin { .. })
+        ));
         let foo_bar_path = rockspec.build.install.lua.get("foo.bar").unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("src/bar.lua"));
         let foo_bar_path = rockspec.build.install.bin.get("foo.bar").unwrap();
@@ -453,7 +456,10 @@ mod tests {
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert_eq!(rockspec.source.archive_name, "foo.zip");
         assert_eq!(rockspec.source.unpack_dir, "baz");
-        assert_eq!(rockspec.build.build_type, BuildType::Make);
+        assert!(matches!(
+            rockspec.build.build_backend,
+            Some(BuildBackendSpec::Make { .. })
+        ));
         let foo_bar_path = rockspec.build.install.lib.get("foo.bar").unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("lib/bar.so"));
         let copy_directories = rockspec.build.copy_directories;

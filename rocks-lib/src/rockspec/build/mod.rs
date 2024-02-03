@@ -1,62 +1,60 @@
+mod builtin;
+
+pub use builtin::*;
+
 use eyre::eyre;
 use std::{collections::HashMap, path::PathBuf};
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
-#[derive(Debug, PartialEq, Deserialize, Default)]
+#[derive(Debug, PartialEq, Default)]
 pub struct BuildSpec {
-    #[serde(rename = "type", default)]
-    pub build_type: BuildType,
-    #[serde(default)]
+    pub build_backend: Option<BuildBackendSpec>,
     pub install: InstallSpec,
-    #[serde(default, deserialize_with = "deserialize_copy_directories")]
     pub copy_directories: Vec<PathBuf>,
-    #[serde(default)]
     pub patches: HashMap<PathBuf, String>,
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
-#[serde(rename_all = "lowercase", remote = "BuildType")]
-pub enum BuildType {
-    /// "builtin" or "module"
-    Builtin,
-    /// "make"
-    Make,
-    /// "cmake"
-    CMake,
-    /// "command"
-    Command,
-    /// "none"
-    None,
-    /// "cargo" (rust)
-    Cargo,
-    /// external Lua rock
-    LuaRock(String),
-}
-
-// Special Deserialize case for BuildType:
-// Both "module" and "builtin" map to `Builtin`
-impl<'de> Deserialize<'de> for BuildType {
+impl<'de> Deserialize<'de> for BuildSpec {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        if s == "builtin" || s == "module" {
-            Ok(Self::Builtin)
-        } else {
-            match Self::deserialize(s.clone().into_deserializer()) {
-                Err(_) => Ok(Self::LuaRock(s)),
-                ok => ok,
-            }
-        }
+        let internal = BuildSpecInternal::deserialize(deserializer).map_err(de::Error::custom)?;
+        let build_backend = match internal.build_type {
+            BuildType::Builtin => Some(BuildBackendSpec::Builtin(
+                internal.builtin_spec.unwrap_or_default(),
+            )),
+            BuildType::Make => Some(BuildBackendSpec::Make),
+            BuildType::CMake => todo!(),
+            BuildType::Command => todo!(),
+            BuildType::None => None,
+            BuildType::LuaRock(s) => Some(BuildBackendSpec::LuaRock(s)),
+        };
+        Ok(Self {
+            build_backend,
+            install: internal.install,
+            copy_directories: internal.copy_directories,
+            patches: internal.patches,
+        })
     }
 }
 
-impl Default for BuildType {
+impl Default for BuildBackendSpec {
     fn default() -> Self {
-        Self::Builtin
+        Self::Builtin(BuiltinBuildSpec::default())
     }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum BuildBackendSpec {
+    Builtin(BuiltinBuildSpec),
+    Make,
+    CMake,
+    Command,
+    LuaRock(String),
+    // TODO?: /// "cargo" (rust)
+    // Cargo,
 }
 
 /// For packages which don't provide means to install modules
@@ -102,6 +100,64 @@ where
         _ => Ok(copy_directories.into_iter().map(PathBuf::from).collect()),
     }
     .map_err(de::Error::custom)
+}
+
+#[derive(Debug, PartialEq, Deserialize, Default)]
+struct BuildSpecInternal {
+    #[serde(rename = "type", default)]
+    build_type: BuildType,
+    #[serde(rename = "modules", default)]
+    builtin_spec: Option<BuiltinBuildSpec>,
+    #[serde(default)]
+    install: InstallSpec,
+    #[serde(default, deserialize_with = "deserialize_copy_directories")]
+    copy_directories: Vec<PathBuf>,
+    #[serde(default)]
+    patches: HashMap<PathBuf, String>,
+}
+
+#[derive(Debug, PartialEq, Deserialize)]
+#[serde(rename_all = "lowercase", remote = "BuildType")]
+enum BuildType {
+    /// "builtin" or "module"
+    Builtin,
+    /// "make"
+    Make,
+    /// "cmake"
+    CMake,
+    /// "command"
+    Command,
+    /// "none"
+    None,
+    /// external Lua rock
+    LuaRock(String),
+    // TODO?: /// "cargo" (rust)
+    // Cargo,
+}
+
+// Special Deserialize case for BuildType:
+// Both "module" and "builtin" map to `Builtin`
+impl<'de> Deserialize<'de> for BuildType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if s == "builtin" || s == "module" {
+            Ok(Self::Builtin)
+        } else {
+            match Self::deserialize(s.clone().into_deserializer()) {
+                Err(_) => Ok(Self::LuaRock(s)),
+                ok => ok,
+            }
+        }
+    }
+}
+
+impl Default for BuildType {
+    fn default() -> Self {
+        Self::Builtin
+    }
 }
 
 #[cfg(test)]
