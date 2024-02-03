@@ -16,6 +16,7 @@ regex = "1.10.3"
 reqwest = "0.11.23"
 semver = "1.0.21"
 serde = { version = "1.0.195", features = ["derive"] }
+serde_json = "1.0.111"
 ssri = "9.2.0"
 strum = "0.26"
 strum_macros = "0.26"
@@ -26,4 +27,3 @@ zip = "0.6.6"
 httptest = "0.15.5"
 serial_test = { version = "3.0.0" }
 proptest = "1.4.0"
-serde_json = "1.0.111"
