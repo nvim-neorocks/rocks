@@ -21,7 +21,7 @@ pub struct Rockspec {
     /// The name of the package. Example: "LuaSocket"
     pub package: String,
     /// The version of the package, plus a suffix indicating the revision of the rockspec. Example: "2.0.1-1"
-    pub version: String,
+    pub version: String, // TODO: This shouldn't be stringly typed!
     pub description: RockDescription,
     pub supported_platforms: PlatformSupport,
     pub dependencies: Vec<LuaDependency>,
