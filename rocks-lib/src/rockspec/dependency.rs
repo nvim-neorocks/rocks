@@ -1,11 +1,14 @@
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 use eyre::{eyre, Result};
 use html_escape::decode_html_entities;
+use mlua::{FromLua, Lua, LuaSerdeExt, Value};
 use semver::{Version, VersionReq};
 use serde::{de, Deserialize, Deserializer};
 
-#[derive(Debug)]
+use super::{PerPlatform, PlatformIdentifier};
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct LuaDependency {
     rock_name: String,
     rock_version_req: VersionReq,
@@ -58,14 +61,155 @@ impl<'de> Deserialize<'de> for LuaDependency {
     }
 }
 
+impl<'lua> FromLua<'lua> for PerPlatform<Vec<LuaDependency>> {
+    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
+        match &value {
+            list @ Value::Table(tbl) => {
+                let mut per_platform = match tbl.get("platforms")? {
+                    val @ Value::Table(_) => Ok(lua.from_value(val)?),
+                    Value::Nil => Ok(HashMap::default()),
+                    val => Err(mlua::Error::DeserializeError(format!(
+                        "Expected dependencies to be a table or nil, but got {}",
+                        val.type_name()
+                    ))),
+                }?;
+                let _ = tbl.raw_remove("platforms");
+                let default = lua.from_value(list.clone())?;
+                // TODO: Extract this to a trait?
+                override_platform_deps(&mut per_platform, &default);
+                Ok(PerPlatform {
+                    default,
+                    per_platform,
+                })
+            }
+            Value::Nil => Ok(PerPlatform::default()),
+            val => Err(mlua::Error::DeserializeError(format!(
+                "Expected dependencies to be a table or nil, but got {}",
+                val.type_name()
+            ))),
+        }
+    }
+}
+
+/// For each platform in `per_platform`, add the base dependencies,
+/// and apply overrides to the extended platforms of each platform override.
+fn override_platform_deps(
+    per_platform: &mut HashMap<PlatformIdentifier, Vec<LuaDependency>>,
+    base: &Vec<LuaDependency>,
+) {
+    let per_platform_raw = per_platform.clone();
+    for (platform, dependencies) in per_platform.clone() {
+        // Add base dependencies for each platform
+        per_platform.insert(platform, override_deps(&base, &dependencies));
+    }
+    for (platform, dependencies) in per_platform_raw {
+        // Add extended platform dependencies (without base deps) for each platform
+        for extended_platform in &platform.get_extended_platforms() {
+            let extended_dependencies = per_platform
+                .get(extended_platform)
+                .map(Vec::clone)
+                .unwrap_or_default();
+            per_platform.insert(
+                *extended_platform,
+                override_deps(&extended_dependencies, &dependencies),
+            );
+        }
+    }
+}
+
+/// Override `base_deps` with `override_deps`
+/// - Adds missing dependencies
+/// - Replaces dependencies with the same name
+fn override_deps(
+    base_vec: &Vec<LuaDependency>,
+    override_vec: &Vec<LuaDependency>,
+) -> Vec<LuaDependency> {
+    let mut result_map: HashMap<String, LuaDependency> = base_vec
+        .into_iter()
+        .map(|dep| (dep.rock_name.clone(), dep.clone()))
+        .collect();
+    for override_dep in override_vec {
+        result_map.insert(override_dep.rock_name.clone(), override_dep.clone());
+    }
+    result_map.into_values().collect()
+}
+
 /// Can be defined in a [platform-agnostic](https://github.com/luarocks/luarocks/wiki/platform-agnostic-external-dependencies) manner
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum ExternalDependency {
     /// A header file, e.g. "foo.h"
     Header(String),
     /// A library file, e.g. "foo.lib"
     Library(String),
+}
+
+impl<'lua> FromLua<'lua> for PerPlatform<HashMap<String, ExternalDependency>> {
+    // TODO: Extract shared logic between ExtendalDependency map and LuaDependency list?
+    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
+        match &value {
+            list @ Value::Table(tbl) => {
+                let mut per_platform = match tbl.get("platforms")? {
+                    val @ Value::Table(_) => Ok(lua.from_value(val)?),
+                    Value::Nil => Ok(HashMap::default()),
+                    val => Err(mlua::Error::DeserializeError(format!(
+                        "Expected external dependencies to be a table or nil, but got {}",
+                        val.type_name()
+                    ))),
+                }?;
+                let _ = tbl.raw_remove("platforms");
+                let default = lua.from_value(list.clone())?;
+                override_platform_external_deps(&mut per_platform, &default);
+                Ok(PerPlatform {
+                    default,
+                    per_platform,
+                })
+            }
+            Value::Nil => Ok(PerPlatform::default()),
+            val => Err(mlua::Error::DeserializeError(format!(
+                "Expected rockspec external dependencies to be a table or nil, but got {}",
+                val.type_name()
+            ))),
+        }
+    }
+}
+
+fn override_platform_external_deps(
+    per_platform: &mut HashMap<PlatformIdentifier, HashMap<String, ExternalDependency>>,
+    base: &HashMap<String, ExternalDependency>,
+) {
+    let per_platform_raw = per_platform.clone();
+    for (platform, dependencies) in per_platform.clone() {
+        // Add base dependencies for each platform
+        per_platform.insert(platform, override_external_deps(&base, &dependencies));
+    }
+    for (platform, dependencies) in per_platform_raw {
+        // Add extended platform dependencies (without base deps) for each platform
+        for extended_platform in &platform.get_extended_platforms() {
+            let extended_dependencies = per_platform
+                .get(extended_platform)
+                .map(HashMap::clone)
+                .unwrap_or_default();
+            per_platform.insert(
+                *extended_platform,
+                override_external_deps(&extended_dependencies, &dependencies),
+            );
+        }
+    }
+}
+
+fn override_external_deps(
+    base_map: &HashMap<String, ExternalDependency>,
+    override_map: &HashMap<String, ExternalDependency>,
+) -> HashMap<String, ExternalDependency> {
+    let mut result = HashMap::new();
+    for (key, value) in base_map {
+        result.insert(key.clone(), value.clone());
+    }
+    for (key, value) in override_map {
+        result.insert(key.clone(), value.clone());
+    }
+    result
 }
 
 // TODO(mrcjkb): Move this somewhere more suitable
@@ -191,5 +335,24 @@ mod tests {
         assert!(dep.matches(&neorg));
         let neorg = LuaRock::new("neorg".into(), "1.0.6".into()).unwrap();
         assert!(!dep.matches(&neorg));
+    }
+
+    #[tokio::test]
+    async fn test_override_deps() {
+        let neorg_a: LuaDependency = "neorg 1.0.0".parse().unwrap();
+        let neorg_b: LuaDependency = "neorg 2.0.0".parse().unwrap();
+        let foo: LuaDependency = "foo 1.0.0".parse().unwrap();
+        let bar: LuaDependency = "bar 1.0.0".parse().unwrap();
+        let base_vec = vec![neorg_a, foo.clone()];
+        let override_vec = vec![neorg_b.clone(), bar.clone()];
+        let result = override_deps(&base_vec, &override_vec);
+        assert_eq!(result.clone().len(), 3);
+        assert_eq!(
+            result
+                .into_iter()
+                .filter(|dep| *dep == neorg_b || *dep == foo || *dep == bar)
+                .count(),
+            3
+        );
     }
 }

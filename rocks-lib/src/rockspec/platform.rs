@@ -1,16 +1,36 @@
 use eyre::{eyre, Result};
-use std::{collections::HashMap, str::FromStr};
+use itertools::Itertools;
+use std::{
+    cmp::{Ordering, Reverse},
+    collections::HashMap,
+    str::FromStr,
+};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, EnumString};
 
 use serde::{de, Deserialize, Deserializer, Serialize};
 
+/// Identifier by a platform.
+/// The `PartialOrd` instance views more specific platforms as `Greater`
 #[derive(
-    Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone, Display, EnumString, EnumIter,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Hash,
+    Debug,
+    Copy,
+    Clone,
+    Display,
+    EnumString,
+    EnumIter,
+    // XXX: This shouldn't implement `Ord`, but `sorted_by_key()` demands it.
+    Ord,
 )]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum PlatformIdentifier {
+    // TODO: Add undocumented platform identifiers from luarocks codebase?
     Unix,
     Windows,
     Win32,
@@ -18,6 +38,28 @@ pub enum PlatformIdentifier {
     MacOSX,
     Linux,
     FreeBSD,
+}
+
+// Order by specificity -> less specific = `Less`
+impl PartialOrd for PlatformIdentifier {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self == other {
+            return Some(Ordering::Equal);
+        }
+        match (self, other) {
+            (PlatformIdentifier::Unix, PlatformIdentifier::Cygwin) => Some(Ordering::Less),
+            (PlatformIdentifier::Unix, PlatformIdentifier::MacOSX) => Some(Ordering::Less),
+            (PlatformIdentifier::Unix, PlatformIdentifier::Linux) => Some(Ordering::Less),
+            (PlatformIdentifier::Unix, PlatformIdentifier::FreeBSD) => Some(Ordering::Less),
+            (PlatformIdentifier::Windows, PlatformIdentifier::Win32) => Some(Ordering::Greater),
+            (PlatformIdentifier::Win32, PlatformIdentifier::Windows) => Some(Ordering::Less),
+            (PlatformIdentifier::Cygwin, PlatformIdentifier::Unix) => Some(Ordering::Greater),
+            (PlatformIdentifier::MacOSX, PlatformIdentifier::Unix) => Some(Ordering::Greater),
+            (PlatformIdentifier::Linux, PlatformIdentifier::Unix) => Some(Ordering::Greater),
+            (PlatformIdentifier::FreeBSD, PlatformIdentifier::Unix) => Some(Ordering::Greater),
+            _ => None,
+        }
+    }
 }
 
 pub fn get_platform() -> PlatformIdentifier {
@@ -43,45 +85,28 @@ pub fn get_platform() -> PlatformIdentifier {
 impl PlatformIdentifier {
     /// Get identifiers that are a subset of this identifier.
     /// For example, Unix is a subset of Linux
-    fn get_subsets(&self) -> Vec<Self> {
-        match self {
-            PlatformIdentifier::Linux => vec![PlatformIdentifier::Unix],
-            PlatformIdentifier::MacOSX => vec![PlatformIdentifier::Unix],
-            PlatformIdentifier::Cygwin => vec![PlatformIdentifier::Unix],
-            PlatformIdentifier::Windows => vec![PlatformIdentifier::Win32],
-            PlatformIdentifier::FreeBSD => vec![PlatformIdentifier::Unix],
-            PlatformIdentifier::Unix => vec![],
-            PlatformIdentifier::Win32 => vec![],
-        }
+    pub fn get_subsets(&self) -> Vec<Self> {
+        PlatformIdentifier::iter()
+            .filter(|identifier| identifier.is_subset_of(self))
+            .collect()
     }
 
     /// Get identifiers that are an extension of this identifier.
     /// For example, Linux is an extension of Unix
-    fn get_extended_platforms(&self) -> Vec<Self> {
-        match self {
-            PlatformIdentifier::Linux => vec![],
-            PlatformIdentifier::MacOSX => vec![],
-            PlatformIdentifier::Cygwin => vec![],
-            PlatformIdentifier::Windows => vec![],
-            PlatformIdentifier::FreeBSD => vec![],
-            PlatformIdentifier::Unix => vec![
-                PlatformIdentifier::Linux,
-                PlatformIdentifier::MacOSX,
-                PlatformIdentifier::Cygwin,
-                PlatformIdentifier::FreeBSD,
-            ],
-            PlatformIdentifier::Win32 => vec![PlatformIdentifier::Windows],
-        }
+    pub fn get_extended_platforms(&self) -> Vec<Self> {
+        PlatformIdentifier::iter()
+            .filter(|identifier| identifier.is_extension_of(self))
+            .collect()
     }
 
-    #[cfg(test)]
-    fn is_subset_of(&self, identifier: &PlatformIdentifier) -> bool {
-        identifier.get_subsets().contains(self)
+    /// e.g. Unix is a subset of Linux
+    fn is_subset_of(&self, other: &PlatformIdentifier) -> bool {
+        self.partial_cmp(other) == Some(Ordering::Less)
     }
 
-    #[cfg(test)]
-    fn is_extension_of(&self, identifier: &PlatformIdentifier) -> bool {
-        identifier.get_extended_platforms().contains(self)
+    /// e.g. Linux is an extension of Unix
+    fn is_extension_of(&self, other: &PlatformIdentifier) -> bool {
+        self.partial_cmp(other) == Some(Ordering::Greater)
     }
 }
 
@@ -175,6 +200,43 @@ impl PlatformSupport {
     }
 }
 
+/// Data that that can vary per platform
+#[derive(Debug, PartialEq)]
+pub struct PerPlatform<T> {
+    /// The base data, applicable if no platform is specified
+    pub default: T,
+    /// The per-platform override, if present.
+    pub per_platform: HashMap<PlatformIdentifier, T>,
+}
+
+impl<T> PerPlatform<T>
+where
+    T: Clone,
+{
+    pub fn get(&self, platform: &PlatformIdentifier) -> &T {
+        self.per_platform
+            .clone()
+            .into_keys()
+            .sorted_by_key(|id| Reverse(id.clone())) // more specific platforms first
+            .find(|identifier| identifier == platform || platform.is_extension_of(identifier))
+            .and_then(|identifier| self.per_platform.get(&identifier))
+            .unwrap_or(&self.default)
+    }
+
+    pub fn current_platform(&self) -> &T {
+        self.get(&get_platform())
+    }
+}
+
+impl<T: Default> Default for PerPlatform<T> {
+    fn default() -> Self {
+        Self {
+            default: T::default(),
+            per_platform: HashMap::default(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -194,6 +256,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn sort_platform_identifier_more_specific_last() {
+        let mut platforms = vec![
+            PlatformIdentifier::Cygwin,
+            PlatformIdentifier::Linux,
+            PlatformIdentifier::Unix,
+        ];
+        platforms.sort();
+        assert_eq!(
+            platforms,
+            vec![
+                PlatformIdentifier::Unix,
+                PlatformIdentifier::Cygwin,
+                PlatformIdentifier::Linux
+            ]
+        );
+        let mut platforms = vec![PlatformIdentifier::Windows, PlatformIdentifier::Win32];
+        platforms.sort();
+        assert_eq!(
+            platforms,
+            vec![PlatformIdentifier::Win32, PlatformIdentifier::Windows]
+        )
+    }
+
+    #[tokio::test]
     async fn test_is_subset_of() {
         assert!(PlatformIdentifier::Unix.is_subset_of(&PlatformIdentifier::Linux));
         assert!(PlatformIdentifier::Unix.is_subset_of(&PlatformIdentifier::MacOSX));
@@ -205,6 +291,22 @@ mod tests {
         assert!(PlatformIdentifier::Linux.is_extension_of(&PlatformIdentifier::Unix));
         assert!(PlatformIdentifier::MacOSX.is_extension_of(&PlatformIdentifier::Unix));
         assert!(!PlatformIdentifier::Unix.is_extension_of(&PlatformIdentifier::Linux));
+    }
+
+    #[tokio::test]
+    async fn per_platform() {
+        let foo = PerPlatform {
+            default: "default",
+            per_platform: vec![
+                (PlatformIdentifier::Unix, "unix"),
+                (PlatformIdentifier::Linux, "linux"),
+            ]
+            .into_iter()
+            .collect(),
+        };
+        assert_eq!(*foo.get(&PlatformIdentifier::MacOSX), "unix");
+        assert_eq!(*foo.get(&PlatformIdentifier::Linux), "linux");
+        assert_eq!(*foo.get(&PlatformIdentifier::Windows), "default");
     }
 
     proptest! {
