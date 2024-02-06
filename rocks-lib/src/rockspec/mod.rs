@@ -7,7 +7,7 @@ mod test_spec;
 use std::{collections::HashMap, path::PathBuf};
 
 use eyre::{eyre, Result};
-use mlua::{Lua, LuaSerdeExt, Value};
+use mlua::{FromLua, Lua, LuaSerdeExt, Value};
 use serde::{de::DeserializeOwned, Deserialize};
 
 pub use build::*;
@@ -26,13 +26,13 @@ pub struct Rockspec {
     pub version: String, // TODO: This shouldn't be stringly typed!
     pub description: RockDescription,
     pub supported_platforms: PlatformSupport,
-    pub dependencies: Vec<LuaDependency>,
-    pub build_dependencies: Vec<LuaDependency>,
-    pub external_dependencies: HashMap<String, ExternalDependency>,
-    pub test_dependencies: Vec<LuaDependency>,
-    pub source: RockSource,
-    pub build: BuildSpec,
-    pub test: TestSpec,
+    pub dependencies: PerPlatform<Vec<LuaDependency>>,
+    pub build_dependencies: PerPlatform<Vec<LuaDependency>>,
+    pub external_dependencies: PerPlatform<HashMap<String, ExternalDependency>>,
+    pub test_dependencies: PerPlatform<Vec<LuaDependency>>,
+    pub source: PerPlatform<RockSource>,
+    pub build: PerPlatform<BuildSpec>,
+    pub test: PerPlatform<TestSpec>,
 }
 
 impl Rockspec {
@@ -45,22 +45,42 @@ impl Rockspec {
             version: lua.from_value(lua.globals().get("version")?)?,
             description: parse_lua_tbl_or_default(&lua, "description")?,
             supported_platforms: parse_lua_tbl_or_default(&lua, "supported_platforms")?,
-            // TODO(mrcjkb): support per-platform overrides: https://github.com/luarocks/luarocks/wiki/platform-overrides
-            dependencies: parse_lua_tbl_or_default(&lua, "dependencies")?,
-            build_dependencies: parse_lua_tbl_or_default(&lua, "build_dependencies")?,
-            test_dependencies: parse_lua_tbl_or_default(&lua, "test_dependencies")?,
-            external_dependencies: parse_lua_tbl_or_default(&lua, "external_dependencies")?,
-            source: lua.from_value(lua.globals().get("source")?)?,
-            build: parse_lua_tbl_or_default(&lua, "build")?,
-            test: parse_lua_tbl_or_default(&lua, "test")?,
+            dependencies: PerPlatform::from_lua(lua.globals().get("dependencies")?, &lua)?,
+            build_dependencies: PerPlatform::from_lua(
+                lua.globals().get("build_dependencies")?,
+                &lua,
+            )?,
+            test_dependencies: PerPlatform::from_lua(
+                lua.globals().get("test_dependencies")?,
+                &lua,
+            )?,
+            external_dependencies: PerPlatform::from_lua(
+                lua.globals().get("external_dependencies")?,
+                &lua,
+            )?,
+            source: PerPlatform::from_lua(lua.globals().get("source")?, &lua)?,
+            build: PerPlatform::from_lua(lua.globals().get("build")?, &lua)?,
+            test: PerPlatform::from_lua(lua.globals().get("test")?, &lua)?,
         };
         let rockspec_file_name = format!("{}-{}.rockspec", rockspec.package, rockspec.version);
         if rockspec
             .build
+            .default
             .copy_directories
             .contains(&PathBuf::from(rockspec_file_name.clone()))
         {
             return Err(eyre!("copy_directories cannot contain the rockspec name!"));
+        }
+        for (platform, build_override) in &rockspec.build.per_platform {
+            if build_override
+                .copy_directories
+                .contains(&PathBuf::from(rockspec_file_name.clone()))
+            {
+                return Err(eyre!(
+                    "platform {}: copy_directories cannot contain the rockspec name!",
+                    platform
+                ));
+            }
         }
         Ok(rockspec)
     }
@@ -207,7 +227,7 @@ mod tests {
         };
         assert_eq!(rockspec.description, expected_description);
         assert_eq!(
-            *rockspec.external_dependencies.get("FOO").unwrap(),
+            *rockspec.external_dependencies.default.get("FOO").unwrap(),
             ExternalDependency::Library("foo".into())
         );
 
@@ -257,20 +277,23 @@ mod tests {
         let neorg = LuaRock::new("neorg".into(), "6.0.0".into()).unwrap();
         assert!(rockspec
             .dependencies
+            .default
             .into_iter()
             .any(|dep| dep.matches(&neorg)));
         let foo = LuaRock::new("foo".into(), "1.0.0".into()).unwrap();
         assert!(rockspec
             .build_dependencies
+            .default
             .into_iter()
             .any(|dep| dep.matches(&foo)));
         let busted = LuaRock::new("busted".into(), "2.2.0".into()).unwrap();
         assert_eq!(
-            *rockspec.external_dependencies.get("FOO").unwrap(),
+            *rockspec.external_dependencies.default.get("FOO").unwrap(),
             ExternalDependency::Header("foo.h".into())
         );
         assert!(rockspec
             .test_dependencies
+            .default
             .into_iter()
             .any(|dep| dep.matches(&busted)));
 
@@ -286,13 +309,13 @@ mod tests {
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert_eq!(
-            rockspec.source.source_spec,
+            rockspec.source.default.source_spec,
             RockSourceSpec::Git(GitSource {
                 url: "git://foo".into(),
                 checkout_ref: Some("bar".into())
             })
         );
-        assert_eq!(rockspec.test, TestSpec::default());
+        assert_eq!(rockspec.test, PerPlatform::default());
         let rockspec_content = "
         rockspec_format = '1.0'\n
         package = 'foo'\n
@@ -305,7 +328,7 @@ mod tests {
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert_eq!(
-            rockspec.source.source_spec,
+            rockspec.source.default.source_spec,
             RockSourceSpec::Git(GitSource {
                 url: "git://foo".into(),
                 checkout_ref: Some("bar".into())
@@ -351,8 +374,8 @@ mod tests {
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
-        assert_eq!(rockspec.source.archive_name, "foo.tar.gz");
-        let foo_bar_path = rockspec.build.install.conf.get("foo.bar").unwrap();
+        assert_eq!(rockspec.source.default.archive_name, "foo.tar.gz");
+        let foo_bar_path = rockspec.build.default.install.conf.get("foo.bar").unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("config/bar.toml"));
         let rockspec_content = "
         rockspec_format = '1.0'\n
@@ -370,15 +393,15 @@ mod tests {
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
-        assert_eq!(rockspec.source.archive_name, "foo.zip");
-        assert_eq!(rockspec.source.unpack_dir, "foo");
+        assert_eq!(rockspec.source.default.archive_name, "foo.zip");
+        assert_eq!(rockspec.source.default.unpack_dir, "foo");
         assert!(matches!(
-            rockspec.build.build_backend,
+            rockspec.build.default.build_backend,
             Some(BuildBackendSpec::Builtin { .. })
         ));
-        let foo_bar_path = rockspec.build.install.lua.get("foo.bar").unwrap();
+        let foo_bar_path = rockspec.build.default.install.lua.get("foo.bar").unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("src/bar.lua"));
-        let foo_bar_path = rockspec.build.install.bin.get("foo.bar").unwrap();
+        let foo_bar_path = rockspec.build.default.install.bin.get("foo.bar").unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("bin/bar"));
         let rockspec_content = "
         rockspec_format = '1.0'\n
@@ -459,20 +482,20 @@ mod tests {
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
-        assert_eq!(rockspec.source.archive_name, "foo.zip");
-        assert_eq!(rockspec.source.unpack_dir, "baz");
+        assert_eq!(rockspec.source.default.archive_name, "foo.zip");
+        assert_eq!(rockspec.source.default.unpack_dir, "baz");
         assert_eq!(
-            rockspec.build.build_backend,
+            rockspec.build.default.build_backend,
             Some(BuildBackendSpec::Make(MakeBuildSpec::default()))
         );
-        let foo_bar_path = rockspec.build.install.lib.get("foo.bar").unwrap();
+        let foo_bar_path = rockspec.build.default.install.lib.get("foo.bar").unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("lib/bar.so"));
-        let copy_directories = rockspec.build.copy_directories;
+        let copy_directories = rockspec.build.default.copy_directories;
         assert_eq!(
             copy_directories,
             vec![PathBuf::from("plugin"), PathBuf::from("ftplugin")]
         );
-        let patches = rockspec.build.patches;
+        let patches = rockspec.build.default.patches;
         let _patch = patches.get(&PathBuf::from("lua51-support.diff")).unwrap();
         let rockspec_content = "
         rockspec_format = '1.0'\n
@@ -488,7 +511,7 @@ mod tests {
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert_eq!(
-            rockspec.build.build_backend,
+            rockspec.build.default.build_backend,
             Some(BuildBackendSpec::CMake(CMakeBuildSpec::default()))
         );
         let rockspec_content = "
@@ -507,7 +530,7 @@ mod tests {
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert!(matches!(
-            rockspec.build.build_backend,
+            rockspec.build.default.build_backend,
             Some(BuildBackendSpec::Command(CommandBuildSpec { .. }))
         ));
         let rockspec_content = "
@@ -538,5 +561,222 @@ mod tests {
         "
         .to_string();
         let _rockspec = Rockspec::new(&rockspec_content).unwrap_err();
+        // platform overrides
+        let rockspec_content = "
+        package = 'rocks'\n
+        version = '3.0.0-1'\n
+        dependencies = {\n
+          'neorg ~> 6',\n
+          'toml-edit ~> 1',\n
+          platforms = {\n
+            windows = {\n
+              'neorg = 5.0.0',\n
+              'toml = 1.0.0',\n
+            },\n
+            unix = {\n
+              'neorg = 5.0.0',\n
+            },\n
+            linux = {\n
+              'toml = 1.0.0',\n
+            },\n
+          },\n
+        }\n
+        source = {\n
+            url = 'git://github.com/nvim-neorocks/rocks.nvim',\n
+            hash = 'sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek=',\n
+        }\n
+        "
+        .to_string();
+        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+        let neorg_override = LuaRock::new("neorg".into(), "5.0.0".into()).unwrap();
+        let toml_edit = LuaRock::new("toml-edit".into(), "1.0.0".into()).unwrap();
+        let toml = LuaRock::new("toml".into(), "1.0.0".into()).unwrap();
+        assert_eq!(rockspec.dependencies.default.len(), 2);
+        let per_platform = &rockspec.dependencies.per_platform;
+        assert_eq!(
+            per_platform
+                .get(&PlatformIdentifier::Windows)
+                .unwrap()
+                .into_iter()
+                .filter(|dep| dep.matches(&neorg_override)
+                    || dep.matches(&toml_edit)
+                    || dep.matches(&toml))
+                .count(),
+            3
+        );
+        assert_eq!(
+            per_platform
+                .get(&PlatformIdentifier::Unix)
+                .unwrap()
+                .into_iter()
+                .filter(|dep| dep.matches(&neorg_override)
+                    || dep.matches(&toml_edit)
+                    || dep.matches(&toml))
+                .count(),
+            2
+        );
+        assert_eq!(
+            per_platform
+                .get(&PlatformIdentifier::Linux)
+                .unwrap()
+                .into_iter()
+                .filter(|dep| dep.matches(&neorg_override)
+                    || dep.matches(&toml_edit)
+                    || dep.matches(&toml))
+                .count(),
+            3
+        );
+        let rockspec_content = "
+        package = 'rocks'\n
+        version = '3.0.0-1'\n
+        external_dependencies = {\n
+            FOO = { library = 'foo' },\n
+            platforms = {\n
+              windows = {\n
+                FOO = { library = 'foo.dll' },\n
+              },\n
+              unix = {\n
+                BAR = { header = 'bar.h' },\n
+              },\n
+              linux = {\n
+                FOO = { library = 'foo.so' },\n
+              },\n
+            },\n
+        }\n
+        source = {\n
+            url = 'https://github.com/nvim-neorocks/rocks.nvim/archive/1.0.0/rocks.nvim.zip',\n
+        }\n
+        "
+        .to_string();
+        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+        assert_eq!(
+            *rockspec.external_dependencies.default.get("FOO").unwrap(),
+            ExternalDependency::Library("foo".into())
+        );
+        let per_platform = rockspec.external_dependencies.per_platform;
+        assert_eq!(
+            *per_platform
+                .get(&PlatformIdentifier::Windows)
+                .and_then(|it| it.get("FOO"))
+                .unwrap(),
+            ExternalDependency::Library("foo.dll".into())
+        );
+        assert_eq!(
+            *per_platform
+                .get(&PlatformIdentifier::Unix)
+                .and_then(|it| it.get("FOO"))
+                .unwrap(),
+            ExternalDependency::Library("foo".into())
+        );
+        assert_eq!(
+            *per_platform
+                .get(&PlatformIdentifier::Unix)
+                .and_then(|it| it.get("BAR"))
+                .unwrap(),
+            ExternalDependency::Header("bar.h".into())
+        );
+        assert_eq!(
+            *per_platform
+                .get(&PlatformIdentifier::Linux)
+                .and_then(|it| it.get("BAR"))
+                .unwrap(),
+            ExternalDependency::Header("bar.h".into())
+        );
+        assert_eq!(
+            *per_platform
+                .get(&PlatformIdentifier::Linux)
+                .and_then(|it| it.get("FOO"))
+                .unwrap(),
+            ExternalDependency::Library("foo.so".into())
+        );
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = {\n
+            url = 'git://foo.git',\n
+            branch = 'bar',\n
+            platforms = {\n
+                macosx = {\n
+                    branch = 'mac',\n
+                },\n
+                windows = {\n
+                    url = 'cvs://foo.cvs',\n
+                    module = 'win',\n
+                },\n
+            },\n
+        }\n
+        "
+        .to_string();
+        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+        assert_eq!(
+            rockspec.source.default.source_spec,
+            RockSourceSpec::Git(GitSource {
+                url: "git://foo.git".into(),
+                checkout_ref: Some("bar".into())
+            })
+        );
+        assert_eq!(
+            rockspec
+                .source
+                .per_platform
+                .get(&PlatformIdentifier::MacOSX)
+                .map(|it| it.source_spec.clone())
+                .unwrap(),
+            RockSourceSpec::Git(GitSource {
+                url: "git://foo.git".into(),
+                checkout_ref: Some("mac".into())
+            })
+        );
+        assert_eq!(
+            rockspec
+                .source
+                .per_platform
+                .get(&PlatformIdentifier::Windows)
+                .map(|it| it.source_spec.clone())
+                .unwrap(),
+            RockSourceSpec::Cvs(CvsSource {
+                url: "cvs://foo.cvs".into(),
+                module: "win".into(),
+            })
+        );
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = { url = 'git://foo.zip' }\n
+        build = {\n
+            type = 'make',\n
+            install = {\n
+                lib = {['foo.bar'] = 'lib/bar.so'},\n
+            },\n
+            copy_directories = { 'plugin' },\n
+            platforms = {\n
+                unix = {\n
+                    copy_directories = { 'ftplugin' },\n
+                },\n
+                linux = {\n
+                    copy_directories = { 'foo' },\n
+                },\n
+            },\n
+        }\n
+        "
+        .to_string();
+        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+        let per_platform = rockspec.build.per_platform;
+        let unix = per_platform.get(&PlatformIdentifier::Unix).unwrap();
+        assert_eq!(
+            unix.copy_directories,
+            vec![PathBuf::from("plugin"), PathBuf::from("ftplugin")]
+        );
+        let linux = per_platform.get(&PlatformIdentifier::Linux).unwrap();
+        assert_eq!(
+            linux.copy_directories,
+            vec![
+                PathBuf::from("plugin"),
+                PathBuf::from("foo"),
+                PathBuf::from("ftplugin")
+            ]
+        );
     }
 }

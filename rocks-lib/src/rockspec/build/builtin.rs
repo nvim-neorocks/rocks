@@ -2,13 +2,13 @@ use std::{collections::HashMap, path::PathBuf};
 
 use serde::{de, Deserialize, Deserializer};
 
-#[derive(Debug, PartialEq, Deserialize, Default)]
+#[derive(Debug, PartialEq, Deserialize, Default, Clone)]
 pub struct BuiltinBuildSpec {
     /// Keys are module names in the format normally used by the `require()` function
     pub modules: HashMap<String, ModulesSpec>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ModulesSpec {
     /// Pathnames of Lua files or C sources, for modules based on a single source file.
     SourcePath(PathBuf),
@@ -36,7 +36,7 @@ impl<'de> Deserialize<'de> for ModulesSpec {
     }
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, Clone)]
 pub struct ModulePaths {
     /// Path names of C sources, mandatory field
     pub sources: Vec<PathBuf>,

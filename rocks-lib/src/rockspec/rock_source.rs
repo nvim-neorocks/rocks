@@ -1,9 +1,12 @@
 use eyre::{eyre, Result};
+use mlua::{FromLua, Lua, LuaSerdeExt, Value};
 use regex::RegexSet;
 use reqwest::Url;
 use serde::{de, Deserialize, Deserializer};
 use ssri::Integrity;
-use std::{borrow::Cow, path::PathBuf, str::FromStr};
+use std::{borrow::Cow, collections::HashMap, path::PathBuf, str::FromStr};
+
+use super::PerPlatform;
 
 #[derive(Debug, PartialEq)]
 pub struct RockSource {
@@ -13,20 +16,12 @@ pub struct RockSource {
     pub unpack_dir: String,
 }
 
-impl<'de> Deserialize<'de> for RockSource {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
+impl RockSource {
+    fn from_internal_source(internal: RockSourceInternal) -> Result<Self> {
         // The rockspec.source table allows invalid combinations
         // This ensures that invalid combinations are caught while parsing.
-        let internal = RockSourceInternal::deserialize(deserializer)?;
-        let source_spec = match (
-            &internal.url,
-            internal.tag,
-            internal.branch,
-            internal.module,
-        ) {
+        let url = &internal.url.ok_or(eyre!("source URL missing"))?;
+        let source_spec = match (url, internal.tag, internal.branch, internal.module) {
             (source, None, None, None) => Ok(RockSourceSpec::default_from_source_url(&source)),
             (SourceUrl::Cvs(url), None, None, Some(module)) => Ok(RockSourceSpec::Cvs(CvsSource {
                 url: url.clone(),
@@ -64,20 +59,14 @@ impl<'de> Deserialize<'de> for RockSource {
                 module,
             })),
             _ => Err(eyre!("invalid rockspec source field combination.")),
-        }
-        .map_err(de::Error::custom)?;
-        let archive_name = internal.file.unwrap_or(
-            (internal.url)
-                .derive_file_name()
-                .map_err(de::Error::custom)?,
-        );
+        }?;
+        let archive_name = internal.file.unwrap_or(url.derive_file_name()?);
         let dir = internal.dir.unwrap_or(
             PathBuf::from(&archive_name)
                 .file_stem()
                 .and_then(|name| name.to_str())
                 .map(|name| name.to_string())
-                .ok_or(eyre!("could not derive rockspec source.dir"))
-                .map_err(de::Error::custom)?,
+                .ok_or(eyre!("could not derive rockspec source.dir"))?,
         );
         Ok(RockSource {
             source_spec,
@@ -88,7 +77,25 @@ impl<'de> Deserialize<'de> for RockSource {
     }
 }
 
-#[derive(Debug, PartialEq)]
+impl<'lua> FromLua<'lua> for PerPlatform<RockSource> {
+    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
+        let internal: PerPlatform<RockSourceInternal> = PerPlatform::from_lua(value, &lua)?;
+        let mut per_platform = HashMap::new();
+        for (platform, internal_override) in internal.per_platform {
+            let override_spec = RockSource::from_internal_source(internal_override)
+                .map_err(|err| mlua::Error::DeserializeError(err.to_string()))?;
+            per_platform.insert(platform, override_spec);
+        }
+        let result = PerPlatform {
+            default: RockSource::from_internal_source(internal.default)
+                .map_err(|err| mlua::Error::DeserializeError(err.to_string()))?,
+            per_platform,
+        };
+        Ok(result)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum RockSourceSpec {
     Cvs(CvsSource),
     Git(GitSource),
@@ -129,31 +136,31 @@ impl RockSourceSpec {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct CvsSource {
     pub url: String,
     pub module: String,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct GitSource {
     pub url: String,
     pub checkout_ref: Option<String>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct MercurialSource {
     pub url: String,
     pub checkout_ref: Option<String>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SscmSource {
     pub url: String,
     pub module: String,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SvnSource {
     pub url: String,
     pub module: Option<String>,
@@ -162,10 +169,10 @@ pub struct SvnSource {
 
 /// Used as a helper for Deserialize,
 /// because the Rockspec schema allows invalid rockspecs (╯°□°)╯︵ ┻━┻
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, Clone, Default)]
 struct RockSourceInternal {
-    #[serde(deserialize_with = "source_url_from_str")]
-    url: SourceUrl,
+    #[serde(default, deserialize_with = "source_url_from_str")]
+    url: Option<SourceUrl>,
     #[serde(deserialize_with = "integrity_opt_from_hash_str")]
     #[serde(default)]
     hash: Option<Integrity>,
@@ -176,8 +183,91 @@ struct RockSourceInternal {
     module: Option<String>,
 }
 
+impl<'lua> FromLua<'lua> for PerPlatform<RockSourceInternal> {
+    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
+        match &value {
+            list @ Value::Table(tbl) => {
+                let mut per_platform = match tbl.get("platforms")? {
+                    Value::Table(overrides) => Ok(lua.from_value(Value::Table(overrides))?),
+                    Value::Nil => Ok(HashMap::default()),
+                    val => Err(mlua::Error::DeserializeError(format!(
+                        "Expected source to be a table, but got {}",
+                        val.type_name()
+                    ))),
+                }?;
+                let _ = tbl.raw_remove("platforms");
+                let default = lua.from_value(list.clone())?;
+                override_platform_sources(&mut per_platform, &default);
+                Ok(PerPlatform {
+                    default,
+                    per_platform,
+                })
+            }
+            Value::Nil => Err(mlua::Error::DeserializeError("Missing source.".into())),
+            val => Err(mlua::Error::DeserializeError(format!(
+                "Expected source to be a table, but got {}",
+                val.type_name()
+            ))),
+        }
+    }
+}
+
+fn override_platform_sources(
+    per_platform: &mut HashMap<super::PlatformIdentifier, RockSourceInternal>,
+    base: &RockSourceInternal,
+) {
+    let per_platform_raw = per_platform.clone();
+    for (platform, build_spec) in per_platform.clone() {
+        // Add base dependencies for each platform
+        per_platform.insert(platform, override_source_spec_internal(&base, &build_spec));
+    }
+    for (platform, build_spec) in per_platform_raw {
+        for extended_platform in &platform.get_extended_platforms() {
+            let extended_spec = per_platform
+                .get(extended_platform)
+                .map(RockSourceInternal::clone)
+                .unwrap_or_default();
+            per_platform.insert(
+                *extended_platform,
+                override_source_spec_internal(&extended_spec, &build_spec),
+            );
+        }
+    }
+}
+
+fn override_source_spec_internal(
+    base: &RockSourceInternal,
+    override_spec: &RockSourceInternal,
+) -> RockSourceInternal {
+    RockSourceInternal {
+        url: override_opt(&override_spec.url, &base.url),
+        hash: override_opt(&override_spec.hash, &base.hash),
+        file: override_opt(&override_spec.file, &base.file),
+        dir: override_opt(&override_spec.dir, &base.dir),
+        tag: match (override_spec.branch.clone(), override_spec.module.clone()) {
+            (None, None) => override_opt(&override_spec.tag, &base.tag),
+            _ => None,
+        },
+        branch: match (override_spec.tag.clone(), override_spec.module.clone()) {
+            (None, None) => override_opt(&override_spec.branch, &base.branch),
+            _ => None,
+        },
+        module: match (override_spec.tag.clone(), override_spec.branch.clone()) {
+            (None, None) => override_opt(&override_spec.module, &base.module),
+            _ => None,
+        },
+    }
+}
+
+fn override_opt<T: Clone>(override_opt: &Option<T>, base: &Option<T>) -> Option<T> {
+    match override_opt.clone() {
+        override_val @ Some(_) => override_val,
+        None => base.clone(),
+    }
+}
+
 /// Internal helper for parsing
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum SourceUrl {
     /// For the CVS source control manager
     Cvs(String),
@@ -248,12 +338,16 @@ impl FromStr for SourceUrl {
     }
 }
 
-fn source_url_from_str<'de, D>(deserializer: D) -> Result<SourceUrl, D::Error>
+fn source_url_from_str<'de, D>(deserializer: D) -> Result<Option<SourceUrl>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let s = String::deserialize(deserializer)?;
-    SourceUrl::from_str(&s).map_err(de::Error::custom)
+    let opt: Option<String> = Option::deserialize(deserializer)?;
+    let source_url = match opt {
+        Some(s) => Some(SourceUrl::from_str(s.as_str()).map_err(de::Error::custom)?),
+        None => None,
+    };
+    Ok(source_url)
 }
 
 fn integrity_opt_from_hash_str<'de, D>(deserializer: D) -> Result<Option<Integrity>, D::Error>
