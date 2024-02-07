@@ -25,7 +25,7 @@ impl RockSource {
         let archive_name = internal.file.unwrap_or(url.derive_file_name()?);
 
         let source_spec = match (url, internal.tag, internal.branch, internal.module) {
-            (source, None, None, None) => Ok(RockSourceSpec::default_from_source_url(&source)),
+            (source, None, None, None) => Ok(RockSourceSpec::default_from_source_url(source)),
             (SourceUrl::Cvs(url), None, None, Some(module)) => {
                 Ok(RockSourceSpec::Cvs(CvsSource { url, module }))
             }
@@ -110,28 +110,28 @@ pub enum RockSourceSpec {
 }
 
 impl RockSourceSpec {
-    fn default_from_source_url(url: &SourceUrl) -> Self {
-        match &url {
+    fn default_from_source_url(url: SourceUrl) -> Self {
+        match url {
             SourceUrl::Cvs(url) => Self::Cvs(CvsSource {
-                url: url.clone(),
                 module: base_name(url.as_str()).into(),
+                url,
             }),
-            SourceUrl::File(path) => Self::File(path.clone()),
-            SourceUrl::Url(url) => Self::Url(url.clone()),
+            SourceUrl::File(path) => Self::File(path),
+            SourceUrl::Url(url) => Self::Url(url),
             SourceUrl::Git(url) => Self::Git(GitSource {
-                url: url.clone(),
+                url,
                 checkout_ref: None,
             }),
             SourceUrl::Mercurial(url) => Self::Mercurial(MercurialSource {
-                url: url.clone(),
+                url,
                 checkout_ref: None,
             }),
             SourceUrl::Sscm(url) => Self::Sscm(SscmSource {
-                url: url.clone(),
                 module: base_name(url.as_str()).into(),
+                url,
             }),
             SourceUrl::Svn(url) => Self::Svn(SvnSource {
-                url: url.clone(),
+                url,
                 module: None,
                 tag: None,
             }),
@@ -188,8 +188,8 @@ struct RockSourceInternal {
 
 impl<'lua> FromLua<'lua> for PerPlatform<RockSourceInternal> {
     fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
-        match &value {
-            list @ Value::Table(tbl) => {
+        match value {
+            Value::Table(ref tbl) => {
                 let mut per_platform = match tbl.get("platforms")? {
                     Value::Table(overrides) => Ok(lua.from_value(Value::Table(overrides))?),
                     Value::Nil => Ok(HashMap::default()),
@@ -198,9 +198,12 @@ impl<'lua> FromLua<'lua> for PerPlatform<RockSourceInternal> {
                         val.type_name()
                     ))),
                 }?;
-                let _ = tbl.raw_remove("platforms");
-                let default = lua.from_value(list.clone())?;
+
+                tbl.raw_remove("platforms")?;
+
+                let default = lua.from_value(value)?;
                 override_platform_sources(&mut per_platform, &default);
+
                 Ok(PerPlatform {
                     default,
                     per_platform,
