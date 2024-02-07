@@ -22,7 +22,7 @@ impl RockSource {
         // This ensures that invalid combinations are caught while parsing.
         let url = &internal.url.ok_or(eyre!("source URL missing"))?;
         let source_spec = match (url, internal.tag, internal.branch, internal.module) {
-            (source, None, None, None) => Ok(RockSourceSpec::default_from_source_url(&source)),
+            (source, None, None, None) => Ok(RockSourceSpec::default_from_source_url(source)),
             (SourceUrl::Cvs(url), None, None, Some(module)) => Ok(RockSourceSpec::Cvs(CvsSource {
                 url: url.clone(),
                 module,
@@ -79,7 +79,7 @@ impl RockSource {
 
 impl<'lua> FromLua<'lua> for PerPlatform<RockSource> {
     fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
-        let internal: PerPlatform<RockSourceInternal> = PerPlatform::from_lua(value, &lua)?;
+        let internal: PerPlatform<RockSourceInternal> = PerPlatform::from_lua(value, lua)?;
         let mut per_platform = HashMap::new();
         for (platform, internal_override) in internal.per_platform {
             let override_spec = RockSource::from_internal_source(internal_override)
@@ -219,7 +219,7 @@ fn override_platform_sources(
     let per_platform_raw = per_platform.clone();
     for (platform, build_spec) in per_platform.clone() {
         // Add base dependencies for each platform
-        per_platform.insert(platform, override_source_spec_internal(&base, &build_spec));
+        per_platform.insert(platform, override_source_spec_internal(base, &build_spec));
     }
     for (platform, build_spec) in per_platform_raw {
         for extended_platform in &platform.get_extended_platforms() {
@@ -309,9 +309,9 @@ impl FromStr for SourceUrl {
 
     fn from_str(str: &str) -> Result<Self> {
         let url_regex_set: RegexSet =
-            RegexSet::new(&[r"^https://", r"^http://", r"^ftp://"]).unwrap();
+            RegexSet::new([r"^https://", r"^http://", r"^ftp://"]).unwrap();
 
-        let git_source_regex_set: RegexSet = RegexSet::new(&[
+        let git_source_regex_set: RegexSet = RegexSet::new([
             r"^git://",
             r"^git\+file://",
             r"^git\+http://",
@@ -321,7 +321,7 @@ impl FromStr for SourceUrl {
         .unwrap();
 
         let mercurial_source_regex_set: RegexSet =
-            RegexSet::new(&[r"^hg://", r"^hg\+http://", r"^hg\+https://", r"^hg\+ssh://"]).unwrap();
+            RegexSet::new([r"^hg://", r"^hg\+http://", r"^hg\+https://", r"^hg\+ssh://"]).unwrap();
 
         match str {
             s if s.starts_with("cvs://") => Ok(Self::Cvs(s.to_string())),
@@ -364,7 +364,7 @@ where
 
 /// Implementation of the luarocks base_name function
 /// Strips the path, so /a/b/c becomes c
-fn base_name<'a>(path: &'a str) -> Cow<'a, str> {
+fn base_name(path: &str) -> Cow<'_, str> {
     let mut pieces = path.rsplit('/');
     match pieces.next() {
         Some(p) => p.into(),

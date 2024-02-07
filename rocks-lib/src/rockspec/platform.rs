@@ -119,10 +119,12 @@ pub struct PlatformSupport {
 impl Default for PlatformSupport {
     fn default() -> Self {
         let mut platform_map = HashMap::default();
+
         for identifier in PlatformIdentifier::iter() {
             platform_map.insert(identifier, true);
         }
-        return Self { platform_map };
+
+        Self { platform_map }
     }
 }
 
@@ -144,7 +146,7 @@ impl PlatformSupport {
         }
         let mut only_negative_entries = true;
         for raw_str in platforms {
-            let (is_supported, platform_str) = if raw_str.starts_with("!") {
+            let (is_supported, platform_str) = if raw_str.starts_with('!') {
                 // trim leading "!"
                 let trimmed = &raw_str[1..raw_str.len()];
                 (false, trimmed)
@@ -160,7 +162,7 @@ impl PlatformSupport {
             {
                 return Err(eyre!("Conflicting supported_platforms entries!"));
             }
-            platform_map.insert(platform_identifier.clone(), is_supported);
+            platform_map.insert(platform_identifier, is_supported);
             if is_supported {
                 // Supported extends to extended platforms
                 for sub_platform in platform_identifier.get_extended_platforms() {
@@ -217,7 +219,7 @@ where
         self.per_platform
             .clone()
             .into_keys()
-            .sorted_by_key(|id| Reverse(id.clone())) // more specific platforms first
+            .sorted_by_key(|id| Reverse(*id)) // more specific platforms first
             .find(|identifier| identifier == platform || platform.is_extension_of(identifier))
             .and_then(|identifier| self.per_platform.get(&identifier))
             .unwrap_or(&self.default)
