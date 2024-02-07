@@ -74,7 +74,7 @@ impl BuildSpec {
 
 impl<'lua> FromLua<'lua> for PerPlatform<BuildSpec> {
     fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
-        let internal = PerPlatform::from_lua(value, &lua)?;
+        let internal = PerPlatform::from_lua(value, lua)?;
         let mut per_platform = HashMap::new();
         for (platform, internal_override) in internal.per_platform {
             let override_spec = BuildSpec::from_internal_spec(internal_override)
@@ -145,7 +145,7 @@ where
     let special_directories: Vec<String> = vec!["lua".into(), "lib".into(), "rock_manifest".into()];
     match special_directories
         .into_iter()
-        .find(|dir| copy_directories.clone().unwrap_or_default().contains(&dir))
+        .find(|dir| copy_directories.clone().unwrap_or_default().contains(dir))
     {
         // NOTE(mrcjkb): There also shouldn't be a directory named the same as the rockspec,
         // but I'm not sure how to (or if it makes sense to) enforce this here.
@@ -232,7 +232,7 @@ fn override_platform_specs(
     let per_platform_raw = per_platform.clone();
     for (platform, build_spec) in per_platform.clone() {
         // Add base dependencies for each platform
-        per_platform.insert(platform, override_build_spec_internal(&base, &build_spec));
+        per_platform.insert(platform, override_build_spec_internal(base, &build_spec));
     }
     for (platform, build_spec) in per_platform_raw {
         for extended_platform in &platform.get_extended_platforms() {

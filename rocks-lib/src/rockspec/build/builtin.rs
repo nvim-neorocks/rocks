@@ -25,10 +25,10 @@ impl<'de> Deserialize<'de> for ModulesSpec {
         let value = serde_json::Value::deserialize(deserializer)?;
         if value.is_string() {
             let src_path = serde_json::from_value(value).map_err(de::Error::custom)?;
-            return Ok(Self::SourcePath(src_path));
+            Ok(Self::SourcePath(src_path))
         } else if value.is_array() {
             let src_paths = serde_json::from_value(value).map_err(de::Error::custom)?;
-            return Ok(Self::SourcePaths(src_paths));
+            Ok(Self::SourcePaths(src_paths))
         } else {
             let module_paths = serde_json::from_value(value).map_err(de::Error::custom)?;
             Ok(Self::ModulePaths(module_paths))

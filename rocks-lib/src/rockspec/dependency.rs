@@ -100,7 +100,7 @@ fn override_platform_deps(
     let per_platform_raw = per_platform.clone();
     for (platform, dependencies) in per_platform.clone() {
         // Add base dependencies for each platform
-        per_platform.insert(platform, override_deps(&base, &dependencies));
+        per_platform.insert(platform, override_deps(base, &dependencies));
     }
     for (platform, dependencies) in per_platform_raw {
         // Add extended platform dependencies (without base deps) for each platform
@@ -121,11 +121,11 @@ fn override_platform_deps(
 /// - Adds missing dependencies
 /// - Replaces dependencies with the same name
 fn override_deps(
-    base_vec: &Vec<LuaDependency>,
+    base_vec: &[LuaDependency],
     override_vec: &Vec<LuaDependency>,
 ) -> Vec<LuaDependency> {
     let mut result_map: HashMap<String, LuaDependency> = base_vec
-        .into_iter()
+        .iter()
         .map(|dep| (dep.rock_name.clone(), dep.clone()))
         .collect();
     for override_dep in override_vec {
@@ -181,7 +181,7 @@ fn override_platform_external_deps(
     let per_platform_raw = per_platform.clone();
     for (platform, dependencies) in per_platform.clone() {
         // Add base dependencies for each platform
-        per_platform.insert(platform, override_external_deps(&base, &dependencies));
+        per_platform.insert(platform, override_external_deps(base, &dependencies));
     }
     for (platform, dependencies) in per_platform_raw {
         // Add extended platform dependencies (without base deps) for each platform
@@ -246,7 +246,7 @@ fn parse_pessimistic_version_constraint(version_constraint: String) -> Result<St
     let min_version_str = &version_constraint[2..].trim();
     let min_version =
         Version::parse(append_minor_patch_if_missing(min_version_str.to_string()).as_str())?;
-    let max_version = match min_version_str.matches(".").count() {
+    let max_version = match min_version_str.matches('.').count() {
         0 => Version {
             major: &min_version.major + 1,
             ..min_version.clone()
@@ -262,13 +262,13 @@ fn parse_pessimistic_version_constraint(version_constraint: String) -> Result<St
     };
     Ok(">= ".to_string()
         + &min_version.to_string()
-        + &", < ".to_string()
+        + ", < "
         + &max_version.to_string())
 }
 
 /// Recursively append .0 until the version string has a minor or patch version
 fn append_minor_patch_if_missing(version: String) -> String {
-    if version.matches(".").count() < 2 {
+    if version.matches('.').count() < 2 {
         return append_minor_patch_if_missing(version + ".0");
     }
     version

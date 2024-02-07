@@ -51,7 +51,7 @@ impl TestSpec {
 
 impl<'lua> FromLua<'lua> for PerPlatform<TestSpec> {
     fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
-        let internal = PerPlatform::from_lua(value, &lua)?;
+        let internal = PerPlatform::from_lua(value, lua)?;
         let mut per_platform = HashMap::new();
         for (platform, internal_override) in internal.per_platform {
             let override_spec = TestSpec::from_internal_spec(internal_override)
@@ -139,7 +139,7 @@ fn override_platform_specs(
     let per_platform_raw = per_platform.clone();
     for (platform, build_spec) in per_platform.clone() {
         // Add base dependencies for each platform
-        per_platform.insert(platform, override_test_spec_internal(&base, &build_spec));
+        per_platform.insert(platform, override_test_spec_internal(base, &build_spec));
     }
     for (platform, build_spec) in per_platform_raw {
         for extended_platform in &platform.get_extended_platforms() {
