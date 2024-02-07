@@ -43,9 +43,6 @@ pub enum PlatformIdentifier {
 // Order by specificity -> less specific = `Less`
 impl PartialOrd for PlatformIdentifier {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self == other {
-            return Some(Ordering::Equal);
-        }
         match (self, other) {
             (PlatformIdentifier::Unix, PlatformIdentifier::Cygwin) => Some(Ordering::Less),
             (PlatformIdentifier::Unix, PlatformIdentifier::MacOSX) => Some(Ordering::Less),
@@ -57,6 +54,7 @@ impl PartialOrd for PlatformIdentifier {
             (PlatformIdentifier::MacOSX, PlatformIdentifier::Unix) => Some(Ordering::Greater),
             (PlatformIdentifier::Linux, PlatformIdentifier::Unix) => Some(Ordering::Greater),
             (PlatformIdentifier::FreeBSD, PlatformIdentifier::Unix) => Some(Ordering::Greater),
+            _ if self == other => Some(Ordering::Equal),
             _ => None,
         }
     }
@@ -118,13 +116,11 @@ pub struct PlatformSupport {
 
 impl Default for PlatformSupport {
     fn default() -> Self {
-        let mut platform_map = HashMap::default();
-
-        for identifier in PlatformIdentifier::iter() {
-            platform_map.insert(identifier, true);
+        Self {
+            platform_map: PlatformIdentifier::iter()
+                .map(|identifier| (identifier, true))
+                .collect(),
         }
-
-        Self { platform_map }
     }
 }
 
@@ -194,7 +190,7 @@ impl PlatformSupport {
     }
 
     pub fn is_supported(&self, platform: &PlatformIdentifier) -> bool {
-        *self.platform_map.get(platform).unwrap_or(&false)
+        self.platform_map.get(platform).cloned().unwrap_or(false)
     }
 
     pub fn is_current_platform_supported(&self) -> bool {
@@ -217,9 +213,9 @@ where
 {
     pub fn get(&self, platform: &PlatformIdentifier) -> &T {
         self.per_platform
-            .clone()
-            .into_keys()
-            .sorted_by_key(|id| Reverse(*id)) // more specific platforms first
+            .keys()
+            .cloned()
+            .sorted_by_key(|&id| Reverse(id)) // more specific platforms first
             .find(|identifier| identifier == platform || platform.is_extension_of(identifier))
             .and_then(|identifier| self.per_platform.get(&identifier))
             .unwrap_or(&self.default)
