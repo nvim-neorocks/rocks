@@ -7,7 +7,7 @@ mod test_spec;
 use std::{collections::HashMap, path::PathBuf};
 
 use eyre::{eyre, Result};
-use mlua::{FromLua, Lua, LuaSerdeExt, Value};
+use mlua::{Lua, LuaSerdeExt, Value};
 use serde::{de::DeserializeOwned, Deserialize};
 
 pub use build::*;
@@ -39,42 +39,37 @@ impl Rockspec {
     pub fn new(rockspec_content: &String) -> Result<Self> {
         let lua = Lua::new();
         lua.load(rockspec_content).exec()?;
+
+        let globals = lua.globals();
         let rockspec = Rockspec {
-            rockspec_format: lua.from_value(lua.globals().get("rockspec_format")?)?,
-            package: lua.from_value(lua.globals().get("package")?)?,
-            version: lua.from_value(lua.globals().get("version")?)?,
+            rockspec_format: globals.get("rockspec_format")?,
+            package: globals.get("package")?,
+            version: globals.get("version")?,
             description: parse_lua_tbl_or_default(&lua, "description")?,
             supported_platforms: parse_lua_tbl_or_default(&lua, "supported_platforms")?,
-            dependencies: PerPlatform::from_lua(lua.globals().get("dependencies")?, &lua)?,
-            build_dependencies: PerPlatform::from_lua(
-                lua.globals().get("build_dependencies")?,
-                &lua,
-            )?,
-            test_dependencies: PerPlatform::from_lua(
-                lua.globals().get("test_dependencies")?,
-                &lua,
-            )?,
-            external_dependencies: PerPlatform::from_lua(
-                lua.globals().get("external_dependencies")?,
-                &lua,
-            )?,
-            source: PerPlatform::from_lua(lua.globals().get("source")?, &lua)?,
-            build: PerPlatform::from_lua(lua.globals().get("build")?, &lua)?,
-            test: PerPlatform::from_lua(lua.globals().get("test")?, &lua)?,
+            dependencies: globals.get("dependencies")?,
+            build_dependencies: globals.get("build_dependencies")?,
+            test_dependencies: globals.get("test_dependencies")?,
+            external_dependencies: globals.get("external_dependencies")?,
+            source: globals.get("source")?,
+            build: globals.get("build")?,
+            test: globals.get("tglobalsest")?,
         };
+
         let rockspec_file_name = format!("{}-{}.rockspec", rockspec.package, rockspec.version);
         if rockspec
             .build
             .default
             .copy_directories
-            .contains(&PathBuf::from(rockspec_file_name.clone()))
+            .contains(&PathBuf::from(&rockspec_file_name))
         {
             return Err(eyre!("copy_directories cannot contain the rockspec name!"));
         }
+
         for (platform, build_override) in &rockspec.build.per_platform {
             if build_override
                 .copy_directories
-                .contains(&PathBuf::from(rockspec_file_name.clone()))
+                .contains(&PathBuf::from(&rockspec_file_name))
             {
                 return Err(eyre!(
                     "platform {}: copy_directories cannot contain the rockspec name!",
