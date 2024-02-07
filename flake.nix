@@ -44,6 +44,8 @@
           hooks = {
             alejandra.enable = true;
             rustfmt.enable = true;
+            # clippy.enable = true;
+            # cargo-check.enable = true;
           };
         };
       in {
@@ -63,6 +65,7 @@
             ++ (with pre-commit-hooks.packages.${system}; [
               alejandra
               rustfmt
+              clippy
             ])
             ++ pkgs.rocks.buildInputs
             ++ pkgs.rocks.nativeBuildInputs;
