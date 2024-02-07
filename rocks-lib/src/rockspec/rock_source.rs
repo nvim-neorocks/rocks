@@ -246,30 +246,27 @@ fn override_source_spec_internal(
     override_spec: &RockSourceInternal,
 ) -> RockSourceInternal {
     RockSourceInternal {
-        url: override_opt(&override_spec.url, &base.url),
-        hash: override_opt(&override_spec.hash, &base.hash),
-        file: override_opt(&override_spec.file, &base.file),
-        dir: override_opt(&override_spec.dir, &base.dir),
-        tag: match (override_spec.branch.clone(), override_spec.module.clone()) {
-            (None, None) => override_opt(&override_spec.tag, &base.tag),
+        url: override_opt(override_spec.url.as_ref(), base.url.as_ref()),
+        hash: override_opt(override_spec.hash.as_ref(), base.hash.as_ref()),
+        file: override_opt(override_spec.file.as_ref(), base.file.as_ref()),
+        dir: override_opt(override_spec.dir.as_ref(), base.dir.as_ref()),
+        tag: match (&override_spec.branch, &override_spec.module) {
+            (None, None) => override_opt(override_spec.tag.as_ref(), base.tag.as_ref()),
             _ => None,
         },
-        branch: match (override_spec.tag.clone(), override_spec.module.clone()) {
-            (None, None) => override_opt(&override_spec.branch, &base.branch),
+        branch: match (&override_spec.tag, &override_spec.module) {
+            (None, None) => override_opt(override_spec.branch.as_ref(), base.branch.as_ref()),
             _ => None,
         },
-        module: match (override_spec.tag.clone(), override_spec.branch.clone()) {
-            (None, None) => override_opt(&override_spec.module, &base.module),
+        module: match (&override_spec.tag, &override_spec.branch) {
+            (None, None) => override_opt(override_spec.module.as_ref(), base.module.as_ref()),
             _ => None,
         },
     }
 }
 
-fn override_opt<T: Clone>(override_opt: &Option<T>, base: &Option<T>) -> Option<T> {
-    match override_opt.clone() {
-        override_val @ Some(_) => override_val,
-        None => base.clone(),
-    }
+fn override_opt<T: Clone>(override_opt: Option<&T>, base: Option<&T>) -> Option<T> {
+    override_opt.or(base).cloned()
 }
 
 /// Internal helper for parsing
