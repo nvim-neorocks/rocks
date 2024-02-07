@@ -1,4 +1,5 @@
 use eyre::{eyre, Result};
+use itertools::Itertools;
 use mlua::{FromLua, Lua, LuaSerdeExt, Value};
 use regex::RegexSet;
 use reqwest::Url;
@@ -76,12 +77,18 @@ impl RockSource {
 impl<'lua> FromLua<'lua> for PerPlatform<RockSource> {
     fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
         let internal: PerPlatform<RockSourceInternal> = PerPlatform::from_lua(value, lua)?;
-        let mut per_platform = HashMap::new();
-        for (platform, internal_override) in internal.per_platform {
-            let override_spec = RockSource::from_internal_source(internal_override)
-                .map_err(|err| mlua::Error::DeserializeError(err.to_string()))?;
-            per_platform.insert(platform, override_spec);
-        }
+
+        let per_platform: HashMap<_, _> = internal
+            .per_platform
+            .into_iter()
+            .map(|(platform, internal_override)| {
+                let override_spec = RockSource::from_internal_source(internal_override)
+                    .map_err(|err| mlua::Error::DeserializeError(err.to_string()))?;
+
+                Ok((platform, override_spec))
+            })
+            .try_collect::<_, _, mlua::Error>()?;
+
         let result = PerPlatform {
             default: RockSource::from_internal_source(internal.default)
                 .map_err(|err| mlua::Error::DeserializeError(err.to_string()))?,
