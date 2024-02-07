@@ -260,10 +260,7 @@ fn parse_pessimistic_version_constraint(version_constraint: String) -> Result<St
             ..min_version.clone()
         },
     };
-    Ok(">= ".to_string()
-        + &min_version.to_string()
-        + ", < "
-        + &max_version.to_string())
+    Ok(">= ".to_string() + &min_version.to_string() + ", < " + &max_version.to_string())
 }
 
 /// Recursively append .0 until the version string has a minor or patch version
