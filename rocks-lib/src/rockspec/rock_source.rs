@@ -20,52 +20,48 @@ impl RockSource {
     fn from_internal_source(internal: RockSourceInternal) -> Result<Self> {
         // The rockspec.source table allows invalid combinations
         // This ensures that invalid combinations are caught while parsing.
-        let url = &internal.url.ok_or(eyre!("source URL missing"))?;
+        let url = internal.url.ok_or(eyre!("source URL missing"))?;
+        let archive_name = internal.file.unwrap_or(url.derive_file_name()?);
+
         let source_spec = match (url, internal.tag, internal.branch, internal.module) {
-            (source, None, None, None) => Ok(RockSourceSpec::default_from_source_url(source)),
-            (SourceUrl::Cvs(url), None, None, Some(module)) => Ok(RockSourceSpec::Cvs(CvsSource {
-                url: url.clone(),
-                module,
-            })),
+            (source, None, None, None) => Ok(RockSourceSpec::default_from_source_url(&source)),
+            (SourceUrl::Cvs(url), None, None, Some(module)) => {
+                Ok(RockSourceSpec::Cvs(CvsSource { url, module }))
+            }
             (SourceUrl::Git(url), Some(tag), None, None) => Ok(RockSourceSpec::Git(GitSource {
-                url: url.clone(),
+                url,
                 checkout_ref: Some(tag),
             })),
             (SourceUrl::Git(url), None, Some(branch), None) => Ok(RockSourceSpec::Git(GitSource {
-                url: url.clone(),
+                url,
                 checkout_ref: Some(branch),
             })),
             (SourceUrl::Mercurial(url), Some(tag), None, None) => {
                 Ok(RockSourceSpec::Mercurial(MercurialSource {
-                    url: url.clone(),
+                    url,
                     checkout_ref: Some(tag),
                 }))
             }
             (SourceUrl::Mercurial(url), None, Some(branch), None) => {
                 Ok(RockSourceSpec::Mercurial(MercurialSource {
-                    url: url.clone(),
+                    url,
                     checkout_ref: Some(branch),
                 }))
             }
             (SourceUrl::Sscm(url), None, None, Some(module)) => {
-                Ok(RockSourceSpec::Sscm(SscmSource {
-                    url: url.clone(),
-                    module,
-                }))
+                Ok(RockSourceSpec::Sscm(SscmSource { url, module }))
             }
-            (SourceUrl::Svn(url), tag, None, module) => Ok(RockSourceSpec::Svn(SvnSource {
-                url: url.clone(),
-                tag,
-                module,
-            })),
+            (SourceUrl::Svn(url), tag, None, module) => {
+                Ok(RockSourceSpec::Svn(SvnSource { url, tag, module }))
+            }
             _ => Err(eyre!("invalid rockspec source field combination.")),
         }?;
-        let archive_name = internal.file.unwrap_or(url.derive_file_name()?);
+
         let dir = internal.dir.unwrap_or(
             PathBuf::from(&archive_name)
                 .file_stem()
                 .and_then(|name| name.to_str())
-                .map(|name| name.to_string())
+                .map(str::to_string)
                 .ok_or(eyre!("could not derive rockspec source.dir"))?,
         );
         Ok(RockSource {
