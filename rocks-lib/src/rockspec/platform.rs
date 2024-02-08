@@ -3,7 +3,6 @@ use itertools::Itertools;
 use std::{
     cmp::{Ordering, Reverse},
     collections::HashMap,
-    str::FromStr,
 };
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, EnumString};
