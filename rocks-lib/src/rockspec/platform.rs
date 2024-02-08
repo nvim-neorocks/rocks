@@ -137,51 +137,53 @@ impl<'de> Deserialize<'de> for PlatformSupport {
 
 impl PlatformSupport {
     fn validate_platforms(platforms: &[String]) -> Result<HashMap<PlatformIdentifier, bool>> {
-        let mut platforms = platforms
+        platforms
             .iter()
-            .map(|platform| {
+            .try_fold(HashMap::new(), |mut platforms, platform| {
+                // Platform assertions can exist in one of the following forms:
+                // - `platform` - a positive assertion for the platform (the platform must be present)
+                // - `!platform` - a negative assertion for the platform (any platform *but* this one must be present)
                 let (is_positive_assertion, platform) = platform
                     .strip_prefix('!')
                     .map(|str| (false, str))
-                    .unwrap_or((false, &platform));
-                // TODO(vhyrro): Maybe provide an informative error if we couldn't parse the
-                // platform identifier?
+                    .unwrap_or((true, &platform));
+
                 let platform_identifier: PlatformIdentifier = platform.parse()?;
 
-                Ok((platform_identifier, is_positive_assertion))
-            })
-            .try_collect::<_, HashMap<_, _>, eyre::Error>()?;
+                // If a platform with the same name exists already and is contradictory
+                // then throw an error. An example of such a contradiction is e.g.:
+                // [`win32`, `!win32`]
+                if platforms
+                    .get(&platform_identifier)
+                    .unwrap_or(&is_positive_assertion)
+                    != &is_positive_assertion
+                {
+                    return Err(eyre!("Conflicting supported platform entries!"));
+                }
 
-        // Check for conflicts within the rockspec
-        let cloned_platforms = platforms.clone();
+                platforms.insert(platform_identifier, is_positive_assertion);
 
-        for (platform, &is_positive_assertion) in cloned_platforms.iter() {
-            let to_check = if is_positive_assertion {
-                platform.get_extended_platforms()
-            } else {
-                platform.get_subsets()
-            };
+                let subset_or_extended_platforms = if is_positive_assertion {
+                    platform_identifier.get_extended_platforms()
+                } else {
+                    platform_identifier.get_subsets()
+                };
 
-            let subplatforms: HashMap<_, _> = to_check
-                .into_iter()
-                .map(|sub_platform| {
+                for sub_platform in subset_or_extended_platforms {
                     if platforms
                         .get(&sub_platform)
                         .unwrap_or(&is_positive_assertion)
-                        == &is_positive_assertion
+                        != &is_positive_assertion
                     {
-                        Ok((sub_platform, is_positive_assertion))
-                    } else {
                         // TODO(vhyrro): More detailed errors
-                        Err(eyre!("Conflicting supported platform entries!"))
+                        return Err(eyre!("Conflicting supported platform entries!"));
                     }
-                })
-                .try_collect()?;
 
-            platforms.extend(subplatforms);
-        }
+                    platforms.insert(sub_platform, is_positive_assertion);
+                }
 
-        todo!()
+                Ok(platforms)
+            })
     }
 
     pub fn parse(platforms: &[String]) -> Result<Self> {
