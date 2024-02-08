@@ -60,6 +60,7 @@ impl PartialOrd for PlatformIdentifier {
     }
 }
 
+/// Retrieves the target compilation platform and returns it as an identifier.
 pub fn get_platform() -> PlatformIdentifier {
     if cfg!(linux) {
         PlatformIdentifier::Linux
@@ -135,58 +136,70 @@ impl<'de> Deserialize<'de> for PlatformSupport {
 }
 
 impl PlatformSupport {
-    fn parse(platforms: &Vec<String>) -> Result<Self> {
-        let mut platform_map = HashMap::default();
-        if platforms.is_empty() {
-            return Ok(Self::default());
-        }
-        let mut only_negative_entries = true;
-        for raw_str in platforms {
-            let (is_supported, platform_str) = if raw_str.starts_with('!') {
-                // trim leading "!"
-                let trimmed = &raw_str[1..raw_str.len()];
-                (false, trimmed)
+    fn validate_platforms(platforms: &[String]) -> Result<HashMap<PlatformIdentifier, bool>> {
+        let mut platforms = platforms
+            .iter()
+            .map(|platform| {
+                let (is_positive_assertion, platform) = platform
+                    .strip_prefix('!')
+                    .map(|str| (false, str))
+                    .unwrap_or((false, &platform));
+                // TODO(vhyrro): Maybe provide an informative error if we couldn't parse the
+                // platform identifier?
+                let platform_identifier: PlatformIdentifier = platform.parse()?;
+
+                Ok((platform_identifier, is_positive_assertion))
+            })
+            .try_collect::<_, HashMap<_, _>, eyre::Error>()?;
+
+        // Check for conflicts within the rockspec
+        let cloned_platforms = platforms.clone();
+
+        for (platform, &is_positive_assertion) in cloned_platforms.iter() {
+            let to_check = if is_positive_assertion {
+                platform.get_extended_platforms()
             } else {
-                only_negative_entries = false;
-                (true, raw_str.as_str())
+                platform.get_subsets()
             };
-            let platform_identifier = PlatformIdentifier::from_str(platform_str)?;
-            if *platform_map
-                .get(&platform_identifier)
-                .unwrap_or(&is_supported)
-                != is_supported
-            {
-                return Err(eyre!("Conflicting supported_platforms entries!"));
-            }
-            platform_map.insert(platform_identifier, is_supported);
-            if is_supported {
-                // Supported extends to extended platforms
-                for sub_platform in platform_identifier.get_extended_platforms() {
-                    if *platform_map.get(&sub_platform).unwrap_or(&is_supported) != is_supported {
-                        return Err(eyre!("Conflicting supported_platforms entries!"));
+
+            let subplatforms: HashMap<_, _> = to_check
+                .into_iter()
+                .map(|sub_platform| {
+                    if platforms
+                        .get(&sub_platform)
+                        .unwrap_or(&is_positive_assertion)
+                        == &is_positive_assertion
+                    {
+                        Ok((sub_platform, is_positive_assertion))
+                    } else {
+                        // TODO(vhyrro): More detailed errors
+                        Err(eyre!("Conflicting supported platform entries!"))
                     }
-                    platform_map.insert(sub_platform, is_supported);
-                }
-            } else {
-                // Unsupported extends to subset platforms
-                for sub_platform in platform_identifier.get_subsets() {
-                    if *platform_map.get(&sub_platform).unwrap_or(&is_supported) != is_supported {
-                        return Err(eyre!("Conflicting supported_platforms entries!"));
-                    }
-                    platform_map.insert(sub_platform, is_supported);
-                }
-            }
+                })
+                .try_collect()?;
+
+            platforms.extend(subplatforms);
         }
-        // Special case
-        if only_negative_entries {
-            // Support any platform except those listed.
-            for identifier in PlatformIdentifier::iter() {
-                if *platform_map.get(&identifier).unwrap_or(&true) {
-                    platform_map.insert(identifier, true);
+
+        todo!()
+    }
+
+    pub fn parse(platforms: &[String]) -> Result<Self> {
+        match platforms {
+            [] => Ok(Self::default()),
+            platforms if platforms.iter().all(|platform| platform.starts_with('!')) => {
+                let mut platform_map = Self::validate_platforms(platforms)?;
+
+                for identifier in PlatformIdentifier::iter() {
+                    platform_map.entry(identifier).or_insert(true);
                 }
+
+                Ok(Self { platform_map })
             }
+            _ => Ok(Self {
+                platform_map: Self::validate_platforms(platforms)?,
+            }),
         }
-        Ok(Self { platform_map })
     }
 
     pub fn is_supported(&self, platform: &PlatformIdentifier) -> bool {
