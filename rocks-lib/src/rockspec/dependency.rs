@@ -63,8 +63,8 @@ impl<'de> Deserialize<'de> for LuaDependency {
 
 impl<'lua> FromLua<'lua> for PerPlatform<Vec<LuaDependency>> {
     fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
-        match &value {
-            list @ Value::Table(tbl) => {
+        match value {
+            Value::Table(ref tbl) => {
                 let mut per_platform = match tbl.get("platforms")? {
                     val @ Value::Table(_) => Ok(lua.from_value(val)?),
                     Value::Nil => Ok(HashMap::default()),
@@ -73,10 +73,14 @@ impl<'lua> FromLua<'lua> for PerPlatform<Vec<LuaDependency>> {
                         val.type_name()
                     ))),
                 }?;
-                let _ = tbl.raw_remove("platforms");
-                let default = lua.from_value(list.clone())?;
+
+                tbl.raw_remove("platforms")?;
+
+                let default = lua.from_value(value)?;
+
                 // TODO: Extract this to a trait?
                 override_platform_deps(&mut per_platform, &default);
+
                 Ok(PerPlatform {
                     default,
                     per_platform,
