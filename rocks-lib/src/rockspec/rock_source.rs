@@ -1,13 +1,14 @@
 use eyre::{eyre, Result};
-use itertools::Itertools;
 use mlua::{FromLua, Lua, Value};
 use regex::RegexSet;
 use reqwest::Url;
 use serde::{de, Deserialize, Deserializer};
 use ssri::Integrity;
-use std::{borrow::Cow, collections::HashMap, path::PathBuf, str::FromStr};
+use std::{borrow::Cow, path::PathBuf, str::FromStr};
 
-use super::{PartialOverride, PerPlatform, PlatformOverridable};
+use super::{
+    FromPlatformOverridable, PartialOverride, PerPlatform, PerPlatformWrapper, PlatformOverridable,
+};
 
 #[derive(Debug, PartialEq)]
 pub struct RockSource {
@@ -17,8 +18,8 @@ pub struct RockSource {
     pub unpack_dir: String,
 }
 
-impl RockSource {
-    fn from_internal_source(internal: RockSourceInternal) -> Result<Self> {
+impl FromPlatformOverridable<RockSourceInternal, Self> for RockSource {
+    fn from_platform_overridable(internal: RockSourceInternal) -> Result<Self> {
         // The rockspec.source table allows invalid combinations
         // This ensures that invalid combinations are caught while parsing.
         let url = internal.url.ok_or(eyre!("source URL missing"))?;
@@ -76,25 +77,8 @@ impl RockSource {
 
 impl<'lua> FromLua<'lua> for PerPlatform<RockSource> {
     fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
-        let internal: PerPlatform<RockSourceInternal> = PerPlatform::from_lua(value, lua)?;
-
-        let per_platform: HashMap<_, _> = internal
-            .per_platform
-            .into_iter()
-            .map(|(platform, internal_override)| {
-                let override_spec = RockSource::from_internal_source(internal_override)
-                    .map_err(|err| mlua::Error::DeserializeError(err.to_string()))?;
-
-                Ok((platform, override_spec))
-            })
-            .try_collect::<_, _, mlua::Error>()?;
-
-        let result = PerPlatform {
-            default: RockSource::from_internal_source(internal.default)
-                .map_err(|err| mlua::Error::DeserializeError(err.to_string()))?,
-            per_platform,
-        };
-        Ok(result)
+        let wrapper = PerPlatformWrapper::from_lua(value, lua)?;
+        Ok(wrapper.un_per_platform)
     }
 }
 

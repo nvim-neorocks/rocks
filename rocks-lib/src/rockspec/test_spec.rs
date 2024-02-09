@@ -1,11 +1,13 @@
 use eyre::{eyre, Result};
 use itertools::Itertools;
-use mlua::{FromLua, Lua, Value};
-use std::{collections::HashMap, path::PathBuf};
+use mlua::FromLua;
+use std::path::PathBuf;
 
 use serde::Deserialize;
 
-use super::{PartialOverride, PerPlatform, PlatformOverridable};
+use super::{
+    FromPlatformOverridable, PartialOverride, PerPlatform, PerPlatformWrapper, PlatformOverridable,
+};
 
 #[derive(Debug, PartialEq)]
 pub enum TestSpec {
@@ -21,8 +23,8 @@ impl Default for TestSpec {
     }
 }
 
-impl TestSpec {
-    fn from_internal_spec(internal: TestSpecInternal) -> Result<Self> {
+impl FromPlatformOverridable<TestSpecInternal, Self> for TestSpec {
+    fn from_platform_overridable(internal: TestSpecInternal) -> Result<Self> {
         let test_spec = match internal.test_type {
             Some(TestType::Busted) => Ok(Self::Busted(BustedTestSpec {
                 flags: internal.flags.unwrap_or_default(),
@@ -50,24 +52,12 @@ impl TestSpec {
 }
 
 impl<'lua> FromLua<'lua> for PerPlatform<TestSpec> {
-    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
-        let internal = PerPlatform::from_lua(value, lua)?;
-        let per_platform: HashMap<_, _> = internal
-            .per_platform
-            .into_iter()
-            .map(|(platform, internal_override)| {
-                let override_spec = TestSpec::from_internal_spec(internal_override)
-                    .map_err(|err| mlua::Error::DeserializeError(err.to_string()))?;
-
-                Ok((platform, override_spec))
-            })
-            .try_collect::<_, _, mlua::Error>()?;
-        let result = PerPlatform {
-            default: TestSpec::from_internal_spec(internal.default)
-                .map_err(|err| mlua::Error::DeserializeError(err.to_string()))?,
-            per_platform,
-        };
-        Ok(result)
+    fn from_lua(
+        value: mlua::prelude::LuaValue<'lua>,
+        lua: &'lua mlua::prelude::Lua,
+    ) -> mlua::prelude::LuaResult<Self> {
+        let wrapper = PerPlatformWrapper::from_lua(value, lua)?;
+        Ok(wrapper.un_per_platform)
     }
 }
 
@@ -153,7 +143,7 @@ fn override_opt<T: Clone>(override_opt: &Option<T>, base: &Option<T>) -> Option<
 #[cfg(test)]
 mod tests {
 
-    use mlua::{Error, Lua};
+    use mlua::{Error, FromLua, Lua};
 
     use crate::rockspec::PlatformIdentifier;
 
