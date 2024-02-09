@@ -1,5 +1,6 @@
 use eyre::{eyre, Result};
 use itertools::Itertools;
+use mlua::{FromLua, Lua, LuaSerdeExt as _, Value};
 use std::{
     cmp::{Ordering, Reverse},
     collections::HashMap,
@@ -7,7 +8,10 @@ use std::{
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, EnumString};
 
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{
+    de::{self, DeserializeOwned},
+    Deserialize, Deserializer, Serialize,
+};
 
 /// Identifier by a platform.
 /// The `PartialOrd` instance views more specific platforms as `Greater`
@@ -212,6 +216,17 @@ impl PlatformSupport {
     }
 }
 
+pub trait PartialOverride {
+    fn apply_overrides(&self, override_val: &Self) -> Self;
+}
+
+pub trait PlatformOverridable: PartialOverride {
+    fn on_nil<T>() -> Result<PerPlatform<T>>
+    where
+        T: PlatformOverridable,
+        T: Default;
+}
+
 /// Data that that can vary per platform
 #[derive(Debug, PartialEq)]
 pub struct PerPlatform<T> {
@@ -245,6 +260,68 @@ impl<T: Default> Default for PerPlatform<T> {
         Self {
             default: T::default(),
             per_platform: HashMap::default(),
+        }
+    }
+}
+
+impl<'lua, T> FromLua<'lua> for PerPlatform<T>
+where
+    T: PlatformOverridable,
+    T: DeserializeOwned,
+    T: Default,
+    T: Clone,
+{
+    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
+        match &value {
+            list @ Value::Table(tbl) => {
+                let mut per_platform = match tbl.get("platforms")? {
+                    val @ Value::Table(_) => Ok(lua.from_value(val)?),
+                    Value::Nil => Ok(HashMap::default()),
+                    val => Err(mlua::Error::DeserializeError(format!(
+                        "Expected platforms to be a table or nil, but got {}",
+                        val.type_name()
+                    ))),
+                }?;
+                let _ = tbl.raw_remove("platforms");
+                let default = lua.from_value(list.clone())?;
+                apply_per_platform_overrides(&mut per_platform, &default);
+                Ok(PerPlatform {
+                    default,
+                    per_platform,
+                })
+            }
+            Value::Nil => T::on_nil().map_err(|err| mlua::Error::DeserializeError(err.to_string())),
+            val => Err(mlua::Error::DeserializeError(format!(
+                "Expected rockspec external dependencies to be a table or nil, but got {}",
+                val.type_name()
+            ))),
+        }
+    }
+}
+
+fn apply_per_platform_overrides<T>(per_platform: &mut HashMap<PlatformIdentifier, T>, base: &T)
+where
+    T: PartialOverride,
+    T: Default,
+    T: Clone,
+{
+    let per_platform_raw = per_platform.clone();
+    for (platform, overrides) in per_platform.clone() {
+        // Add base values for each platform
+        let overridden = base.apply_overrides(&overrides);
+        per_platform.insert(platform, overridden);
+    }
+    for (platform, overrides) in per_platform_raw {
+        // Add extended platform dependencies (without base deps) for each platform
+        for extended_platform in &platform.get_extended_platforms() {
+            let extended_overrides = per_platform
+                .get(extended_platform)
+                .map(T::clone)
+                .unwrap_or_default();
+            per_platform.insert(
+                *extended_platform,
+                extended_overrides.apply_overrides(&overrides),
+            );
         }
     }
 }
