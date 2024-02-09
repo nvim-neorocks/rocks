@@ -1,11 +1,11 @@
 use eyre::{eyre, Result};
 use itertools::Itertools;
-use mlua::{FromLua, Lua, LuaSerdeExt, Value};
+use mlua::{FromLua, Lua, Value};
 use std::{collections::HashMap, path::PathBuf};
 
 use serde::Deserialize;
 
-use super::PerPlatform;
+use super::{PartialOverride, PerPlatform, PlatformOverridable};
 
 #[derive(Debug, PartialEq)]
 pub enum TestSpec {
@@ -103,82 +103,39 @@ struct TestSpecInternal {
     script: Option<PathBuf>,
 }
 
-impl<'lua> FromLua<'lua> for PerPlatform<TestSpecInternal> {
-    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
-        match &value {
-            list @ Value::Table(tbl) => {
-                let mut per_platform = match tbl.get("platforms")? {
-                    Value::Table(overrides) => Ok(lua.from_value(Value::Table(overrides))?),
-                    Value::Nil => Ok(HashMap::default()),
-                    val => Err(mlua::Error::DeserializeError(format!(
-                        "Expected rockspec 'test' to be table or nil, but got {}",
-                        val.type_name()
-                    ))),
-                }?;
-                let _ = tbl.raw_remove("platforms");
-                let default = lua.from_value(list.clone())?;
-                override_platform_specs(&mut per_platform, &default);
-                Ok(PerPlatform {
-                    default,
-                    per_platform,
-                })
-            }
-            Value::Nil => Ok(PerPlatform::default()),
-            val => Err(mlua::Error::DeserializeError(format!(
-                "Expected rockspec 'test' to be a table or nil, but got {}",
-                val.type_name()
-            ))),
+impl PartialOverride for TestSpecInternal {
+    fn apply_overrides(&self, override_spec: &Self) -> Self {
+        TestSpecInternal {
+            test_type: override_opt(&override_spec.test_type, &self.test_type),
+            flags: match (override_spec.flags.clone(), self.flags.clone()) {
+                (Some(override_vec), Some(base_vec)) => {
+                    let merged: Vec<String> =
+                        base_vec.into_iter().chain(override_vec).unique().collect();
+                    Some(merged)
+                }
+                (None, base_vec @ Some(_)) => base_vec,
+                (override_vec @ Some(_), None) => override_vec,
+                _ => None,
+            },
+            command: match override_spec.script.clone() {
+                Some(_) => None,
+                None => override_opt(&override_spec.command, &self.command),
+            },
+            script: match override_spec.command.clone() {
+                Some(_) => None,
+                None => override_opt(&override_spec.script, &self.script),
+            },
         }
     }
 }
 
-fn override_platform_specs(
-    per_platform: &mut HashMap<super::PlatformIdentifier, TestSpecInternal>,
-    base: &TestSpecInternal,
-) {
-    let per_platform_raw = per_platform.clone();
-    for (platform, build_spec) in per_platform.clone() {
-        // Add base dependencies for each platform
-        per_platform.insert(platform, override_test_spec_internal(base, &build_spec));
-    }
-    for (platform, build_spec) in per_platform_raw {
-        for extended_platform in &platform.get_extended_platforms() {
-            let extended_spec = per_platform
-                .get(extended_platform)
-                .map(TestSpecInternal::clone)
-                .unwrap_or_default();
-            per_platform.insert(
-                *extended_platform,
-                override_test_spec_internal(&extended_spec, &build_spec),
-            );
-        }
-    }
-}
-
-fn override_test_spec_internal(
-    base: &TestSpecInternal,
-    override_spec: &TestSpecInternal,
-) -> TestSpecInternal {
-    TestSpecInternal {
-        test_type: override_opt(&override_spec.test_type, &base.test_type),
-        flags: match (override_spec.flags.clone(), base.flags.clone()) {
-            (Some(override_vec), Some(base_vec)) => {
-                let merged: Vec<String> =
-                    base_vec.into_iter().chain(override_vec).unique().collect();
-                Some(merged)
-            }
-            (None, base_vec @ Some(_)) => base_vec,
-            (override_vec @ Some(_), None) => override_vec,
-            _ => todo!(),
-        },
-        command: match override_spec.script.clone() {
-            Some(_) => None,
-            None => override_opt(&override_spec.command, &base.command),
-        },
-        script: match override_spec.command.clone() {
-            Some(_) => None,
-            None => override_opt(&override_spec.script, &base.script),
-        },
+impl PlatformOverridable for TestSpecInternal {
+    fn on_nil<T>() -> Result<PerPlatform<T>>
+    where
+        T: PlatformOverridable,
+        T: Default,
+    {
+        Ok(PerPlatform::default())
     }
 }
 

@@ -1,13 +1,13 @@
 use eyre::{eyre, Result};
 use itertools::Itertools;
-use mlua::{FromLua, Lua, LuaSerdeExt, Value};
+use mlua::{FromLua, Lua, Value};
 use regex::RegexSet;
 use reqwest::Url;
 use serde::{de, Deserialize, Deserializer};
 use ssri::Integrity;
 use std::{borrow::Cow, collections::HashMap, path::PathBuf, str::FromStr};
 
-use super::PerPlatform;
+use super::{PartialOverride, PerPlatform, PlatformOverridable};
 
 #[derive(Debug, PartialEq)]
 pub struct RockSource {
@@ -186,82 +186,35 @@ struct RockSourceInternal {
     module: Option<String>,
 }
 
-impl<'lua> FromLua<'lua> for PerPlatform<RockSourceInternal> {
-    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
-        match value {
-            Value::Table(ref tbl) => {
-                let mut per_platform = match tbl.get("platforms")? {
-                    Value::Table(overrides) => Ok(lua.from_value(Value::Table(overrides))?),
-                    Value::Nil => Ok(HashMap::default()),
-                    val => Err(mlua::Error::DeserializeError(format!(
-                        "Expected source to be a table, but got {}",
-                        val.type_name()
-                    ))),
-                }?;
-
-                tbl.raw_remove("platforms")?;
-
-                let default = lua.from_value(value)?;
-                override_platform_sources(&mut per_platform, &default);
-
-                Ok(PerPlatform {
-                    default,
-                    per_platform,
-                })
-            }
-            Value::Nil => Err(mlua::Error::DeserializeError("Missing source.".into())),
-            val => Err(mlua::Error::DeserializeError(format!(
-                "Expected source to be a table, but got {}",
-                val.type_name()
-            ))),
+impl PartialOverride for RockSourceInternal {
+    fn apply_overrides(&self, override_spec: &Self) -> Self {
+        Self {
+            url: override_opt(override_spec.url.as_ref(), self.url.as_ref()),
+            hash: override_opt(override_spec.hash.as_ref(), self.hash.as_ref()),
+            file: override_opt(override_spec.file.as_ref(), self.file.as_ref()),
+            dir: override_opt(override_spec.dir.as_ref(), self.dir.as_ref()),
+            tag: match (&override_spec.branch, &override_spec.module) {
+                (None, None) => override_opt(override_spec.tag.as_ref(), self.tag.as_ref()),
+                _ => None,
+            },
+            branch: match (&override_spec.tag, &override_spec.module) {
+                (None, None) => override_opt(override_spec.branch.as_ref(), self.branch.as_ref()),
+                _ => None,
+            },
+            module: match (&override_spec.tag, &override_spec.branch) {
+                (None, None) => override_opt(override_spec.module.as_ref(), self.module.as_ref()),
+                _ => None,
+            },
         }
     }
 }
 
-fn override_platform_sources(
-    per_platform: &mut HashMap<super::PlatformIdentifier, RockSourceInternal>,
-    base: &RockSourceInternal,
-) {
-    let per_platform_raw = per_platform.clone();
-    for (platform, build_spec) in per_platform.clone() {
-        // Add base dependencies for each platform
-        per_platform.insert(platform, override_source_spec_internal(base, &build_spec));
-    }
-    for (platform, build_spec) in per_platform_raw {
-        for extended_platform in &platform.get_extended_platforms() {
-            let extended_spec = per_platform
-                .get(extended_platform)
-                .map(RockSourceInternal::clone)
-                .unwrap_or_default();
-            per_platform.insert(
-                *extended_platform,
-                override_source_spec_internal(&extended_spec, &build_spec),
-            );
-        }
-    }
-}
-
-fn override_source_spec_internal(
-    base: &RockSourceInternal,
-    override_spec: &RockSourceInternal,
-) -> RockSourceInternal {
-    RockSourceInternal {
-        url: override_opt(override_spec.url.as_ref(), base.url.as_ref()),
-        hash: override_opt(override_spec.hash.as_ref(), base.hash.as_ref()),
-        file: override_opt(override_spec.file.as_ref(), base.file.as_ref()),
-        dir: override_opt(override_spec.dir.as_ref(), base.dir.as_ref()),
-        tag: match (&override_spec.branch, &override_spec.module) {
-            (None, None) => override_opt(override_spec.tag.as_ref(), base.tag.as_ref()),
-            _ => None,
-        },
-        branch: match (&override_spec.tag, &override_spec.module) {
-            (None, None) => override_opt(override_spec.branch.as_ref(), base.branch.as_ref()),
-            _ => None,
-        },
-        module: match (&override_spec.tag, &override_spec.branch) {
-            (None, None) => override_opt(override_spec.module.as_ref(), base.module.as_ref()),
-            _ => None,
-        },
+impl PlatformOverridable for RockSourceInternal {
+    fn on_nil<T>() -> Result<PerPlatform<T>>
+    where
+        T: PlatformOverridable,
+    {
+        Err(eyre!("Missing source."))
     }
 }
 
