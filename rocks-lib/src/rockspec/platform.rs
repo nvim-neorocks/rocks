@@ -4,6 +4,7 @@ use mlua::{FromLua, Lua, LuaSerdeExt as _, Value};
 use std::{
     cmp::{Ordering, Reverse},
     collections::HashMap,
+    marker::PhantomData,
 };
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, EnumString};
@@ -227,6 +228,10 @@ pub trait PlatformOverridable: PartialOverride {
         T: Default;
 }
 
+pub trait FromPlatformOverridable<T: PlatformOverridable, G: FromPlatformOverridable<T, G>> {
+    fn from_platform_overridable(internal: T) -> Result<G>;
+}
+
 /// Data that that can vary per platform
 #[derive(Debug, PartialEq)]
 pub struct PerPlatform<T> {
@@ -296,6 +301,45 @@ where
                 val.type_name()
             ))),
         }
+    }
+}
+
+/// Newtype wrapper used to implement a `FromLua` instance for `FromPlatformOverridable`
+/// This is necessary, because Rust doesn't yet support specialization.
+pub struct PerPlatformWrapper<T, G> {
+    pub un_per_platform: PerPlatform<T>,
+    phantom: PhantomData<G>,
+}
+
+impl<'lua, T, G> FromLua<'lua> for PerPlatformWrapper<T, G>
+where
+    T: FromPlatformOverridable<G, T>,
+    G: PlatformOverridable,
+    G: DeserializeOwned,
+    G: Default,
+    G: Clone,
+{
+    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
+        let internal = PerPlatform::from_lua(value, lua)?;
+        let per_platform: HashMap<_, _> = internal
+            .per_platform
+            .into_iter()
+            .map(|(platform, internal_override)| {
+                let override_spec = T::from_platform_overridable(internal_override)
+                    .map_err(|err| mlua::Error::DeserializeError(err.to_string()))?;
+
+                Ok((platform, override_spec))
+            })
+            .try_collect::<_, _, mlua::Error>()?;
+        let un_per_platform = PerPlatform {
+            default: T::from_platform_overridable(internal.default)
+                .map_err(|err| mlua::Error::DeserializeError(err.to_string()))?,
+            per_platform,
+        };
+        Ok(PerPlatformWrapper {
+            un_per_platform,
+            phantom: PhantomData,
+        })
     }
 }
 
