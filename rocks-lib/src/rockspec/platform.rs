@@ -1,11 +1,7 @@
 use eyre::{eyre, Result};
 use itertools::Itertools;
 use mlua::{FromLua, Lua, LuaSerdeExt as _, Value};
-use std::{
-    cmp::{Ordering, Reverse},
-    collections::HashMap,
-    marker::PhantomData,
-};
+use std::{cmp::Ordering, collections::HashMap, marker::PhantomData};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, EnumString};
 
@@ -17,19 +13,7 @@ use serde::{
 /// Identifier by a platform.
 /// The `PartialOrd` instance views more specific platforms as `Greater`
 #[derive(
-    Serialize,
-    Deserialize,
-    PartialEq,
-    Eq,
-    Hash,
-    Debug,
-    Copy,
-    Clone,
-    Display,
-    EnumString,
-    EnumIter,
-    // XXX: This shouldn't implement `Ord`, but `sorted_by_key()` demands it.
-    Ord,
+    Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Copy, Clone, Display, EnumString, EnumIter,
 )]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
@@ -246,13 +230,18 @@ where
     T: Clone,
 {
     pub fn get(&self, platform: &PlatformIdentifier) -> &T {
-        self.per_platform
-            .keys()
-            .cloned()
-            .sorted_by_key(|&id| Reverse(id)) // more specific platforms first
-            .find(|identifier| identifier == platform || platform.is_extension_of(identifier))
-            .and_then(|identifier| self.per_platform.get(&identifier))
-            .unwrap_or(&self.default)
+        self.per_platform.get(platform).unwrap_or(
+            platform
+                .get_subsets()
+                .into_iter()
+                // More specific platforms first.
+                // This is safe because a platform's subsets
+                // can be totally ordered among each other.
+                .sorted_by(|a, b| b.partial_cmp(a).unwrap_or(Ordering::Equal))
+                .find(|identifier| self.per_platform.contains_key(identifier))
+                .and_then(|identifier| self.per_platform.get(&identifier))
+                .unwrap_or(&self.default),
+        )
     }
 
     pub fn current_platform(&self) -> &T {
@@ -395,7 +384,7 @@ mod tests {
             PlatformIdentifier::Linux,
             PlatformIdentifier::Unix,
         ];
-        platforms.sort();
+        platforms.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
         assert_eq!(
             platforms,
             vec![
@@ -405,7 +394,7 @@ mod tests {
             ]
         );
         let mut platforms = vec![PlatformIdentifier::Windows, PlatformIdentifier::Win32];
-        platforms.sort();
+        platforms.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
         assert_eq!(
             platforms,
             vec![PlatformIdentifier::Win32, PlatformIdentifier::Windows]
@@ -432,6 +421,8 @@ mod tests {
             default: "default",
             per_platform: vec![
                 (PlatformIdentifier::Unix, "unix"),
+                (PlatformIdentifier::FreeBSD, "freebsd"),
+                (PlatformIdentifier::Cygwin, "cygwin"),
                 (PlatformIdentifier::Linux, "linux"),
             ]
             .into_iter()
@@ -439,6 +430,8 @@ mod tests {
         };
         assert_eq!(*foo.get(&PlatformIdentifier::MacOSX), "unix");
         assert_eq!(*foo.get(&PlatformIdentifier::Linux), "linux");
+        assert_eq!(*foo.get(&PlatformIdentifier::FreeBSD), "freebsd");
+        assert_eq!(*foo.get(&PlatformIdentifier::Cygwin), "cygwin");
         assert_eq!(*foo.get(&PlatformIdentifier::Windows), "default");
     }
 
