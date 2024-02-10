@@ -134,15 +134,16 @@
         "nixpkgs-stable": "nixpkgs-stable"
       },
       "locked": {
-        "lastModified": 1705229514,
-        "narHash": "sha256-itILy0zimR/iyUGq5Dgg0fiW8plRDyxF153LWGsg3Cw=",
-        "owner": "cachix",
+        "lastModified": 1707593974,
+        "narHash": "sha256-AGBTwjp4IiJNCIgUIp/H+yLeT7Oqli7X/HBz0LtW4dw=",
+        "owner": "mrcjkb",
         "repo": "pre-commit-hooks.nix",
-        "rev": "ffa9a5b90b0acfaa03b1533b83eaf5dead819a05",
+        "rev": "bfc996601d0ca70fde408f742cf290800ff8c2c2",
         "type": "github"
       },
       "original": {
-        "owner": "cachix",
+        "owner": "mrcjkb",
+        "ref": "clippy",
         "repo": "pre-commit-hooks.nix",
         "type": "github"
       }

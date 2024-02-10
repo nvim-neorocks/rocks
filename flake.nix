@@ -5,7 +5,9 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
     pre-commit-hooks = {
-      url = "github:cachix/pre-commit-hooks.nix";
+      # TODO: https://github.com/cachix/pre-commit-hooks.nix/pull/396
+      # url = "github:cachix/pre-commit-hooks.nix";
+      url = "github:mrcjkb/pre-commit-hooks.nix/clippy";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -44,8 +46,18 @@
           hooks = {
             alejandra.enable = true;
             rustfmt.enable = true;
-            # clippy.enable = true;
-            # cargo-check.enable = true;
+            clippy.enable = true;
+            cargo-check.enable = true;
+          };
+          settings = {
+            runtimeDeps = pkgs.rocks.buildInputs ++ pkgs.rocks.nativeBuildInputs;
+            rust.cargoDeps = pkgs.rustPlatform.importCargoLock {
+              lockFile = ./Cargo.lock;
+            };
+            clippy = {
+              denyWarnings = true;
+              allFeatures = true;
+            };
           };
         };
       in {
