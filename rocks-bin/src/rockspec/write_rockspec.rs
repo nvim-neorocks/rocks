@@ -38,7 +38,7 @@ pub async fn write_rockspec(data: WriteRockspec) -> Result<()> {
 
     let mut editor = rustyline::Editor::<(), _>::new()?;
 
-    editor.readline(format!("name (empty for '{}'):", repo_metadata.name).as_str())?;
+    editor.readline(format!("name (empty for '{}'): ", repo_metadata.name).as_str())?;
 
     Ok(())
 }
