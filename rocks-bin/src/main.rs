@@ -6,6 +6,7 @@ use rocks_lib::config::Config;
 mod download;
 mod search;
 mod unpack;
+mod rockspec;
 
 /// An small and efficient Lua package manager.
 #[derive(Parser)]
@@ -123,7 +124,7 @@ enum Commands {
     /// Tell which file corresponds to a given module name.
     Which,
     /// Write a template for a rockspec file.
-    WriteRockspec,
+    WriteRockspec(rockspec::WriteRockspec),
 }
 
 #[tokio::main]
@@ -159,6 +160,7 @@ async fn main() {
             Commands::UnpackRemote(unpack_data) => {
                 unpack::unpack_remote(unpack_data, &config).await.unwrap()
             }
+            Commands::WriteRockspec(rockspec_data) => rockspec::write_rockspec(rockspec_data).await.unwrap(),
             _ => unimplemented!(),
         },
         None => {
