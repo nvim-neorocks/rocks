@@ -43,7 +43,7 @@ pub async fn search(data: Search, config: &Config) -> Result<()> {
 
             if data.porcelain {
                 versions.for_each(|version| {
-                    println!("{} {} {} {}", key, version, "src|rockspec", config.server)
+                    println!("{} {} src|rockspec {}", key, version, config.server)
                 });
             } else {
                 let mut tree = StringTreeNode::new(key.to_owned());

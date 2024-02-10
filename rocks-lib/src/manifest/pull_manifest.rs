@@ -104,9 +104,11 @@ mod tests {
         let server = start_test_server("manifest-5.1".into());
         let mut url_str = server.url_str(""); // Remove trailing "/"
         url_str.pop();
-        let mut config = Config::default();
 
-        config.lua_version = Some("5.1".into());
+        let config = Config {
+            lua_version: Some("5.1".into()),
+            ..Config::default()
+        };
 
         manifest_from_server(url_str, &config).await.unwrap();
     }
