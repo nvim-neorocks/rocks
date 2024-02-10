@@ -1,0 +1,13 @@
+# Any change to files in the root directory, any later match takes precedence.
+* @NTBBloodbath @vhyrro @mrcjkb
+
+# Documentation
+*.md @NTBBloodbath @vhyrro @mrcjkb
+
+# Rust source files
+rocks-bin/ @NTBBloodbath @vhyrro @mrcjkb
+rocks-lib/ @NTBBloodbath @vhyrro @mrcjkb
+
+# Nix
+nix/ @mrcjkb @teto
+flake.* @mrcjkb @teto
