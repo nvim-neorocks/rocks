@@ -592,7 +592,7 @@ mod tests {
             per_platform
                 .get(&PlatformIdentifier::Windows)
                 .unwrap()
-                .into_iter()
+                .iter()
                 .filter(|dep| dep.matches(&neorg_override)
                     || dep.matches(&toml_edit)
                     || dep.matches(&toml))
@@ -603,7 +603,7 @@ mod tests {
             per_platform
                 .get(&PlatformIdentifier::Unix)
                 .unwrap()
-                .into_iter()
+                .iter()
                 .filter(|dep| dep.matches(&neorg_override)
                     || dep.matches(&toml_edit)
                     || dep.matches(&toml))
@@ -614,7 +614,7 @@ mod tests {
             per_platform
                 .get(&PlatformIdentifier::Linux)
                 .unwrap()
-                .into_iter()
+                .iter()
                 .filter(|dep| dep.matches(&neorg_override)
                     || dep.matches(&toml_edit)
                     || dep.matches(&toml))

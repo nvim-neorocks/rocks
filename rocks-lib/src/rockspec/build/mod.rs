@@ -388,14 +388,13 @@ mod tests {
 
     #[tokio::test]
     pub async fn deserialize_build_type() {
-        let build_type: BuildType = serde_json::from_str("\"builtin\"".into()).unwrap();
+        let build_type: BuildType = serde_json::from_str("\"builtin\"").unwrap();
         assert_eq!(build_type, BuildType::Builtin);
-        let build_type: BuildType = serde_json::from_str("\"module\"".into()).unwrap();
+        let build_type: BuildType = serde_json::from_str("\"module\"").unwrap();
         assert_eq!(build_type, BuildType::Builtin);
-        let build_type: BuildType = serde_json::from_str("\"make\"".into()).unwrap();
+        let build_type: BuildType = serde_json::from_str("\"make\"").unwrap();
         assert_eq!(build_type, BuildType::Make);
-        let build_type: BuildType =
-            serde_json::from_str("\"luarocks_build_rust_mlua\"".into()).unwrap();
+        let build_type: BuildType = serde_json::from_str("\"luarocks_build_rust_mlua\"").unwrap();
         assert_eq!(
             build_type,
             BuildType::LuaRock("luarocks_build_rust_mlua".into())
