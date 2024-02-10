@@ -38,6 +38,7 @@ pub async fn write_rockspec(data: WriteRockspec) -> Result<()> {
 
     let mut editor = rustyline::Editor::<(), _>::new()?;
 
+    // TODO: Make prompts coloured
     editor.readline(format!("name (empty for '{}'): ", repo_metadata.name).as_str())?;
 
     Ok(())
