@@ -5,13 +5,15 @@ use spinners::{Spinner, Spinners};
 use crate::rockspec::github_metadata::{self, RepoMetadata};
 
 macro_rules! empty_or {
-    ($initial:expr, $alternative:expr) => {
-        if $initial.is_empty() {
+    ($initial:expr, $alternative:expr) => {{
+        let check = $initial;
+
+        if check.is_empty() {
             $alternative.into()
         } else {
-            $initial
+            check
         }
-    };
+    }};
 }
 
 // General notes and ideas:
