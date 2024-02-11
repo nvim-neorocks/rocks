@@ -13,6 +13,7 @@ nucleo = "0.3.0"
 octocrab = "0.34.0"
 rocks-lib = { path = "../rocks-lib/" }
 rustyline = "13.0.0"
+spdx = "0.10.3"
 spinners = "4.1.1"
 termcolor = "1.4.1"
 text_trees = "0.1.2"
