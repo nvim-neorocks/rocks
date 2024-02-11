@@ -130,16 +130,16 @@ pub async fn write_rockspec(_data: WriteRockspec) -> Result<()> {
             .unwrap_or("*** enter a license ***".into())
     )?;
 
-    let authors = parse!(
+    let maintainer = parse!(
         editor.readline(
             format!(
-                "Authors (empty for '[{}]'): ",
-                repo_metadata.contributors.join(" ")
+                "Maintainer (empty for '{}'): ",
+                repo_metadata.contributors.first().unwrap_or(&"".into())
             )
             .as_str()
         ),
-        parse_list,
-        repo_metadata.contributors
+        identity,
+        repo_metadata.contributors.first().unwrap_or(&"".into())
     )?;
 
     let labels = parse!(
@@ -169,11 +169,12 @@ package = "{package_name}"
 version = "dev-1"
 
 source = {{
-    url = "*** provide a url here***",
+    url = "*** provide a url here ***",
 }}
 
 description = {{
     summary = "{summary}",
+    maintainer = "{maintainer}",
     license = "{license}",
     labels = {{ {labels} }},
 }}
@@ -185,7 +186,8 @@ build = {{
             package_name = package_name,
             summary = description,
             license = license,
-            labels = labels
+            labels = labels,
+            maintainer = maintainer,
         )
         .trim(),
     )?;
