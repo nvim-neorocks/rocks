@@ -1,5 +1,6 @@
 use clap::Args;
 use eyre::{eyre, Result};
+use itertools::Itertools;
 use rustyline::error::ReadlineError;
 use spinners::{Spinner, Spinners};
 
@@ -14,12 +15,13 @@ macro_rules! parse {
                         break Ok($alternative.into());
                     }
 
-                    if let Result::<_, eyre::Error>::Err(err) = $parser(&value) {
-                        println!("Error: {}", err.to_string());
-                        continue;
+                    match $parser(value) {
+                        Ok(value) => break Ok(value),
+                        Err(err) => {
+                            println!("Error: {}", err.to_string());
+                            continue;
+                        }
                     }
-
-                    break Ok(value);
                 }
                 Err(ReadlineError::Interrupted) => {
                     break Err(eyre!("Ctrl-C pressed, exiting..."));
@@ -37,12 +39,26 @@ macro_rules! parse {
 // - Should we require the user to create a "project" in order to use this command?
 // - Should we grab all collaborators by default? That might end up being massive
 //   if there's a sizeable project.
+// - Ask user for a homepage
+// - Automatically detect build type by inspecting the current repo (is there a Cargo.toml? is
+//   there something that tells us it's a lua project?).
 
 #[derive(Args)]
 pub struct WriteRockspec {}
 
-fn verify_list(input: &String) -> Result<()> {
-    Ok(())
+fn identity(input: String) -> Result<String> {
+    Ok(input)
+}
+
+fn parse_list(input: String) -> Result<Vec<String>> {
+    if let Some((pos, char)) = input
+        .chars()
+        .find_position(|&c| c != '-' && c != '_' && c.is_ascii_punctuation())
+    {
+        Err(eyre!("Unexpected punctuation '{}' found at column {}. Lists are space separated and do not consist of punctuation!", char, pos))
+    } else {
+        Ok(input.split_whitespace().map_into().collect())
+    }
 }
 
 pub async fn write_rockspec(_data: WriteRockspec) -> Result<()> {
@@ -78,7 +94,7 @@ pub async fn write_rockspec(_data: WriteRockspec) -> Result<()> {
     // TODO(vhyrro): Make the array inputs less confusing (mention it being space separated)
     let package_name = parse!(
         editor.readline(format!("Package Name (empty for '{}'): ", repo_metadata.name).as_str()),
-        |_| { Ok(()) },
+        identity,
         repo_metadata.name
     )?;
 
@@ -89,24 +105,41 @@ pub async fn write_rockspec(_data: WriteRockspec) -> Result<()> {
                 repo_metadata
                     .description
                     .as_ref()
-                    .unwrap_or(&"".to_string())
+                    .unwrap_or(&"*** enter a description ***".to_string())
             )
             .as_str()
         ),
-        |_| { Ok(()) },
+        identity,
         repo_metadata.description.unwrap_or_default()
+    )?;
+
+    let license = parse!(
+        editor.readline(
+            format!(
+                "License (empty for '{}'): ",
+                repo_metadata
+                    .license
+                    .as_ref()
+                    .unwrap_or(&"*** enter a license ***".to_string())
+            )
+            .as_str()
+        ),
+        identity, // TODO: verify license validity
+        repo_metadata
+            .license
+            .unwrap_or("*** enter a license ***".into())
     )?;
 
     let authors = parse!(
         editor.readline(
             format!(
                 "Authors (empty for '[{}]'): ",
-                repo_metadata.contributors.join(", ")
+                repo_metadata.contributors.join(" ")
             )
             .as_str()
         ),
-        verify_list,
-        repo_metadata.contributors.join(" ")
+        parse_list,
+        repo_metadata.contributors
     )?;
 
     let labels = parse!(
@@ -117,15 +150,45 @@ pub async fn write_rockspec(_data: WriteRockspec) -> Result<()> {
                     .labels
                     .as_ref()
                     .unwrap_or(&Vec::default())
-                    .join(", ")
+                    .join(" ")
             )
             .as_str()
         ),
-        verify_list,
-        repo_metadata.labels.unwrap_or_default().join(" ")
-    )?;
+        parse_list,
+        repo_metadata.labels.unwrap_or_default()
+    )?
+    .into_iter()
+    .map(|label| "\"".to_string() + &label + "\"")
+    .join(", ");
 
-    println!("{}, {}, {}, {}", package_name, description, authors, labels);
+    std::fs::write(
+        format!("{}-dev.rockspec", package_name),
+        format!(
+            r#"
+package = "{package_name}"
+version = "dev-1"
+
+source = {{
+    url = "*** provide a url here***",
+}}
+
+description = {{
+    summary = "{summary}",
+    license = "{license}",
+    labels = {{ {labels} }},
+}}
+
+build = {{
+    type = "builtin",
+}}
+    "#,
+            package_name = package_name,
+            summary = description,
+            license = license,
+            labels = labels
+        )
+        .trim(),
+    )?;
 
     Ok(())
 }
