@@ -2,6 +2,7 @@ use clap::Args;
 use eyre::{eyre, Result};
 use itertools::Itertools;
 use rustyline::error::ReadlineError;
+use spdx::LicenseId;
 use spinners::{Spinner, Spinners};
 
 use crate::rockspec::github_metadata::{self, RepoMetadata};
@@ -37,8 +38,6 @@ macro_rules! parse {
 
 // General notes and ideas:
 // - Should we require the user to create a "project" in order to use this command?
-// - Should we grab all collaborators by default? That might end up being massive
-//   if there's a sizeable project.
 // - Ask user for a homepage
 // - Automatically detect build type by inspecting the current repo (is there a Cargo.toml? is
 //   there something that tells us it's a lua project?).
@@ -58,6 +57,20 @@ fn parse_list(input: String) -> Result<Vec<String>> {
         Err(eyre!("Unexpected punctuation '{}' found at column {}. Lists are space separated and do not consist of punctuation!", char, pos))
     } else {
         Ok(input.split_whitespace().map_into().collect())
+    }
+}
+
+fn parse_license(input: String) -> Result<Option<LicenseId>> {
+    match input.to_lowercase().as_str() {
+        "none" => Ok(None),
+        _ => Ok(Some(
+            spdx::imprecise_license_id(&input)
+                .ok_or(eyre!(
+                    "Unable to identify license '{}', please try again!",
+                    input
+                ))?
+                .0,
+        )),
     }
 }
 
@@ -91,7 +104,6 @@ pub async fn write_rockspec(_data: WriteRockspec) -> Result<()> {
     // let mut stdout = BufferedStandardStream::stdout(ColorChoice::Always);
     // stdout.set_color(ColorSpec::new().set_fg(Some(Color::Green)))?;
 
-    // TODO(vhyrro): Make the array inputs less confusing (mention it being space separated)
     let package_name = parse!(
         editor.readline(format!("Package Name (empty for '{}'): ", repo_metadata.name).as_str()),
         identity,
@@ -116,19 +128,19 @@ pub async fn write_rockspec(_data: WriteRockspec) -> Result<()> {
     let license = parse!(
         editor.readline(
             format!(
-                "License (empty for '{}'): ",
+                "License (empty for '{}', 'none' for no license): ",
                 repo_metadata
                     .license
                     .as_ref()
-                    .unwrap_or(&"*** enter a license ***".to_string())
+                    .unwrap_or(&"none".to_string())
             )
             .as_str()
         ),
-        identity, // TODO: verify license validity
-        repo_metadata
-            .license
-            .unwrap_or("*** enter a license ***".into())
-    )?;
+        parse_license,
+        parse_license(repo_metadata.license.unwrap())?
+    )?
+    .map(|license| license.name)
+    .unwrap_or("*** enter license here ***");
 
     let maintainer = parse!(
         editor.readline(
