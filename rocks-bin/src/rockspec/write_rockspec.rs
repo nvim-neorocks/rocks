@@ -1,11 +1,6 @@
-use std::{collections::HashMap, io::Write};
-
 use clap::Args;
 use eyre::Result;
 use spinners::{Spinner, Spinners};
-use termcolor::{
-    Buffer, BufferedStandardStream, Color, ColorChoice, ColorSpec, StandardStream, WriteColor,
-};
 
 use crate::rockspec::github_metadata::{self, RepoMetadata};
 
@@ -27,7 +22,7 @@ macro_rules! empty_or {
 #[derive(Args)]
 pub struct WriteRockspec {}
 
-pub async fn write_rockspec(data: WriteRockspec) -> Result<()> {
+pub async fn write_rockspec(_data: WriteRockspec) -> Result<()> {
     let mut spinner = Spinner::new(Spinners::Dots, "Fetching repository metadata...".into());
 
     let repo_metadata = github_metadata::get_metadata_for(None)
