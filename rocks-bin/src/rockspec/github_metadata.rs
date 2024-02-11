@@ -7,6 +7,7 @@ use std::path::PathBuf;
 #[derive(Debug)]
 pub struct RepoMetadata {
     pub name: String,
+    pub description: Option<String>,
     pub license: Option<String>,
     pub labels: Option<Vec<String>>,
     pub contributors: Vec<String>,
@@ -36,6 +37,7 @@ pub async fn get_metadata_for(directory: Option<&PathBuf>) -> Result<Option<Repo
 
         Ok(Some(RepoMetadata {
             name: repo_data.name,
+            description: repo_data.description,
             license: repo_data.license.map(|license| license.name),
             labels: repo_data.topics,
             contributors: contributors

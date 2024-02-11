@@ -1,10 +1,23 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Write};
 
 use clap::Args;
 use eyre::Result;
 use spinners::{Spinner, Spinners};
+use termcolor::{
+    Buffer, BufferedStandardStream, Color, ColorChoice, ColorSpec, StandardStream, WriteColor,
+};
 
 use crate::rockspec::github_metadata::{self, RepoMetadata};
+
+macro_rules! empty_or {
+    ($initial:expr, $alternative:expr) => {
+        if $initial.is_empty() {
+            $alternative.into()
+        } else {
+            $initial
+        }
+    };
+}
 
 // General notes and ideas:
 // - Should we require the user to create a "project" in order to use this command?
@@ -26,6 +39,7 @@ pub async fn write_rockspec(data: WriteRockspec) -> Result<()> {
                 .unwrap_or_default()
                 .to_string_lossy()
                 .to_string(),
+            description: None,
             license: None,
             contributors: vec![users::get_current_username()
                 .unwrap_or_default()
@@ -39,7 +53,54 @@ pub async fn write_rockspec(data: WriteRockspec) -> Result<()> {
     let mut editor = rustyline::Editor::<(), _>::new()?;
 
     // TODO: Make prompts coloured
-    editor.readline(format!("name (empty for '{}'): ", repo_metadata.name).as_str())?;
+
+    // let mut stdout = BufferedStandardStream::stdout(ColorChoice::Always);
+    // stdout.set_color(ColorSpec::new().set_fg(Some(Color::Green)))?;
+
+    // TODO(vhyrro): Make the array inputs less confusing (mention it being space separated)
+    let package_name = empty_or!(
+        editor.readline(format!("Package Name (empty for '{}'): ", repo_metadata.name).as_str())?,
+        repo_metadata.name
+    );
+    let description = empty_or!(
+        editor.readline(
+            format!(
+                "Description (empty for '{}'): ",
+                repo_metadata
+                    .description
+                    .as_ref()
+                    .unwrap_or(&"".to_string())
+            )
+            .as_str()
+        )?,
+        repo_metadata.description.unwrap_or_default()
+    );
+    let authors = empty_or!(
+        editor.readline(
+            format!(
+                "Authors (empty for '[{}]'): ",
+                repo_metadata.contributors.join(", ")
+            )
+            .as_str()
+        )?,
+        repo_metadata.contributors.join(" ")
+    );
+    let labels = empty_or!(
+        editor.readline(
+            format!(
+                "Labels (empty for '[{}]'): ",
+                repo_metadata
+                    .labels
+                    .as_ref()
+                    .unwrap_or(&Vec::default())
+                    .join(", ")
+            )
+            .as_str()
+        )?,
+        repo_metadata.labels.unwrap_or_default().join(" ")
+    );
+
+    println!("{}, {}, {}, {}", package_name, description, authors, labels);
 
     Ok(())
 }
