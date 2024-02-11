@@ -1,19 +1,36 @@
 use clap::Args;
-use eyre::Result;
+use eyre::{eyre, Result};
+use rustyline::error::ReadlineError;
 use spinners::{Spinner, Spinners};
 
 use crate::rockspec::github_metadata::{self, RepoMetadata};
 
-macro_rules! empty_or {
-    ($initial:expr, $alternative:expr) => {{
-        let check = $initial;
+macro_rules! parse {
+    ($initial:expr, $parser:expr, $alternative:expr) => {
+        loop {
+            match $initial {
+                Ok(value) => {
+                    if value.is_empty() {
+                        break Ok($alternative.into());
+                    }
 
-        if check.is_empty() {
-            $alternative.into()
-        } else {
-            check
+                    if let Result::<_, eyre::Error>::Err(err) = $parser(&value) {
+                        println!("Error: {}", err.to_string());
+                        continue;
+                    }
+
+                    break Ok(value);
+                }
+                Err(ReadlineError::Interrupted) => {
+                    break Err(eyre!("Ctrl-C pressed, exiting..."));
+                }
+                Err(ReadlineError::Eof) => {
+                    break Err(eyre!("Ctrl-D pressed, exiting..."));
+                }
+                Err(err) => break Err(err.into()),
+            }
         }
-    }};
+    };
 }
 
 // General notes and ideas:
@@ -23,6 +40,10 @@ macro_rules! empty_or {
 
 #[derive(Args)]
 pub struct WriteRockspec {}
+
+fn verify_list(input: &String) -> Result<()> {
+    Ok(())
+}
 
 pub async fn write_rockspec(_data: WriteRockspec) -> Result<()> {
     let mut spinner = Spinner::new(Spinners::Dots, "Fetching repository metadata...".into());
@@ -55,11 +76,13 @@ pub async fn write_rockspec(_data: WriteRockspec) -> Result<()> {
     // stdout.set_color(ColorSpec::new().set_fg(Some(Color::Green)))?;
 
     // TODO(vhyrro): Make the array inputs less confusing (mention it being space separated)
-    let package_name = empty_or!(
-        editor.readline(format!("Package Name (empty for '{}'): ", repo_metadata.name).as_str())?,
+    let package_name = parse!(
+        editor.readline(format!("Package Name (empty for '{}'): ", repo_metadata.name).as_str()),
+        |_| { Ok(()) },
         repo_metadata.name
-    );
-    let description = empty_or!(
+    )?;
+
+    let description = parse!(
         editor.readline(
             format!(
                 "Description (empty for '{}'): ",
@@ -69,20 +92,24 @@ pub async fn write_rockspec(_data: WriteRockspec) -> Result<()> {
                     .unwrap_or(&"".to_string())
             )
             .as_str()
-        )?,
+        ),
+        |_| { Ok(()) },
         repo_metadata.description.unwrap_or_default()
-    );
-    let authors = empty_or!(
+    )?;
+
+    let authors = parse!(
         editor.readline(
             format!(
                 "Authors (empty for '[{}]'): ",
                 repo_metadata.contributors.join(", ")
             )
             .as_str()
-        )?,
+        ),
+        verify_list,
         repo_metadata.contributors.join(" ")
-    );
-    let labels = empty_or!(
+    )?;
+
+    let labels = parse!(
         editor.readline(
             format!(
                 "Labels (empty for '[{}]'): ",
@@ -93,9 +120,10 @@ pub async fn write_rockspec(_data: WriteRockspec) -> Result<()> {
                     .join(", ")
             )
             .as_str()
-        )?,
+        ),
+        verify_list,
         repo_metadata.labels.unwrap_or_default().join(" ")
-    );
+    )?;
 
     println!("{}, {}, {}, {}", package_name, description, authors, labels);
 
