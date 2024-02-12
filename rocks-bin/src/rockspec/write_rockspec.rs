@@ -55,7 +55,7 @@ pub struct WriteRockspec {
     #[arg(short, long)]
     description: Option<String>,
 
-    /// The license of the rock. Generic license names will try to be inferred.
+    /// The license of the rock. Generic license names will be inferred.
     #[arg(short, long, value_parser = parse_license_wrapper)]
     license: Option<Either<LicenseId, ()>>,
 
