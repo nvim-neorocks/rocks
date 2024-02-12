@@ -9,8 +9,8 @@ use super::{PartialOverride, PerPlatform, PlatformOverridable};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LuaDependency {
-    rock_name: String,
-    rock_version_req: VersionReq,
+    pub rock_name: String,
+    pub rock_version_req: VersionReq,
 }
 
 impl FromStr for LuaDependency {
