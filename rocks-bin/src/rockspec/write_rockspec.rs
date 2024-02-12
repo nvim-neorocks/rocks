@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use clap::Args;
 use eyre::{eyre, Result};
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use rustyline::error::ReadlineError;
 use spdx::LicenseId;
 use spinners::{Spinner, Spinners};
@@ -46,7 +46,26 @@ macro_rules! parse {
 //   there something that tells us it's a lua project?).
 
 #[derive(Args)]
-pub struct WriteRockspec {}
+pub struct WriteRockspec {
+    /// The name to give to the rock.
+    #[arg(long)]
+    name: Option<String>,
+
+    /// The description of the rock.
+    #[arg(long)]
+    description: Option<String>,
+
+    /// The license of the rock. Generic license names will try to be inferred.
+    #[arg(long, value_parser = parse_license_wrapper)]
+    license: Option<Either<LicenseId, ()>>,
+}
+
+fn parse_license_wrapper(s: &str) -> std::result::Result<Either<LicenseId, ()>, String> {
+    match parse_license(s.to_string()) {
+        Ok(val) => Ok(val.map(Either::Left).unwrap_or(Either::Right(()))),
+        Err(err) => Err(err.to_string()),
+    }
+}
 
 fn identity(input: String) -> Result<String> {
     Ok(input)
@@ -81,7 +100,7 @@ fn parse_version(input: String) -> Result<LuaDependency> {
     LuaDependency::from_str(format!("lua {}", input).as_str())
 }
 
-pub async fn write_rockspec(_data: WriteRockspec) -> Result<()> {
+pub async fn write_rockspec(data: WriteRockspec) -> Result<()> {
     let mut spinner = Spinner::new(Spinners::Dots, "Fetching repository metadata...".into());
 
     let repo_metadata = github_metadata::get_metadata_for(None)
@@ -111,43 +130,59 @@ pub async fn write_rockspec(_data: WriteRockspec) -> Result<()> {
     // let mut stdout = BufferedStandardStream::stdout(ColorChoice::Always);
     // stdout.set_color(ColorSpec::new().set_fg(Some(Color::Green)))?;
 
-    let package_name = parse!(
-        editor.readline(format!("Package Name (empty for '{}'): ", repo_metadata.name).as_str()),
-        identity,
-        repo_metadata.name
-    )?;
+    let package_name = data.name.map(Ok).unwrap_or_else(|| {
+        parse!(
+            editor
+                .readline(format!("Package Name (empty for '{}'): ", repo_metadata.name).as_str()),
+            identity,
+            repo_metadata.name
+        )
+    })?;
 
-    let description = parse!(
-        editor.readline(
-            format!(
-                "Description (empty for '{}'): ",
-                repo_metadata
-                    .description
-                    .as_ref()
-                    .unwrap_or(&"*** enter a description ***".to_string())
-            )
-            .as_str()
-        ),
-        identity,
-        repo_metadata.description.unwrap_or_default()
-    )?;
+    let description = data.description.map(Ok).unwrap_or_else(|| {
+        parse!(
+            editor.readline(
+                format!(
+                    "Description (empty for '{}'): ",
+                    repo_metadata
+                        .description
+                        .as_ref()
+                        .unwrap_or(&"*** enter a description ***".to_string())
+                )
+                .as_str()
+            ),
+            identity,
+            repo_metadata.description.unwrap_or_default()
+        )
+    })?;
 
-    let license = parse!(
-        editor.readline(
-            format!(
-                "License (empty for '{}', 'none' for no license): ",
-                repo_metadata
-                    .license
-                    .as_ref()
-                    .unwrap_or(&"none".to_string())
-            )
-            .as_str()
-        ),
-        parse_license,
-        parse_license(repo_metadata.license.unwrap())?
-    )?
-    .map(|license| license.name)
-    .unwrap_or("*** enter license here ***");
+    let license = data
+        .license // First validate the `--license` option
+        .and_then(|license| match license {
+            Either::Left(license) => Some(license),
+            Either::Right(_) => None,
+        })
+        .map_or_else(
+            || { // If there was no `--license` then prompt the user
+                parse!(
+                    editor.readline(
+                        format!(
+                            "License (empty for '{}', 'none' for no license): ",
+                            repo_metadata
+                                .license
+                                .as_ref()
+                                .unwrap_or(&"none".to_string())
+                        )
+                        .as_str()
+                    ),
+                    parse_license,
+                    parse_license(repo_metadata.license.unwrap())?
+                )
+            },
+            |val| Ok(Some(val)),
+        )?
+        .map(|license| license.name)
+        .unwrap_or("*** enter a license ***");
 
     let maintainer = parse!(
         editor.readline(
