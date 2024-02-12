@@ -48,16 +48,20 @@ macro_rules! parse {
 #[derive(Args)]
 pub struct WriteRockspec {
     /// The name to give to the rock.
-    #[arg(long)]
+    #[arg(short, long)]
     name: Option<String>,
 
     /// The description of the rock.
-    #[arg(long)]
+    #[arg(short, long)]
     description: Option<String>,
 
     /// The license of the rock. Generic license names will try to be inferred.
-    #[arg(long, value_parser = parse_license_wrapper)]
+    #[arg(short, long, value_parser = parse_license_wrapper)]
     license: Option<Either<LicenseId, ()>>,
+
+    /// The maintainer of this rock. Does not have to be the code author.
+    #[arg(short, long)]
+    maintainer: Option<String>,
 }
 
 fn parse_license_wrapper(s: &str) -> std::result::Result<Either<LicenseId, ()>, String> {
@@ -163,7 +167,8 @@ pub async fn write_rockspec(data: WriteRockspec) -> Result<()> {
             Either::Right(_) => None,
         })
         .map_or_else(
-            || { // If there was no `--license` then prompt the user
+            || {
+                // If there was no `--license` then prompt the user
                 parse!(
                     editor.readline(
                         format!(
@@ -184,17 +189,19 @@ pub async fn write_rockspec(data: WriteRockspec) -> Result<()> {
         .map(|license| license.name)
         .unwrap_or("*** enter a license ***");
 
-    let maintainer = parse!(
-        editor.readline(
-            format!(
-                "Maintainer (empty for '{}'): ",
-                repo_metadata.contributors.first().unwrap_or(&"".into())
-            )
-            .as_str()
-        ),
-        identity,
-        repo_metadata.contributors.first().unwrap_or(&"".into())
-    )?;
+    let maintainer = data.maintainer.map(Ok).unwrap_or_else(|| {
+        parse!(
+            editor.readline(
+                format!(
+                    "Maintainer (empty for '{}'): ",
+                    repo_metadata.contributors.first().unwrap_or(&"".into())
+                )
+                .as_str()
+            ),
+            identity,
+            repo_metadata.contributors.first().unwrap_or(&"".into())
+        )
+    })?;
 
     let labels = parse!(
         editor.readline(
