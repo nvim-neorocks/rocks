@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use clap::Args;
 use eyre::{eyre, Result};
 use itertools::Itertools;
@@ -6,6 +8,7 @@ use spdx::LicenseId;
 use spinners::{Spinner, Spinners};
 
 use crate::rockspec::github_metadata::{self, RepoMetadata};
+use rocks_lib::rockspec::LuaDependency;
 
 macro_rules! parse {
     ($initial:expr, $parser:expr, $alternative:expr) => {
@@ -72,6 +75,10 @@ fn parse_license(input: String) -> Result<Option<LicenseId>> {
                 .0,
         )),
     }
+}
+
+fn parse_version(input: String) -> Result<LuaDependency> {
+    LuaDependency::from_str(format!("lua {}", input).as_str())
 }
 
 pub async fn write_rockspec(_data: WriteRockspec) -> Result<()> {
@@ -173,10 +180,17 @@ pub async fn write_rockspec(_data: WriteRockspec) -> Result<()> {
     .map(|label| "\"".to_string() + &label + "\"")
     .join(", ");
 
+    let lua_versions = parse!(
+        editor.readline("Supported Lua Versions (empty for '>= 5.1'): ",),
+        parse_version,
+        LuaDependency::from_str("lua >= 5.1")?
+    )?;
+
     std::fs::write(
         format!("{}-dev.rockspec", package_name),
         format!(
             r#"
+rockspec_format = "3.0"
 package = "{package_name}"
 version = "dev-1"
 
@@ -191,6 +205,10 @@ description = {{
     labels = {{ {labels} }},
 }}
 
+dependencies = {{
+    "lua{version}",
+}}
+
 build = {{
     type = "builtin",
 }}
@@ -200,9 +218,12 @@ build = {{
             license = license,
             labels = labels,
             maintainer = maintainer,
+            version = lua_versions.rock_version_req.to_string().replace('^', "~>"),
         )
         .trim(),
     )?;
 
     Ok(())
 }
+
+// TODO(vhyrro): Add tests
