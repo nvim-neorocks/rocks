@@ -1,7 +1,8 @@
+///! Retrieves metadata from a given github repository
+
 use eyre::eyre;
 use eyre::Result;
 use git2::Repository;
-///! Retrieves metadata from a given github repository
 use std::path::PathBuf;
 
 #[derive(Debug)]
