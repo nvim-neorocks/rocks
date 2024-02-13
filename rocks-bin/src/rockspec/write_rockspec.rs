@@ -122,28 +122,31 @@ fn parse_version(input: String) -> Result<LuaDependency> {
 }
 
 pub async fn write_rockspec(cli_flags: WriteRockspec) -> Result<()> {
-    let (package_name, description, labels, license, lua_versions, maintainer) = match (
-        cli_flags.name,
-        cli_flags.description,
-        cli_flags.labels,
-        cli_flags.license,
-        cli_flags.lua_versions,
-        cli_flags.maintainer,
-    ) {
+    let (package_name, description, labels, license, lua_versions, maintainer) = match cli_flags {
         // If all parameters are provided then don't bother prompting the user
-        (
-            Some(name),
-            Some(description),
-            Some(labels),
-            Some(license),
-            Some(lua_versions),
-            Some(maintainer),
-        ) => Ok::<_, eyre::Report>((name, description, labels, license, lua_versions, maintainer)),
-        (name, description, labels, license, lua_versions, maintainer) => {
+        WriteRockspec {
+            name: Some(name),
+            description: Some(description),
+            labels: Some(labels),
+            license: Some(license),
+            lua_versions: Some(lua_versions),
+            maintainer: Some(maintainer),
+            ..
+        } => Ok::<_, eyre::Report>((name, description, labels, license, lua_versions, maintainer)),
+
+        WriteRockspec {
+            name,
+            description,
+            labels,
+            license,
+            lua_versions,
+            maintainer,
+            directory,
+        } => {
             let mut spinner =
                 Spinner::new(Spinners::Dots, "Fetching repository metadata...".into());
 
-            let repo_metadata = github_metadata::get_metadata_for(cli_flags.directory.as_ref())
+            let repo_metadata = github_metadata::get_metadata_for(directory.as_ref())
                 .await?
                 .unwrap_or_else(|| RepoMetadata {
                     name: std::env::current_dir()
