@@ -77,15 +77,15 @@ pub struct WriteRockspec {
 }
 
 fn parse_license_wrapper(s: &str) -> std::result::Result<Option<LicenseId>, String> {
-    Ok(parse_license(s.to_string()).map_err(|err| err.to_string())?)
+    parse_license(s.to_string()).map_err(|err| err.to_string())
 }
 
 fn parse_version_wrapper(s: &str) -> std::result::Result<LuaDependency, String> {
-    Ok(parse_version(s.to_string()).map_err(|err| err.to_string())?)
+    parse_version(s.to_string()).map_err(|err| err.to_string())
 }
 
 fn parse_list_wrapper(s: &str) -> std::result::Result<Vec<String>, String> {
-    Ok(parse_list(s.to_string()).map_err(|err| err.to_string())?)
+    parse_list(s.to_string()).map_err(|err| err.to_string())
 }
 
 fn identity(input: String) -> Result<String> {
