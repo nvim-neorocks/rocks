@@ -4,9 +4,9 @@ use clap::{Parser, Subcommand};
 use rocks_lib::config::Config;
 
 mod download;
+mod rockspec;
 mod search;
 mod unpack;
-mod rockspec;
 
 /// An small and efficient Lua package manager.
 #[derive(Parser)]
@@ -160,7 +160,9 @@ async fn main() {
             Commands::UnpackRemote(unpack_data) => {
                 unpack::unpack_remote(unpack_data, &config).await.unwrap()
             }
-            Commands::WriteRockspec(rockspec_data) => rockspec::write_rockspec(rockspec_data).await.unwrap(),
+            Commands::WriteRockspec(rockspec_data) => {
+                rockspec::write_rockspec(rockspec_data).await.unwrap()
+            }
             _ => unimplemented!(),
         },
         None => {
