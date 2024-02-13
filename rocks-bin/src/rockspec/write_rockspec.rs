@@ -1,4 +1,4 @@
-use std::{str::FromStr, path::PathBuf};
+use std::{path::PathBuf, str::FromStr};
 
 use clap::Args;
 use eyre::{eyre, Result};
@@ -130,7 +130,8 @@ pub async fn write_rockspec(cli_flags: WriteRockspec) -> Result<()> {
         cli_flags.lua_versions,
         cli_flags.maintainer,
     ) {
-        ( // If all parameters are provided then don't bother prompting the user
+        // If all parameters are provided then don't bother prompting the user
+        (
             Some(name),
             Some(description),
             Some(labels),
