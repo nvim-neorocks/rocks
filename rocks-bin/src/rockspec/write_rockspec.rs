@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use clap::Args;
 use eyre::{eyre, Result};
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use rustyline::error::ReadlineError;
 use spdx::LicenseId;
 use spinners::{Spinner, Spinners};
@@ -48,27 +48,41 @@ macro_rules! parse {
 #[derive(Args)]
 pub struct WriteRockspec {
     /// The name to give to the rock.
-    #[arg(short, long)]
+    #[arg(long)]
     name: Option<String>,
 
     /// The description of the rock.
-    #[arg(short, long)]
+    #[arg(long)]
     description: Option<String>,
 
     /// The license of the rock. Generic license names will be inferred.
-    #[arg(short, long, value_parser = parse_license_wrapper)]
-    license: Option<Either<LicenseId, ()>>,
+    #[arg(long, value_parser = parse_license_wrapper)]
+    license: Option<std::option::Option<LicenseId>>, // Note: full qualified name required, see https://github.com/clap-rs/clap/issues/4626
 
     /// The maintainer of this rock. Does not have to be the code author.
-    #[arg(short, long)]
+    #[arg(long)]
     maintainer: Option<String>,
+
+    /// A comma-separated list of labels to apply to this rock.
+    #[arg(long, value_parser = parse_list_wrapper)]
+    labels: Option<std::vec::Vec<String>>, // Note: full qualified name required, see https://github.com/clap-rs/clap/issues/4626
+
+    /// A version constraint on the required Lua version for this rock.
+    /// Examples: ">=5.1", "5.1"
+    #[arg(long, value_parser = parse_version_wrapper)]
+    lua_versions: Option<LuaDependency>,
 }
 
-fn parse_license_wrapper(s: &str) -> std::result::Result<Either<LicenseId, ()>, String> {
-    match parse_license(s.to_string()) {
-        Ok(val) => Ok(val.map(Either::Left).unwrap_or(Either::Right(()))),
-        Err(err) => Err(err.to_string()),
-    }
+fn parse_license_wrapper(s: &str) -> std::result::Result<Option<LicenseId>, String> {
+    Ok(parse_license(s.to_string()).map_err(|err| err.to_string())?)
+}
+
+fn parse_version_wrapper(s: &str) -> std::result::Result<LuaDependency, String> {
+    Ok(parse_version(s.to_string()).map_err(|err| err.to_string())?)
+}
+
+fn parse_list_wrapper(s: &str) -> std::result::Result<Vec<String>, String> {
+    Ok(parse_list(s.to_string()).map_err(|err| err.to_string())?)
 }
 
 fn identity(input: String) -> Result<String> {
@@ -78,11 +92,11 @@ fn identity(input: String) -> Result<String> {
 fn parse_list(input: String) -> Result<Vec<String>> {
     if let Some((pos, char)) = input
         .chars()
-        .find_position(|&c| c != '-' && c != '_' && c.is_ascii_punctuation())
+        .find_position(|&c| c != '-' && c != '_' && c != ',' && c.is_ascii_punctuation())
     {
-        Err(eyre!("Unexpected punctuation '{}' found at column {}. Lists are space separated and do not consist of punctuation!", char, pos))
+        Err(eyre!("Unexpected punctuation '{}' found at column {}. Lists are comma separated but names should not contain punctuation!", char, pos))
     } else {
-        Ok(input.split_whitespace().map_into().collect())
+        Ok(input.split(",").map(|str| str.trim().to_string()).collect())
     }
 }
 
@@ -106,6 +120,8 @@ fn parse_version(input: String) -> Result<LuaDependency> {
 
 pub async fn write_rockspec(data: WriteRockspec) -> Result<()> {
     let mut spinner = Spinner::new(Spinners::Dots, "Fetching repository metadata...".into());
+
+    // [data.labels, data.license].into_iter().all(Option::is_some);
 
     let repo_metadata = github_metadata::get_metadata_for(None)
         .await?
@@ -162,30 +178,24 @@ pub async fn write_rockspec(data: WriteRockspec) -> Result<()> {
 
     let license = data
         .license // First validate the `--license` option
-        .and_then(|license| match license {
-            Either::Left(license) => Some(license),
-            Either::Right(_) => None,
-        })
-        .map_or_else(
-            || {
-                // If there was no `--license` then prompt the user
-                parse!(
-                    editor.readline(
-                        format!(
-                            "License (empty for '{}', 'none' for no license): ",
-                            repo_metadata
-                                .license
-                                .as_ref()
-                                .unwrap_or(&"none".to_string())
-                        )
-                        .as_str()
-                    ),
-                    parse_license,
-                    parse_license(repo_metadata.license.unwrap())?
-                )
-            },
-            |val| Ok(Some(val)),
-        )?
+        .map(Ok)
+        .unwrap_or_else(|| {
+            // If there was no `--license` then prompt the user
+            parse!(
+                editor.readline(
+                    format!(
+                        "License (empty for '{}', 'none' for no license): ",
+                        repo_metadata
+                            .license
+                            .as_ref()
+                            .unwrap_or(&"none".to_string())
+                    )
+                    .as_str()
+                ),
+                parse_license,
+                parse_license(repo_metadata.license.unwrap())?
+            )
+        })?
         .map(|license| license.name)
         .unwrap_or("*** enter a license ***");
 
@@ -203,30 +213,37 @@ pub async fn write_rockspec(data: WriteRockspec) -> Result<()> {
         )
     })?;
 
-    let labels = parse!(
-        editor.readline(
-            format!(
-                "Labels (empty for '[{}]'): ",
-                repo_metadata
-                    .labels
-                    .as_ref()
-                    .unwrap_or(&Vec::default())
-                    .join(" ")
+    let labels = data
+        .labels
+        .map(Ok)
+        .unwrap_or_else(|| {
+            parse!(
+                editor.readline(
+                    format!(
+                        "Labels (empty for '[{}]'): ",
+                        repo_metadata
+                            .labels
+                            .as_ref()
+                            .unwrap_or(&Vec::default())
+                            .join(" ")
+                    )
+                    .as_str()
+                ),
+                parse_list,
+                repo_metadata.labels.unwrap_or_default()
             )
-            .as_str()
-        ),
-        parse_list,
-        repo_metadata.labels.unwrap_or_default()
-    )?
-    .into_iter()
-    .map(|label| "\"".to_string() + &label + "\"")
-    .join(", ");
+        })?
+        .into_iter()
+        .map(|label| "\"".to_string() + &label + "\"")
+        .join(", ");
 
-    let lua_versions = parse!(
-        editor.readline("Supported Lua Versions (empty for '>= 5.1'): ",),
-        parse_version,
-        LuaDependency::from_str("lua >= 5.1")?
-    )?;
+    let lua_versions = data.lua_versions.map(Ok).unwrap_or_else(|| {
+        parse!(
+            editor.readline("Supported Lua Versions (empty for '>= 5.1'): ",),
+            parse_version,
+            LuaDependency::from_str("lua >= 5.1")?
+        )
+    })?;
 
     std::fs::write(
         format!("{}-dev.rockspec", package_name),
