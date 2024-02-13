@@ -99,7 +99,7 @@ fn parse_list(input: String) -> Result<Vec<String>> {
     {
         Err(eyre!("Unexpected punctuation '{}' found at column {}. Lists are comma separated but names should not contain punctuation!", char, pos))
     } else {
-        Ok(input.split(",").map(|str| str.trim().to_string()).collect())
+        Ok(input.split(',').map(|str| str.trim().to_string()).collect())
     }
 }
 
