@@ -12,6 +12,26 @@ pub struct RepoMetadata {
     pub contributors: Vec<String>,
 }
 
+impl Default for RepoMetadata {
+    fn default() -> Self {
+        RepoMetadata {
+            name: std::env::current_dir()
+                .expect("unable to get current working directory")
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
+                description: None,
+                license: None,
+                contributors: vec![users::get_current_username()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string()],
+                    labels: None,
+        }
+    }
+}
+
 /// Retrieves metadata for a given directory
 pub async fn get_metadata_for(directory: Option<&PathBuf>) -> Result<Option<RepoMetadata>> {
     let repo = match directory {
