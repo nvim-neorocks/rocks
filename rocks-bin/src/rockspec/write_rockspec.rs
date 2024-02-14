@@ -144,25 +144,16 @@ pub async fn write_rockspec(cli_flags: WriteRockspec) -> Result<()> {
             directory,
         } => {
             let mut spinner =
-                Spinner::new(Spinners::Dots, "Fetching repository metadata...".into());
+                Spinner::new(Spinners::Dots, "Fetching repository metadata... ".into());
 
-            let repo_metadata = github_metadata::get_metadata_for(directory.as_ref())
-                .await?
-                .unwrap_or_else(|| RepoMetadata {
-                    name: std::env::current_dir()
-                        .expect("unable to get current working directory")
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string(),
-                    description: None,
-                    license: None,
-                    contributors: vec![users::get_current_username()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string()],
-                    labels: None,
-                });
+            let repo_metadata = match github_metadata::get_metadata_for(directory.as_ref()).await {
+                Ok(value) => value.unwrap_or_default(),
+                Err(_) => {
+                    println!("Could not fetch repo metadata, defaulting to empty values.");
+
+                    RepoMetadata::default()
+                }
+            };
 
             spinner.stop();
 
@@ -191,12 +182,14 @@ pub async fn write_rockspec(cli_flags: WriteRockspec) -> Result<()> {
                             repo_metadata
                                 .description
                                 .as_ref()
-                                .unwrap_or(&"*** enter a description ***".to_string())
+                                .unwrap_or(&"".to_string())
                         )
                         .as_str()
                     ),
                     identity,
-                    repo_metadata.description.unwrap_or_default()
+                    repo_metadata
+                        .description
+                        .unwrap_or("*** enter a description ***".to_string())
                 )
             })?;
 
@@ -216,7 +209,7 @@ pub async fn write_rockspec(cli_flags: WriteRockspec) -> Result<()> {
                             .as_str()
                         ),
                         parse_license,
-                        parse_license(repo_metadata.license.unwrap())?
+                        parse_license(repo_metadata.license.unwrap_or("none".to_string()))?
                     )
                 })?;
 
