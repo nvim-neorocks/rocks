@@ -78,6 +78,10 @@ fn autodetect_modules(build: &mut BuiltinBuildSpec) -> Result<()> {
                 .extension()
                 .map(|ext| ext == "lua")
                 .unwrap_or(false)
+                && matches!(
+                    file.file_name().to_string_lossy().as_bytes(),
+                    b"spec" | b".luarocks" | b"lua_modules" | b"test.lua" | b"tests.lua"
+                )
         })
         .map(|file| {
             let cwd = std::env::current_dir().unwrap();
