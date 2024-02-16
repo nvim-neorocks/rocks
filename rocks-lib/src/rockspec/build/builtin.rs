@@ -1,6 +1,11 @@
 use std::{collections::HashMap, path::PathBuf};
 
+use eyre::{OptionExt, Result};
+use itertools::Itertools;
 use serde::{de, Deserialize, Deserializer};
+use walkdir::WalkDir;
+
+use super::Build;
 
 #[derive(Debug, PartialEq, Deserialize, Default, Clone)]
 pub struct BuiltinBuildSpec {
@@ -52,6 +57,41 @@ pub struct ModulePaths {
     /// Directories to be added to the linker's library lookup directory list.
     #[serde(default)]
     pub libdirs: Vec<PathBuf>,
+}
+
+impl Build for BuiltinBuildSpec {
+    fn run(mut self, _no_install: bool) -> Result<()> {
+        autodetect_modules(&mut self)?;
+        Ok(())
+    }
+}
+
+fn autodetect_modules(build: &mut BuiltinBuildSpec) -> Result<()> {
+    WalkDir::new("src")
+        .into_iter()
+        .chain(WalkDir::new("lua"))
+        .chain(WalkDir::new("lib"))
+        .filter_map(|file| file.ok())
+        .filter(|file| {
+            PathBuf::from(file.file_name())
+                .extension()
+                .map(|ext| ext == "lua")
+                .unwrap_or(false)
+        })
+        .map(|file| {
+            let diff = pathdiff::diff_paths(std::env::current_dir().unwrap(), file.into_path())
+                .ok_or_eyre("unable to autodetect modules")?;
+            let lua_module_path = diff
+                .to_string_lossy()
+                .replace(std::path::MAIN_SEPARATOR_STR, ".");
+
+            build
+                .modules
+                .insert(lua_module_path, ModulesSpec::SourcePath(diff));
+
+            Ok::<_, eyre::Error>(())
+        })
+        .try_collect()
 }
 
 #[cfg(test)]
