@@ -381,6 +381,10 @@ impl Default for BuildType {
     }
 }
 
+pub trait Build {
+    fn run(self, no_install: bool) -> Result<()>;
+}
+
 #[cfg(test)]
 mod tests {
 
