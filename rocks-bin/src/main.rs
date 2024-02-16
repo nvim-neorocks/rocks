@@ -3,6 +3,7 @@ use std::{path::PathBuf, time::Duration};
 use clap::{Parser, Subcommand};
 use rocks_lib::config::Config;
 
+mod build;
 mod download;
 mod rockspec;
 mod search;
@@ -82,7 +83,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Build/compile a rock.
-    Build,
+    Build(build::Build),
     /// Query information about Rocks's configuration.
     Config,
     /// Show documentation for an installed rock.
@@ -163,6 +164,7 @@ async fn main() {
             Commands::WriteRockspec(rockspec_data) => {
                 rockspec::write_rockspec(rockspec_data).await.unwrap()
             }
+            Commands::Build(build_data) => build::build(build_data).unwrap(),
             _ => unimplemented!(),
         },
         None => {
