@@ -72,16 +72,22 @@ fn autodetect_modules(build: &mut BuiltinBuildSpec) -> Result<()> {
         .into_iter()
         .chain(WalkDir::new("lua"))
         .chain(WalkDir::new("lib"))
-        .filter_map(|file| file.ok())
-        .filter(|file| {
-            PathBuf::from(file.file_name())
-                .extension()
-                .map(|ext| ext == "lua")
-                .unwrap_or(false)
-                && matches!(
-                    file.file_name().to_string_lossy().as_bytes(),
-                    b"spec" | b".luarocks" | b"lua_modules" | b"test.lua" | b"tests.lua"
-                )
+        .filter_map(|file| {
+            file.ok().and_then(|file| {
+                if PathBuf::from(file.file_name())
+                    .extension()
+                    .map(|ext| ext == "lua")
+                    .unwrap_or(false)
+                    && !matches!(
+                        file.file_name().to_string_lossy().as_bytes(),
+                        b"spec" | b".luarocks" | b"lua_modules" | b"test.lua" | b"tests.lua"
+                    )
+                {
+                    Some(file)
+                } else {
+                    None
+                }
+            })
         })
         .map(|file| {
             let cwd = std::env::current_dir().unwrap();
