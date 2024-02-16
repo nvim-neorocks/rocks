@@ -62,6 +62,7 @@ pub struct ModulePaths {
 impl Build for BuiltinBuildSpec {
     fn run(mut self, _no_install: bool) -> Result<()> {
         autodetect_modules(&mut self)?;
+        // println!("{:?}", self.modules);
         Ok(())
     }
 }
@@ -79,10 +80,13 @@ fn autodetect_modules(build: &mut BuiltinBuildSpec) -> Result<()> {
                 .unwrap_or(false)
         })
         .map(|file| {
-            let diff = pathdiff::diff_paths(std::env::current_dir().unwrap(), file.into_path())
+            let cwd = std::env::current_dir().unwrap();
+            let diff = pathdiff::diff_paths(cwd.join(file.into_path()), cwd)
                 .ok_or_eyre("unable to autodetect modules")?;
+
             let lua_module_path = diff
                 .to_string_lossy()
+                .trim_end_matches(".lua")
                 .replace(std::path::MAIN_SEPARATOR_STR, ".");
 
             build
