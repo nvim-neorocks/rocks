@@ -13,7 +13,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
-use super::{PerPlatform, PlatformIdentifier};
+use super::{PerPlatform, PlatformIdentifier, Rockspec};
 
 #[derive(Debug, PartialEq, Default)]
 pub struct BuildSpec {
@@ -96,7 +96,7 @@ impl Default for BuildBackendSpec {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum BuildBackendSpec {
     Builtin(BuiltinBuildSpec),
     Make(MakeBuildSpec),
@@ -107,7 +107,7 @@ pub enum BuildBackendSpec {
     // Cargo,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct CommandBuildSpec {
     pub build_command: String,
     pub install_command: String,
@@ -381,8 +381,9 @@ impl Default for BuildType {
     }
 }
 
+// TODO(vhyrro): Move this to the dedicated build.rs module
 pub trait Build {
-    fn run(self, no_install: bool) -> Result<()>;
+    fn run(self, rockspec: Rockspec, no_install: bool) -> Result<()>;
 }
 
 #[cfg(test)]

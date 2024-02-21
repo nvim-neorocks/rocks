@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct MakeBuildSpec {
     /// Makefile to be used.
     /// Default is "Makefile" on Unix variants and "Makefile.win" under Win32.
