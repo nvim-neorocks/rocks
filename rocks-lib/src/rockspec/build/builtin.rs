@@ -5,6 +5,8 @@ use itertools::Itertools;
 use serde::{de, Deserialize, Deserializer};
 use walkdir::WalkDir;
 
+use crate::rockspec::Rockspec;
+
 use super::Build;
 
 #[derive(Debug, PartialEq, Deserialize, Default, Clone)]
@@ -60,11 +62,19 @@ pub struct ModulePaths {
 }
 
 impl Build for BuiltinBuildSpec {
-    fn run(mut self, _no_install: bool) -> Result<()> {
+    fn run(mut self, rockspec: Rockspec, _no_install: bool) -> Result<()> {
+        // Detect all Lua modules
         autodetect_modules(&mut self)?;
-        // println!("{:?}", self.modules);
+
+        // Detect the default list of copy-able directories.
+        // autodetect_copy_directories(&rockspec)?;
+
         Ok(())
     }
+}
+
+fn autodetect_copy_directories(rockspec: &Rockspec) -> Result<()> {
+    Ok(())
 }
 
 fn autodetect_modules(build: &mut BuiltinBuildSpec) -> Result<()> {
