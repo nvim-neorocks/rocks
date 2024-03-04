@@ -9,7 +9,7 @@ eyre = "0.6.11"
 git-url-parse = "0.4.4"
 git2 = "0.18.2"
 itertools = "0.12.0"
-nucleo = "0.3.0"
+nucleo = "0.4.0"
 octocrab = "0.34.0"
 rocks-lib = { path = "../rocks-lib/" }
 rustyline = "13.0.0"
