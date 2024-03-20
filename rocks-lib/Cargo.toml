@@ -7,23 +7,23 @@ edition = "2021"
 
 [dependencies]
 directories = "5.0.1"
-eyre = "0.6.11"
+eyre = "0.6.12"
 html-escape = "0.2.13"
 httpdate = "1.0.3"
-itertools = "0.12.0"
-mlua = { version = "0.9.4", features = ["luajit52", "serialize"] }
+itertools = "0.12.1"
+mlua = { version = "0.9.6", features = ["luajit52", "serialize"] }
 regex = "1.10.3"
-reqwest = "0.11.23"
-semver = "1.0.21"
-serde = { version = "1.0.195", features = ["derive"] }
-serde_json = "1.0.111"
+reqwest = "0.12.0"
+semver = "1.0.22"
+serde = { version = "1.0.197", features = ["derive"] }
+serde_json = "1.0.114"
 ssri = "9.2.0"
-strum = "0.26"
+strum = { version = "0.26" }
 strum_macros = "0.26"
-tokio = { version = "1.35.1", features = ["macros"] }
+tokio = { version = "1.36.0", features = ["macros"] }
 zip = "0.6.6"
 
 [dev-dependencies]
-httptest = "0.15.5"
+httptest = { version = "0.15.5" }
 serial_test = { version = "3.0.0" }
 proptest = "1.4.0"
