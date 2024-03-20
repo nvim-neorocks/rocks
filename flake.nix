@@ -46,17 +46,19 @@
           hooks = {
             alejandra.enable = true;
             rustfmt.enable = true;
-            clippy.enable = true;
+            clippy = {
+              enable = true;
+              settings = {
+                denyWarnings = true;
+                allFeatures = true;
+              };
+            };
             cargo-check.enable = true;
           };
           settings = {
             runtimeDeps = pkgs.rocks.buildInputs ++ pkgs.rocks.nativeBuildInputs;
             rust.cargoDeps = pkgs.rustPlatform.importCargoLock {
               lockFile = ./Cargo.lock;
-            };
-            clippy = {
-              denyWarnings = true;
-              allFeatures = true;
             };
           };
         };

@@ -21,13 +21,13 @@ impl Default for RepoMetadata {
                 .unwrap_or_default()
                 .to_string_lossy()
                 .to_string(),
-                description: None,
-                license: None,
-                contributors: vec![users::get_current_username()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string()],
-                    labels: None,
+            description: None,
+            license: None,
+            contributors: vec![users::get_current_username()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string()],
+            labels: None,
         }
     }
 }
