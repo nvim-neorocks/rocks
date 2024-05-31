@@ -15,11 +15,21 @@ use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
 use super::{PerPlatform, PlatformIdentifier, Rockspec};
 
+/// The build specification for a given rock, serialized from `rockspec.build = { ... }`.
+///
+/// See [the rockspec format](https://github.com/luarocks/luarocks/wiki/Rockspec-format) for more
+/// info.
 #[derive(Debug, PartialEq, Default)]
 pub struct BuildSpec {
+    /// Determines the build backend to use.
     pub build_backend: Option<BuildBackendSpec>,
+    /// A set of instructions on how/where to copy files from the project.
+    // TODO(vhyrro): While we may want to support this, we also may want to supercede this in our
+    // new Lua project rewrite.
     pub install: InstallSpec,
+    /// A list of directories that should be copied as-is into the resulting rock.
     pub copy_directories: Vec<PathBuf>,
+    /// A list of patches to apply to the project before packaging it.
     pub patches: HashMap<PathBuf, String>,
 }
 
@@ -96,6 +106,12 @@ impl Default for BuildBackendSpec {
     }
 }
 
+/// Encodes extra information about each backend.
+/// When selecting a backend, one may provide extra parameters
+/// to `build = { ... }` in order to further customize the behaviour of the build step.
+///
+/// Luarocks provides several default build types, these are also reflected in `rocks`
+/// for compatibility.
 #[derive(Debug, PartialEq, Clone)]
 pub enum BuildBackendSpec {
     Builtin(BuiltinBuildSpec),
@@ -150,7 +166,7 @@ where
         // NOTE(mrcjkb): There also shouldn't be a directory named the same as the rockspec,
         // but I'm not sure how to (or if it makes sense to) enforce this here.
         Some(d) => Err(eyre!(
-            "Directory '{}' in copy_directories clashes with the .rock format",
+            "Directory '{}' in copy_directories clashes with the .rock format", // TODO(vhyrro): More informative error message.
             d
         )),
         _ => Ok(copy_directories.map(|vec| vec.into_iter().map(PathBuf::from).collect())),
@@ -238,7 +254,7 @@ fn override_platform_specs(
         for extended_platform in &platform.get_extended_platforms() {
             let extended_spec = per_platform
                 .get(extended_platform)
-                .map(BuildSpecInternal::clone)
+                .cloned()
                 .unwrap_or_default();
             per_platform.insert(
                 *extended_platform,
