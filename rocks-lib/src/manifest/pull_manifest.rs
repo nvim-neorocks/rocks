@@ -66,7 +66,7 @@ mod tests {
 
     fn reset_cache() {
         let config = Config::default();
-        let cache_path = config.get_default_cache_path().unwrap();
+        let cache_path = Config::get_default_cache_path().unwrap();
         let _ = fs::remove_dir_all(&cache_path);
         fs::create_dir_all(cache_path).unwrap();
     }
@@ -106,7 +106,7 @@ mod tests {
         url_str.pop();
 
         let config = Config {
-            lua_version: Some("5.1".into()),
+            lua_version: Some(crate::config::LuaVersion::Lua51),
             ..Config::default()
         };
 
@@ -122,7 +122,7 @@ mod tests {
         url_str.pop();
         let manifest_content = "dummy content";
         let config = Config::default();
-        let cache_dir = config.get_default_cache_path().unwrap();
+        let cache_dir = Config::get_default_cache_path().unwrap();
         let cache = cache_dir.join("manifest");
         fs::write(&cache, manifest_content).unwrap();
         let _metadata = fs::metadata(&cache).unwrap();
