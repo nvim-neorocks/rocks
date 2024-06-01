@@ -5,11 +5,7 @@ use itertools::Itertools;
 use serde::{de, Deserialize, Deserializer};
 use walkdir::WalkDir;
 
-use crate::{
-    config::Config,
-    rockspec::Rockspec,
-    tree::{Tree, TreeLayout},
-};
+use crate::{rockspec::Rockspec, tree::TreeLayout};
 
 use super::Build;
 
@@ -66,25 +62,45 @@ pub struct ModulePaths {
 }
 
 impl Build for BuiltinBuildSpec {
-    fn run(self, rockspec: Rockspec, output_paths: TreeLayout, _no_install: bool) -> Result<()> {
+    fn run(self, _rockspec: Rockspec, output_paths: TreeLayout, _no_install: bool) -> Result<()> {
         // Detect all Lua modules
         let modules = autodetect_modules()?
             .into_iter()
             .chain(self.modules)
-            .filter_map(|(key, value)| match value {
-                ModuleType::SourcePath(path) => Some((key, path)),
-                _ => None,
-            })
             .collect::<HashMap<_, _>>();
 
-        for (destination_path, source) in &modules {
-            let target = output_paths.src.join(PathBuf::from(
-                destination_path.replace('.', std::path::MAIN_SEPARATOR_STR) + ".lua",
-            ));
+        for (destination_path, module_type) in &modules {
+            match module_type {
+                ModuleType::SourcePath(source) => {
+                    let target = output_paths.src.join(PathBuf::from(
+                        destination_path.replace('.', std::path::MAIN_SEPARATOR_STR) + ".lua",
+                    ));
 
-            std::fs::create_dir_all(target.parent().unwrap())?;
+                    std::fs::create_dir_all(target.parent().unwrap())?;
 
-            std::fs::copy(source, target)?;
+                    std::fs::copy(source, target)?;
+                }
+                ModuleType::SourcePaths(files) => {
+                    let path = PathBuf::from(destination_path);
+                    std::fs::create_dir_all(path.parent().unwrap())?;
+
+                    cc::Build::new()
+                        .shared_flag(true)
+                        .files(files)
+                        .try_compile(destination_path)?;
+                }
+                ModuleType::ModulePaths(data) => {
+                    let path = PathBuf::from(destination_path);
+                    std::fs::create_dir_all(path.parent().unwrap())?;
+
+                    // TODO: Defines, libraries
+                    cc::Build::new()
+                        .shared_flag(true)
+                        .files(&data.sources)
+                        .includes(&data.incdirs)
+                        .try_compile(destination_path)?;
+                }
+            }
         }
 
         Ok(())
