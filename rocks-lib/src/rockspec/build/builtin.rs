@@ -71,17 +71,11 @@ impl Build for BuiltinBuildSpec {
             .into_iter()
             .chain(self.modules)
             .collect::<HashMap<_, _>>();
-        println!("{:#?}", modules);
 
-        // Detect the default list of copy-able directories.
-        // autodetect_copy_directories(&rockspec)?;
+        println!("{:#?}", modules);
 
         Ok(())
     }
-}
-
-fn autodetect_copy_directories(rockspec: &Rockspec) -> Result<()> {
-    todo!()
 }
 
 fn autodetect_modules() -> Result<HashMap<String, ModuleType>> {
