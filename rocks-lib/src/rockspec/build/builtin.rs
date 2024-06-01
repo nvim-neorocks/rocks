@@ -1,14 +1,15 @@
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-};
+use std::{collections::HashMap, path::PathBuf};
 
 use eyre::{OptionExt, Result};
 use itertools::Itertools;
 use serde::{de, Deserialize, Deserializer};
 use walkdir::WalkDir;
 
-use crate::{config::Config, rockspec::Rockspec, tree::Tree};
+use crate::{
+    config::Config,
+    rockspec::Rockspec,
+    tree::{Tree, TreeLayout},
+};
 
 use super::Build;
 
@@ -65,7 +66,7 @@ pub struct ModulePaths {
 }
 
 impl Build for BuiltinBuildSpec {
-    fn run(self, rockspec: Rockspec, config: &Config, _no_install: bool) -> Result<()> {
+    fn run(self, rockspec: Rockspec, output_paths: TreeLayout, _no_install: bool) -> Result<()> {
         // Detect all Lua modules
         let modules = autodetect_modules()?
             .into_iter()
@@ -76,18 +77,8 @@ impl Build for BuiltinBuildSpec {
             })
             .collect::<HashMap<_, _>>();
 
-        let tree = Tree::new(
-            &config.tree,
-            config
-                .lua_version
-                .as_ref()
-                .unwrap_or(&crate::config::LuaVersion::Lua51),
-        )?;
-
-        let rock_paths = tree.rock(&rockspec.package, &rockspec.version)?;
-
         for (destination_path, source) in &modules {
-            let target = rock_paths.src.join(PathBuf::from(
+            let target = output_paths.src.join(PathBuf::from(
                 destination_path.replace('.', std::path::MAIN_SEPARATOR_STR) + ".lua",
             ));
 
