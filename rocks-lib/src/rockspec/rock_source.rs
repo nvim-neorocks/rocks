@@ -1,4 +1,5 @@
 use eyre::{eyre, Result};
+use git_url_parse::GitUrl;
 use mlua::{FromLua, Lua, Value};
 use regex::RegexSet;
 use reqwest::Url;
@@ -131,7 +132,7 @@ pub struct CvsSource {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct GitSource {
-    pub url: String,
+    pub url: GitUrl,
     pub checkout_ref: Option<String>,
 }
 
@@ -216,7 +217,7 @@ enum SourceUrl {
     /// Web URLs
     Url(Url),
     /// For the Git source control manager
-    Git(String),
+    Git(GitUrl),
     /// or the Mercurial source control manager
     Mercurial(String),
     /// or the SurroundSCM source control manager
@@ -251,23 +252,15 @@ impl FromStr for SourceUrl {
         let url_regex_set: RegexSet =
             RegexSet::new([r"^https://", r"^http://", r"^ftp://"]).unwrap();
 
-        let git_source_regex_set: RegexSet = RegexSet::new([
-            r"^git://",
-            r"^git\+file://",
-            r"^git\+http://",
-            r"^git\+https://",
-            r"^git\+ssh://",
-        ])
-        .unwrap();
-
         let mercurial_source_regex_set: RegexSet =
             RegexSet::new([r"^hg://", r"^hg\+http://", r"^hg\+https://", r"^hg\+ssh://"]).unwrap();
 
         match str {
             s if s.starts_with("cvs://") => Ok(Self::Cvs(s.to_string())),
             s if s.starts_with("file://") => Ok(Self::File(s.trim_start_matches("file://").into())),
+            s if s.starts_with("git://") => Ok(Self::Git(s.parse()?)),
+            s if s.starts_with("git+") => Ok(Self::Git(s.trim_start_matches("git+").parse()?)),
             s if url_regex_set.matches(s).matched_any() => Ok(Self::Url(s.parse()?)),
-            s if git_source_regex_set.matches(s).matched_any() => Ok(Self::Git(s.to_string())),
             s if mercurial_source_regex_set.matches(s).matched_any() => {
                 Ok(Self::Mercurial(s.to_string()))
             }
