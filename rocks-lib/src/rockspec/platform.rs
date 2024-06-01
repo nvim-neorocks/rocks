@@ -225,10 +225,7 @@ pub struct PerPlatform<T> {
     pub per_platform: HashMap<PlatformIdentifier, T>,
 }
 
-impl<T> PerPlatform<T>
-where
-    T: Clone,
-{
+impl<T> PerPlatform<T> {
     pub fn get(&self, platform: &PlatformIdentifier) -> &T {
         self.per_platform.get(platform).unwrap_or(
             platform
