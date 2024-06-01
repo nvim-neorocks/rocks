@@ -1,13 +1,25 @@
 use std::{path::PathBuf, time::Duration};
 
 use clap::{Parser, Subcommand};
-use rocks_lib::config::Config;
+use rocks_lib::config::{Config, LuaVersion};
 
 mod build;
 mod download;
 mod rockspec;
 mod search;
 mod unpack;
+
+fn parse_lua_version(s: &str) -> Result<LuaVersion, String> {
+    match s {
+        "5.1" | "51" | "jit" | "luajit" => Ok(LuaVersion::Lua51),
+        "5.2" | "52" => Ok(LuaVersion::Lua52),
+        "5.3" | "53" => Ok(LuaVersion::Lua53),
+        "5.4" | "54" => Ok(LuaVersion::Lua54),
+        _ => Err(
+            "unrecognized Lua version. Allowed versions: '5.1', '5.2', '5.3', '5.4', 'jit'.".into(),
+        ),
+    }
+}
 
 /// An small and efficient Lua package manager.
 #[derive(Parser)]
@@ -42,8 +54,8 @@ struct Cli {
 
     /// Which Lua installation to use.
     // TODO(vhyrro): Add option validator for the version here.
-    #[arg(long, value_name = "ver")]
-    lua_version: Option<String>,
+    #[arg(long, value_name = "ver", value_parser = parse_lua_version)]
+    lua_version: Option<LuaVersion>,
 
     /// Which tree to operate on.
     #[arg(long, value_name = "tree")]
@@ -164,7 +176,7 @@ async fn main() {
             Commands::WriteRockspec(rockspec_data) => {
                 rockspec::write_rockspec(rockspec_data).await.unwrap()
             }
-            Commands::Build(build_data) => build::build(build_data).unwrap(),
+            Commands::Build(build_data) => build::build(build_data, &config).unwrap(),
             _ => unimplemented!(),
         },
         None => {
