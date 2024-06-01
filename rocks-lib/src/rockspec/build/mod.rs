@@ -9,7 +9,10 @@ pub use make::*;
 
 use eyre::{eyre, OptionExt as _, Result};
 use mlua::{FromLua, Lua, LuaSerdeExt, Value};
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
@@ -353,6 +356,7 @@ where
     }
 }
 
+/// Maps `build.type` to an enum.
 #[derive(Debug, PartialEq, Deserialize, Clone)]
 #[serde(rename_all = "lowercase", remote = "BuildType")]
 enum BuildType {

@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use eyre::{OptionExt, Result};
 use itertools::Itertools;
@@ -12,11 +15,11 @@ use super::Build;
 #[derive(Debug, PartialEq, Deserialize, Default, Clone)]
 pub struct BuiltinBuildSpec {
     /// Keys are module names in the format normally used by the `require()` function
-    pub modules: HashMap<String, ModulesSpec>,
+    pub modules: HashMap<String, ModuleType>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum ModulesSpec {
+pub enum ModuleType {
     /// Pathnames of Lua files or C sources, for modules based on a single source file.
     SourcePath(PathBuf),
     /// Pathnames of C sources of a simple module written in C composed of multiple files.
@@ -24,7 +27,7 @@ pub enum ModulesSpec {
     ModulePaths(ModulePaths),
 }
 
-impl<'de> Deserialize<'de> for ModulesSpec {
+impl<'de> Deserialize<'de> for ModuleType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -62,9 +65,13 @@ pub struct ModulePaths {
 }
 
 impl Build for BuiltinBuildSpec {
-    fn run(mut self, rockspec: Rockspec, _no_install: bool) -> Result<()> {
+    fn run(self, rockspec: Rockspec, _no_install: bool) -> Result<()> {
         // Detect all Lua modules
-        autodetect_modules(&mut self)?;
+        let modules = autodetect_modules()?
+            .into_iter()
+            .chain(self.modules)
+            .collect::<HashMap<_, _>>();
+        println!("{:#?}", modules);
 
         // Detect the default list of copy-able directories.
         // autodetect_copy_directories(&rockspec)?;
@@ -74,10 +81,10 @@ impl Build for BuiltinBuildSpec {
 }
 
 fn autodetect_copy_directories(rockspec: &Rockspec) -> Result<()> {
-    Ok(())
+    todo!()
 }
 
-fn autodetect_modules(build: &mut BuiltinBuildSpec) -> Result<()> {
+fn autodetect_modules() -> Result<HashMap<String, ModuleType>> {
     WalkDir::new("src")
         .into_iter()
         .chain(WalkDir::new("lua"))
@@ -109,11 +116,7 @@ fn autodetect_modules(build: &mut BuiltinBuildSpec) -> Result<()> {
                 .trim_end_matches(".lua")
                 .replace(std::path::MAIN_SEPARATOR_STR, ".");
 
-            build
-                .modules
-                .insert(lua_module_path, ModulesSpec::SourcePath(diff));
-
-            Ok::<_, eyre::Error>(())
+            Ok((lua_module_path, ModuleType::SourcePath(diff)))
         })
         .try_collect()
 }
@@ -148,14 +151,14 @@ mod tests {
         let build_spec: BuiltinBuildSpec =
             lua.from_value(lua.globals().get("build").unwrap()).unwrap();
         let foo = build_spec.modules.get("foo").unwrap();
-        assert_eq!(*foo, ModulesSpec::SourcePath("lua/foo/init.lua".into()));
+        assert_eq!(*foo, ModuleType::SourcePath("lua/foo/init.lua".into()));
         let bar = build_spec.modules.get("bar").unwrap();
         assert_eq!(
             *bar,
-            ModulesSpec::SourcePaths(vec!["lua/bar.lua".into(), "lua/bar/internal.lua".into()])
+            ModuleType::SourcePaths(vec!["lua/bar.lua".into(), "lua/bar/internal.lua".into()])
         );
         let baz = build_spec.modules.get("baz").unwrap();
-        assert!(matches!(baz, ModulesSpec::ModulePaths { .. }));
+        assert!(matches!(baz, ModuleType::ModulePaths { .. }));
         let lua_content_no_sources = "
         build = {\n
             modules = {\n

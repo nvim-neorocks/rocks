@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use eyre::eyre;
+use std::path::PathBuf;
 
 use clap::Args;
 use eyre::Result;
@@ -11,7 +11,12 @@ pub struct Build {
 }
 
 pub fn build(data: Build) -> Result<()> {
-    if data.directory.extension().map(|ext| ext != "rockspec").unwrap_or(true) {
+    if data
+        .directory
+        .extension()
+        .map(|ext| ext != "rockspec")
+        .unwrap_or(true)
+    {
         return Err(eyre!("Provided path is not a valid rockspec!"));
     }
 
