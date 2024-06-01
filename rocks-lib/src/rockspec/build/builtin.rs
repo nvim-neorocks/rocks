@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 use eyre::{OptionExt, Result};
@@ -8,7 +8,7 @@ use itertools::Itertools;
 use serde::{de, Deserialize, Deserializer};
 use walkdir::WalkDir;
 
-use crate::rockspec::Rockspec;
+use crate::{config::Config, rockspec::Rockspec, tree::Tree};
 
 use super::Build;
 
@@ -65,14 +65,36 @@ pub struct ModulePaths {
 }
 
 impl Build for BuiltinBuildSpec {
-    fn run(self, rockspec: Rockspec, _no_install: bool) -> Result<()> {
+    fn run(self, rockspec: Rockspec, config: &Config, _no_install: bool) -> Result<()> {
         // Detect all Lua modules
         let modules = autodetect_modules()?
             .into_iter()
             .chain(self.modules)
+            .filter_map(|(key, value)| match value {
+                ModuleType::SourcePath(path) => Some((key, path)),
+                _ => None,
+            })
             .collect::<HashMap<_, _>>();
 
-        println!("{:#?}", modules);
+        let tree = Tree::new(
+            &config.tree,
+            config
+                .lua_version
+                .as_ref()
+                .unwrap_or(&crate::config::LuaVersion::Lua51),
+        )?;
+
+        let rock_paths = tree.rock(&rockspec.package, &rockspec.version)?;
+
+        for (destination_path, source) in &modules {
+            let target = rock_paths.src.join(PathBuf::from(
+                destination_path.replace('.', std::path::MAIN_SEPARATOR_STR) + ".lua",
+            ));
+
+            std::fs::create_dir_all(target.parent().unwrap())?;
+
+            std::fs::copy(source, target)?;
+        }
 
         Ok(())
     }
@@ -102,10 +124,19 @@ fn autodetect_modules() -> Result<HashMap<String, ModuleType>> {
         })
         .map(|file| {
             let cwd = std::env::current_dir().unwrap();
-            let diff = pathdiff::diff_paths(cwd.join(file.into_path()), cwd)
+            let diff: PathBuf = pathdiff::diff_paths(cwd.join(file.into_path()), cwd)
                 .ok_or_eyre("unable to autodetect modules")?;
 
+            // NOTE(vhyrro): You may ask why we convert all paths to Lua module paths
+            // just to convert them back later in the `run()` stage.
+            //
+            // The rockspec requires the format to be like this, and representing our
+            // data in this form allows us to respect any overrides made by the user (which follow
+            // the `module.name` format, not our internal one).
             let lua_module_path = diff
+                .components()
+                .skip(1)
+                .collect::<PathBuf>()
                 .to_string_lossy()
                 .trim_end_matches(".lua")
                 .replace(std::path::MAIN_SEPARATOR_STR, ".");

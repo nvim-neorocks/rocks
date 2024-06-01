@@ -16,7 +16,7 @@ pub async fn manifest_from_server(url: String, config: &Config) -> Result<String
 
     // Stores a path to the manifest cache (this allows us to operate on a manifest without
     // needing to pull it from the luarocks servers each time).
-    let cache = config.get_default_cache_path()?.join(&manifest_filename);
+    let cache = Config::get_default_cache_path()?.join(&manifest_filename);
 
     // Ensure all intermediate directories for the cache file are created (e.g. `~/.cache/rocks/manifest`)
     fs::create_dir_all(cache.parent().unwrap())?;

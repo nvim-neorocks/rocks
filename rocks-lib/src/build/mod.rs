@@ -1,8 +1,11 @@
-use crate::rockspec::{Build, BuildBackendSpec, RockSourceSpec, Rockspec};
+use crate::{
+    config::Config,
+    rockspec::{Build, BuildBackendSpec, RockSourceSpec, Rockspec},
+};
 use eyre::Result;
 use git2::Repository;
 
-pub fn build(rockspec: Rockspec, no_install: bool) -> Result<()> {
+pub fn build(rockspec: Rockspec, config: &Config, no_install: bool) -> Result<()> {
     // TODO(vhyrro): Use a more serious isolation strategy here.
     let temp_dir = tempdir::TempDir::new(&rockspec.package)?;
 
@@ -30,7 +33,7 @@ pub fn build(rockspec: Rockspec, no_install: bool) -> Result<()> {
 
     // TODO: Ensure dependencies and build dependencies.
     match rockspec.build.default.build_backend.as_ref().cloned() {
-        Some(BuildBackendSpec::Builtin(spec)) => spec.run(rockspec, no_install)?,
+        Some(BuildBackendSpec::Builtin(spec)) => spec.run(rockspec, config, no_install)?,
         _ => unimplemented!(),
     };
 
