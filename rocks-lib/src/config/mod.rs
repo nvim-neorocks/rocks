@@ -1,6 +1,28 @@
 use directories::ProjectDirs;
 use eyre::{eyre, Result};
-use std::{path::PathBuf, time::Duration};
+use std::{fmt::Display, path::PathBuf, time::Duration};
+
+#[derive(Clone)]
+pub enum LuaVersion {
+    Lua51,
+    Lua52,
+    Lua53,
+    Lua54,
+    LuaJIT,
+    // TODO(vhyrro): Support luau?
+    // LuaU,
+}
+
+impl Display for LuaVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            LuaVersion::Lua51 | LuaVersion::LuaJIT => "5.1",
+            LuaVersion::Lua52 => "5.2",
+            LuaVersion::Lua53 => "5.3",
+            LuaVersion::Lua54 => "5.4",
+        })
+    }
+}
 
 pub struct Config {
     pub enable_development_rockspecs: bool,
@@ -11,29 +33,29 @@ pub struct Config {
     // TODO(vhyrro): Make both of these non-options and autodetect
     // this in Config::default()
     pub lua_dir: Option<PathBuf>,
-    pub lua_version: Option<String>,
+    pub lua_version: Option<LuaVersion>,
     pub tree: PathBuf,
     pub local: bool,
     pub global: bool,
     pub no_project: bool,
     pub verbose: bool,
     pub timeout: Duration,
-
-    // Non-luarocks configs
-    pub qualifier: String,
-    pub org_name: String,
-    pub app_name: String,
 }
 
 impl Config {
-    pub fn get_project_dirs(&self) -> Result<ProjectDirs> {
-        directories::ProjectDirs::from(&self.qualifier, &self.org_name, &self.app_name)
+    pub fn get_project_dirs() -> Result<ProjectDirs> {
+        directories::ProjectDirs::from("org", "neorocks", "rocks")
             .ok_or(eyre!("Could not find a valid home directory"))
     }
 
-    pub fn get_default_cache_path(&self) -> Result<PathBuf> {
-        let project_dirs = self.get_project_dirs()?;
+    pub fn get_default_cache_path() -> Result<PathBuf> {
+        let project_dirs = Config::get_project_dirs()?;
         Ok(project_dirs.cache_dir().to_path_buf())
+    }
+
+    pub fn get_default_data_path() -> Result<PathBuf> {
+        let project_dirs = Config::get_project_dirs()?;
+        Ok(project_dirs.data_local_dir().to_path_buf())
     }
 }
 
@@ -86,7 +108,7 @@ impl Config {
         Config { lua_dir, ..self }
     }
 
-    pub fn lua_version(self, lua_version: Option<String>) -> Config {
+    pub fn lua_version(self, lua_version: Option<LuaVersion>) -> Config {
         Config {
             lua_version,
             ..self
@@ -134,15 +156,12 @@ impl Default for Config {
             namespace: "".into(),
             lua_dir: None,
             lua_version: None,
-            tree: "/usr".into(),
-            local: false,
+            tree: Config::get_default_data_path().unwrap(), // TODO: Remove this unwrap
+            local: true,
             global: false,
             no_project: false,
             verbose: false,
             timeout: Duration::from_secs(30),
-            qualifier: "org".into(),
-            org_name: "neorocks".into(),
-            app_name: "rocks".into(),
         }
     }
 }
