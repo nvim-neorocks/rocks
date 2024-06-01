@@ -16,7 +16,7 @@ use std::{
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
-use crate::config::Config;
+use crate::{config::Config, tree::TreeLayout};
 
 use super::{PerPlatform, PlatformIdentifier, Rockspec};
 
@@ -405,7 +405,7 @@ impl Default for BuildType {
 
 // TODO(vhyrro): Move this to the dedicated build.rs module
 pub trait Build {
-    fn run(self, rockspec: Rockspec, config: &Config, no_install: bool) -> Result<()>;
+    fn run(self, rockspec: Rockspec, output_paths: TreeLayout, no_install: bool) -> Result<()>;
 }
 
 #[cfg(test)]
