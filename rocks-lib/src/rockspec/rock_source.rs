@@ -255,8 +255,13 @@ impl FromStr for SourceUrl {
         let mercurial_source_regex_set: RegexSet =
             RegexSet::new([r"^hg://", r"^hg\+http://", r"^hg\+https://", r"^hg\+ssh://"]).unwrap();
 
-        let git_source_regex_set: RegexSet =
-            RegexSet::new([r"^git\+file://", r"^git\+http://", r"^git\+https://", r"^git\+ssh://"]).unwrap();
+        let git_source_regex_set: RegexSet = RegexSet::new([
+            r"^git\+file://",
+            r"^git\+http://",
+            r"^git\+https://",
+            r"^git\+ssh://",
+        ])
+        .unwrap();
 
         match str {
             s if s.starts_with("cvs://") => Ok(Self::Cvs(s.to_string())),

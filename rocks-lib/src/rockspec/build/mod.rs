@@ -9,14 +9,11 @@ pub use make::*;
 
 use eyre::{eyre, OptionExt as _, Result};
 use mlua::{FromLua, Lua, LuaSerdeExt, Value};
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, path::PathBuf};
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
-use crate::{config::Config, tree::TreeLayout};
+use crate::tree::TreeLayout;
 
 use super::{PerPlatform, PlatformIdentifier, Rockspec};
 
