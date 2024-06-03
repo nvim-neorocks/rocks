@@ -274,7 +274,7 @@ where
                     ))),
                 }?;
                 let _ = tbl.raw_remove("platforms");
-                let default = lua.from_value(list.clone())?;
+                let default = lua.from_value(list.to_owned())?;
                 apply_per_platform_overrides(&mut per_platform, &default);
                 Ok(PerPlatform {
                     default,

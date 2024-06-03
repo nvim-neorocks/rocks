@@ -38,9 +38,9 @@ pub struct BuildSpec {
 impl BuildSpec {
     fn from_internal_spec(internal: BuildSpecInternal) -> Result<Self> {
         let build_backend = match internal.build_type.unwrap_or_default() {
-            BuildType::Builtin => Some(BuildBackendSpec::Builtin(
-                internal.builtin_spec.unwrap_or_default(),
-            )),
+            BuildType::Builtin => Some(BuildBackendSpec::Builtin(BuiltinBuildSpec {
+                modules: internal.builtin_spec.unwrap_or_default(),
+            })),
             BuildType::Make => {
                 let default = MakeBuildSpec::default();
                 Some(BuildBackendSpec::Make(MakeBuildSpec {
@@ -181,7 +181,7 @@ struct BuildSpecInternal {
     #[serde(rename = "type", default)]
     build_type: Option<BuildType>,
     #[serde(rename = "modules", default)]
-    builtin_spec: Option<BuiltinBuildSpec>,
+    builtin_spec: Option<HashMap<String, ModuleType>>,
     #[serde(default)]
     makefile: Option<PathBuf>,
     #[serde(rename = "build_target", default)]
@@ -276,13 +276,9 @@ fn override_build_spec_internal(
             override_spec.builtin_spec.clone(),
             base.builtin_spec.clone(),
         ) {
-            (Some(override_val), Some(base_val)) => Some(BuiltinBuildSpec {
-                modules: base_val
-                    .modules
-                    .into_iter()
-                    .chain(override_val.modules)
-                    .collect(),
-            }),
+            (Some(override_val), Some(base_val)) => {
+                Some(base_val.into_iter().chain(override_val).collect())
+            }
             (override_val @ Some(_), _) => override_val,
             (_, base_val @ Some(_)) => base_val,
             _ => None,
