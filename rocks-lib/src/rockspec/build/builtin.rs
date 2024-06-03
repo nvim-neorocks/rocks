@@ -69,36 +69,61 @@ impl Build for BuiltinBuildSpec {
             .chain(self.modules)
             .collect::<HashMap<_, _>>();
 
+        fn lua_module_to_pathbuf(path: &str, extension: &str) -> PathBuf {
+            PathBuf::from(path.replace('.', std::path::MAIN_SEPARATOR_STR) + extension)
+        }
+
         for (destination_path, module_type) in &modules {
             match module_type {
                 ModuleType::SourcePath(source) => {
-                    let target = output_paths.src.join(PathBuf::from(
-                        destination_path.replace('.', std::path::MAIN_SEPARATOR_STR) + ".lua",
-                    ));
+                    let destination_path = lua_module_to_pathbuf(destination_path, ".lua");
+
+                    let target = output_paths.src.join(destination_path);
 
                     std::fs::create_dir_all(target.parent().unwrap())?;
 
                     std::fs::copy(source, target)?;
                 }
                 ModuleType::SourcePaths(files) => {
-                    let path = PathBuf::from(destination_path);
-                    std::fs::create_dir_all(path.parent().unwrap())?;
+                    // TODO(vhyrro): Use the appropriate file extension here.
+                    let destination_path = lua_module_to_pathbuf(destination_path, ".so");
+                    let target = output_paths.lib.join(destination_path);
+
+                    let parent = target.parent().expect("TODO");
+                    let file = target.file_name().expect("TODO");
+
+                    std::fs::create_dir_all(parent)?;
 
                     cc::Build::new()
-                        .shared_flag(true)
+                        .cargo_metadata(false)
+                        .debug(false)
                         .files(files)
-                        .try_compile(destination_path)?;
+                        .host(std::env::consts::OS)
+                        .opt_level(3)
+                        .out_dir(parent)
+                        .shared_flag(true)
+                        .target(std::env::consts::ARCH)
+                        .try_compile(file.to_str().unwrap())?;
                 }
                 ModuleType::ModulePaths(data) => {
-                    let path = PathBuf::from(destination_path);
-                    std::fs::create_dir_all(path.parent().unwrap())?;
+                    let destination_path =
+                        lua_module_to_pathbuf(destination_path, std::env::consts::DLL_SUFFIX);
+                    let target = output_paths.lib.join(destination_path);
+
+                    std::fs::create_dir_all(target.parent().unwrap())?;
 
                     // TODO: Defines, libraries
                     cc::Build::new()
+                        .cargo_metadata(false)
+                        .debug(false)
+                        .host(std::env::consts::OS)
+                        .opt_level(3)
+                        .out_dir(std::env::current_dir()?)
+                        .target(std::env::consts::ARCH)
                         .shared_flag(true)
                         .files(&data.sources)
                         .includes(&data.incdirs)
-                        .try_compile(destination_path)?;
+                        .try_compile(target.to_str().unwrap())?;
                 }
             }
         }
