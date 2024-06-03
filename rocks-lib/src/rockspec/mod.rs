@@ -53,7 +53,7 @@ impl Rockspec {
             external_dependencies: globals.get("external_dependencies")?,
             source: globals.get("source")?,
             build: globals.get("build")?,
-            test: globals.get("tglobalsest")?,
+            test: globals.get("test")?,
         };
 
         let rockspec_file_name = format!("{}-{}.rockspec", rockspec.package, rockspec.version);
