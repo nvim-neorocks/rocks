@@ -181,7 +181,7 @@ struct BuildSpecInternal {
     #[serde(rename = "type", default)]
     build_type: Option<BuildType>,
     #[serde(rename = "modules", default)]
-    builtin_spec: Option<HashMap<String, ModuleType>>,
+    builtin_spec: Option<HashMap<String, ModuleSpec>>,
     #[serde(default)]
     makefile: Option<PathBuf>,
     #[serde(rename = "build_target", default)]

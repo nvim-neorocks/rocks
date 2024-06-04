@@ -12,11 +12,11 @@ use super::Build;
 #[derive(Debug, PartialEq, Deserialize, Default, Clone)]
 pub struct BuiltinBuildSpec {
     /// Keys are module names in the format normally used by the `require()` function
-    pub modules: HashMap<String, ModuleType>,
+    pub modules: HashMap<String, ModuleSpec>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum ModuleType {
+pub enum ModuleSpec {
     /// Pathnames of Lua files or C sources, for modules based on a single source file.
     SourcePath(PathBuf),
     /// Pathnames of C sources of a simple module written in C composed of multiple files.
@@ -24,7 +24,7 @@ pub enum ModuleType {
     ModulePaths(ModulePaths),
 }
 
-impl<'de> Deserialize<'de> for ModuleType {
+impl<'de> Deserialize<'de> for ModuleSpec {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -101,7 +101,7 @@ impl Build for BuiltinBuildSpec {
 
         for (destination_path, module_type) in &modules {
             match module_type {
-                ModuleType::SourcePath(source) => {
+                ModuleSpec::SourcePath(source) => {
                     let destination_path = lua_module_to_pathbuf(destination_path, ".lua");
 
                     let target = output_paths.src.join(destination_path);
@@ -110,7 +110,7 @@ impl Build for BuiltinBuildSpec {
 
                     std::fs::copy(source, target)?;
                 }
-                ModuleType::SourcePaths(files) => {
+                ModuleSpec::SourcePaths(files) => {
                     // TODO(vhyrro): Use the appropriate file extension here.
                     let destination_path = lua_module_to_pathbuf(destination_path, ".so");
                     let target = output_paths.lib.join(destination_path);
@@ -131,7 +131,7 @@ impl Build for BuiltinBuildSpec {
                         .target(std::env::consts::ARCH)
                         .try_compile(file.to_str().unwrap())?;
                 }
-                ModuleType::ModulePaths(data) => {
+                ModuleSpec::ModulePaths(data) => {
                     let destination_path =
                         lua_module_to_pathbuf(destination_path, std::env::consts::DLL_SUFFIX);
                     let target = output_paths.lib.join(destination_path);
@@ -174,7 +174,7 @@ impl Build for BuiltinBuildSpec {
     }
 }
 
-fn autodetect_modules() -> Result<HashMap<String, ModuleType>> {
+fn autodetect_modules() -> Result<HashMap<String, ModuleSpec>> {
     WalkDir::new("src")
         .into_iter()
         .chain(WalkDir::new("lua"))
@@ -215,7 +215,7 @@ fn autodetect_modules() -> Result<HashMap<String, ModuleType>> {
                 .trim_end_matches(".lua")
                 .replace(std::path::MAIN_SEPARATOR_STR, ".");
 
-            Ok((lua_module_path, ModuleType::SourcePath(diff)))
+            Ok((lua_module_path, ModuleSpec::SourcePath(diff)))
         })
         .try_collect()
 }
@@ -250,14 +250,14 @@ mod tests {
         let build_spec: BuiltinBuildSpec =
             lua.from_value(lua.globals().get("build").unwrap()).unwrap();
         let foo = build_spec.modules.get("foo").unwrap();
-        assert_eq!(*foo, ModuleType::SourcePath("lua/foo/init.lua".into()));
+        assert_eq!(*foo, ModuleSpec::SourcePath("lua/foo/init.lua".into()));
         let bar = build_spec.modules.get("bar").unwrap();
         assert_eq!(
             *bar,
-            ModuleType::SourcePaths(vec!["lua/bar.lua".into(), "lua/bar/internal.lua".into()])
+            ModuleSpec::SourcePaths(vec!["lua/bar.lua".into(), "lua/bar/internal.lua".into()])
         );
         let baz = build_spec.modules.get("baz").unwrap();
-        assert!(matches!(baz, ModuleType::ModulePaths { .. }));
+        assert!(matches!(baz, ModuleSpec::ModulePaths { .. }));
         let lua_content_no_sources = "
         build = {\n
             modules = {\n
@@ -288,7 +288,7 @@ mod tests {
             lua.from_value(lua.globals().get("build").unwrap()).unwrap();
         let baz = build_spec.modules.get("baz").unwrap();
         match baz {
-            ModuleType::ModulePaths(paths) => assert_eq!(
+            ModuleSpec::ModulePaths(paths) => assert_eq!(
                 paths.defines,
                 vec![
                     ("USE_BAZ".into(), Some("1".into())),
