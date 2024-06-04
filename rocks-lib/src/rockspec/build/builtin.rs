@@ -43,6 +43,32 @@ impl<'de> Deserialize<'de> for ModuleType {
     }
 }
 
+fn deserialize_definitions<'de, D>(
+    deserializer: D,
+) -> Result<Vec<(String, Option<String>)>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let values = serde_json::Value::deserialize(deserializer)?;
+
+    values
+        .as_array()
+        .ok_or_else(|| de::Error::custom("expected `defines` to be a list of strings"))?
+        .iter()
+        .map(|val| {
+            if let Some((key, value)) = val
+                .as_str()
+                .ok_or_else(|| de::Error::custom("expected item in `defines` to be a string"))?
+                .split_once('=')
+            {
+                Ok((key.into(), Some(value.into())))
+            } else {
+                Ok((val.as_str().unwrap().into(), None))
+            }
+        })
+        .try_collect()
+}
+
 #[derive(Debug, PartialEq, Deserialize, Clone)]
 pub struct ModulePaths {
     /// Path names of C sources, mandatory field
@@ -51,8 +77,8 @@ pub struct ModulePaths {
     #[serde(default)]
     pub libraries: Vec<PathBuf>,
     /// C defines, e.g. { "FOO=bar", "USE_BLA" }
-    #[serde(default)]
-    pub defines: Vec<String>,
+    #[serde(default, deserialize_with = "deserialize_definitions")]
+    pub defines: Vec<(String, Option<String>)>,
     /// Directories to be added to the compiler's headers lookup directory list.
     #[serde(default)]
     pub incdirs: Vec<PathBuf>,
@@ -113,7 +139,8 @@ impl Build for BuiltinBuildSpec {
                     std::fs::create_dir_all(target.parent().unwrap())?;
 
                     // TODO: Defines, libraries
-                    cc::Build::new()
+                    let mut build = cc::Build::new();
+                    let build = build
                         .cargo_metadata(false)
                         .debug(false)
                         .host(std::env::consts::OS)
@@ -122,8 +149,23 @@ impl Build for BuiltinBuildSpec {
                         .target(std::env::consts::ARCH)
                         .shared_flag(true)
                         .files(&data.sources)
-                        .includes(&data.incdirs)
-                        .try_compile(target.to_str().unwrap())?;
+                        .includes(&data.incdirs);
+
+                    // `cc::Build` has no `defines()` function, so we manually feed in the
+                    // definitions in a verbose loop
+                    for (name, value) in &data.defines {
+                        build.define(name, value.as_deref());
+                    }
+
+                    for libdir in &data.libdirs {
+                        build.flag(&("-L".to_string() + libdir.to_str().unwrap()));
+                    }
+
+                    for library in &data.libraries {
+                        build.flag(&("-l".to_string() + library.to_str().unwrap()));
+                    }
+
+                    build.try_compile(target.to_str().unwrap())?;
                 }
             }
         }
@@ -229,5 +271,32 @@ mod tests {
         let result: mlua::Result<BuiltinBuildSpec> =
             lua.from_value(lua.globals().get("build").unwrap());
         let _err = result.unwrap_err();
+        let lua_content_complex_defines = "
+        build = {\n
+            modules = {\n
+                baz = {\n
+                    sources = {\n
+                        'lua/baz.lua',\n
+                    },\n
+                    defines = { 'USE_BAZ=1', 'ENABLE_LOGGING=true', 'LINK_STATIC' },\n
+                },\n
+            },\n
+        }\n
+        ";
+        lua.load(lua_content_complex_defines).exec().unwrap();
+        let build_spec: BuiltinBuildSpec =
+            lua.from_value(lua.globals().get("build").unwrap()).unwrap();
+        let baz = build_spec.modules.get("baz").unwrap();
+        match baz {
+            ModuleType::ModulePaths(paths) => assert_eq!(
+                paths.defines,
+                vec![
+                    ("USE_BAZ".into(), Some("1".into())),
+                    ("ENABLE_LOGGING".into(), Some("true".into())),
+                    ("LINK_STATIC".into(), None)
+                ]
+            ),
+            _ => panic!(),
+        }
     }
 }
