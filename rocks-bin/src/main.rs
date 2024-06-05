@@ -53,7 +53,6 @@ struct Cli {
     lua_dir: Option<PathBuf>,
 
     /// Which Lua installation to use.
-    // TODO(vhyrro): Add option validator for the version here.
     #[arg(long, value_name = "ver", value_parser = parse_lua_version)]
     lua_version: Option<LuaVersion>,
 
