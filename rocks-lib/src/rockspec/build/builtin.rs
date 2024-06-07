@@ -111,8 +111,8 @@ impl Build for BuiltinBuildSpec {
                     std::fs::copy(source, target)?;
                 }
                 ModuleSpec::SourcePaths(files) => {
-                    // TODO(vhyrro): Use the appropriate file extension here.
-                    let destination_path = lua_module_to_pathbuf(destination_path, ".so");
+                    let destination_path =
+                        lua_module_to_pathbuf(destination_path, std::env::consts::DLL_SUFFIX);
                     let target = output_paths.lib.join(destination_path);
 
                     let parent = target.parent().expect("TODO");

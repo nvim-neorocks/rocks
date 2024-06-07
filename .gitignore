@@ -11,4 +11,4 @@
 # Temp test files
 /rocks-lib/resources/test/luatest-0.2-1/
 /rocks-lib/proptest-regressions/
-
+/*.rockspec
