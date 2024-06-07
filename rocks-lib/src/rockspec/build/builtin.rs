@@ -138,7 +138,6 @@ impl Build for BuiltinBuildSpec {
 
                     std::fs::create_dir_all(target.parent().unwrap())?;
 
-                    // TODO: Defines, libraries
                     let mut build = cc::Build::new();
                     let build = build
                         .cargo_metadata(false)
