@@ -2,10 +2,12 @@ mod builtin;
 mod cmake;
 mod make;
 
+pub mod utils; // Make build utilities available as a submodule
 pub use builtin::*;
 pub use cmake::*;
-use itertools::Itertools as _;
 pub use make::*;
+
+use itertools::Itertools as _;
 
 use eyre::{eyre, OptionExt as _, Result};
 use mlua::{FromLua, Lua, LuaSerdeExt, Value};
@@ -13,7 +15,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
-use crate::tree::TreeLayout;
+use crate::tree::RockLayout;
 
 use super::{PerPlatform, PlatformIdentifier, Rockspec};
 
@@ -151,6 +153,8 @@ pub struct InstallSpec {
     #[serde(default)]
     pub conf: HashMap<String, PathBuf>,
     /// Lua command-line scripts.
+    // TODO(vhyrro): The String component should be checked to ensure that it consists of a single
+    // path component, such that targets like `my.binary` are not allowed.
     #[serde(default)]
     pub bin: HashMap<String, PathBuf>,
 }
@@ -398,7 +402,7 @@ impl Default for BuildType {
 
 // TODO(vhyrro): Move this to the dedicated build.rs module
 pub trait Build {
-    fn run(self, rockspec: Rockspec, output_paths: TreeLayout, no_install: bool) -> Result<()>;
+    fn run(self, rockspec: Rockspec, output_paths: RockLayout, no_install: bool) -> Result<()>;
 }
 
 #[cfg(test)]

@@ -1,16 +1,36 @@
 use crate::{
     config::Config,
-    rockspec::{Build, BuildBackendSpec, RockSourceSpec, Rockspec},
-    tree::Tree,
+    rockspec::{utils, Build, BuildBackendSpec, RockSourceSpec, Rockspec},
+    tree::{RockLayout, Tree},
 };
 use eyre::Result;
 use git2::Repository;
+
+fn install(rockspec: &Rockspec, tree: &Tree, output_paths: &RockLayout) -> Result<()> {
+    let install_spec = &rockspec.build.current_platform().install;
+
+    for (target, source) in &install_spec.lua {
+        utils::copy_lua_to_module_path(source, target, &output_paths.src)?;
+    }
+
+    for (target, source) in &install_spec.lib {
+        utils::compile_c_files(&vec![source.into()], target, &output_paths.lib)?;
+    }
+
+    for (target, source) in &install_spec.bin {
+        std::fs::copy(source, tree.bin().join(target))?;
+    }
+
+    Ok(())
+}
 
 pub fn build(rockspec: Rockspec, config: &Config, no_install: bool) -> Result<()> {
     // TODO(vhyrro): Use a more serious isolation strategy here.
     let temp_dir = tempdir::TempDir::new(&rockspec.package)?;
 
     let previous_dir = std::env::current_dir()?;
+
+    std::env::set_current_dir(&temp_dir)?;
 
     // Install the source in order to build.
     match &rockspec.source.current_platform().source_spec {
@@ -30,8 +50,6 @@ pub fn build(rockspec: Rockspec, config: &Config, no_install: bool) -> Result<()
         RockSourceSpec::Svn(_) => unimplemented!(),
     };
 
-    std::env::set_current_dir(&temp_dir)?;
-
     // TODO(vhyrro): Instead of copying bit-by-bit we should instead perform all of these
     // operations in the temporary directory itself and then copy all results over once they've
     // succeeded.
@@ -45,6 +63,8 @@ pub fn build(rockspec: Rockspec, config: &Config, no_install: bool) -> Result<()
     )?;
 
     let output_paths = tree.rock(&rockspec.package, &rockspec.version)?;
+
+    install(&rockspec, &tree, &output_paths)?;
 
     // Copy over all `copy_directories` to their respective paths
     for directory in &rockspec.build.current_platform().copy_directories {
@@ -60,7 +80,7 @@ pub fn build(rockspec: Rockspec, config: &Config, no_install: bool) -> Result<()
 
     // TODO: Ensure dependencies and build dependencies.
     match rockspec.build.default.build_backend.as_ref().cloned() {
-        Some(BuildBackendSpec::Builtin(spec)) => spec.run(rockspec, output_paths, no_install)?,
+        Some(BuildBackendSpec::Builtin(build_spec)) => build_spec.run(rockspec, output_paths, no_install)?,
         _ => unimplemented!(),
     };
 
