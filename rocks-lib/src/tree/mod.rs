@@ -22,7 +22,7 @@ pub struct Tree<'a> {
 }
 
 /// Change-agnostic way of referencing various paths for a rock.
-pub struct TreeLayout {
+pub struct RockLayout {
     pub etc: PathBuf,
     pub lib: PathBuf,
     pub src: PathBuf,
@@ -40,7 +40,11 @@ impl<'a> Tree<'a> {
         self.root.join(self.version.to_string())
     }
 
-    pub fn rock(&self, rock_name: &String, rock_version: &String) -> Result<TreeLayout> {
+    pub fn bin(&self) -> PathBuf {
+        self.root().join("bin")
+    }
+
+    pub fn rock(&self, rock_name: &String, rock_version: &String) -> Result<RockLayout> {
         // TODO(vhyrro): Don't store rocks with the revision number, that should be stripped almost
         // everywhere by default.
         let rock_path = self.root().join(format!("{}@{}", rock_name, rock_version));
@@ -53,6 +57,6 @@ impl<'a> Tree<'a> {
         std::fs::create_dir_all(&lib)?;
         std::fs::create_dir_all(&src)?;
 
-        Ok(TreeLayout { etc, lib, src })
+        Ok(RockLayout { etc, lib, src })
     }
 }

@@ -5,9 +5,9 @@ use itertools::Itertools;
 use serde::{de, Deserialize, Deserializer};
 use walkdir::WalkDir;
 
-use crate::{rockspec::Rockspec, tree::TreeLayout};
+use crate::{rockspec::Rockspec, tree::RockLayout};
 
-use super::Build;
+use super::{utils, Build};
 
 #[derive(Debug, PartialEq, Deserialize, Default, Clone)]
 pub struct BuiltinBuildSpec {
@@ -88,84 +88,18 @@ pub struct ModulePaths {
 }
 
 impl Build for BuiltinBuildSpec {
-    fn run(self, _rockspec: Rockspec, output_paths: TreeLayout, _no_install: bool) -> Result<()> {
+    fn run(self, _rockspec: Rockspec, output_paths: RockLayout, _no_install: bool) -> Result<()> {
         // Detect all Lua modules
         let modules = autodetect_modules()?
             .into_iter()
             .chain(self.modules)
             .collect::<HashMap<_, _>>();
 
-        fn lua_module_to_pathbuf(path: &str, extension: &str) -> PathBuf {
-            PathBuf::from(path.replace('.', std::path::MAIN_SEPARATOR_STR) + extension)
-        }
-
         for (destination_path, module_type) in &modules {
             match module_type {
-                ModuleSpec::SourcePath(source) => {
-                    let destination_path = lua_module_to_pathbuf(destination_path, ".lua");
-
-                    let target = output_paths.src.join(destination_path);
-
-                    std::fs::create_dir_all(target.parent().unwrap())?;
-
-                    std::fs::copy(source, target)?;
-                }
-                ModuleSpec::SourcePaths(files) => {
-                    let destination_path =
-                        lua_module_to_pathbuf(destination_path, std::env::consts::DLL_SUFFIX);
-                    let target = output_paths.lib.join(destination_path);
-
-                    let parent = target.parent().expect("TODO");
-                    let file = target.file_name().expect("TODO");
-
-                    std::fs::create_dir_all(parent)?;
-
-                    cc::Build::new()
-                        .cargo_metadata(false)
-                        .debug(false)
-                        .files(files)
-                        .host(std::env::consts::OS)
-                        .opt_level(3)
-                        .out_dir(parent)
-                        .shared_flag(true)
-                        .target(std::env::consts::ARCH)
-                        .try_compile(file.to_str().unwrap())?;
-                }
-                ModuleSpec::ModulePaths(data) => {
-                    let destination_path =
-                        lua_module_to_pathbuf(destination_path, std::env::consts::DLL_SUFFIX);
-                    let target = output_paths.lib.join(destination_path);
-
-                    std::fs::create_dir_all(target.parent().unwrap())?;
-
-                    let mut build = cc::Build::new();
-                    let build = build
-                        .cargo_metadata(false)
-                        .debug(false)
-                        .host(std::env::consts::OS)
-                        .opt_level(3)
-                        .out_dir(std::env::current_dir()?)
-                        .target(std::env::consts::ARCH)
-                        .shared_flag(true)
-                        .files(&data.sources)
-                        .includes(&data.incdirs);
-
-                    // `cc::Build` has no `defines()` function, so we manually feed in the
-                    // definitions in a verbose loop
-                    for (name, value) in &data.defines {
-                        build.define(name, value.as_deref());
-                    }
-
-                    for libdir in &data.libdirs {
-                        build.flag(&("-L".to_string() + libdir.to_str().unwrap()));
-                    }
-
-                    for library in &data.libraries {
-                        build.flag(&("-l".to_string() + library.to_str().unwrap()));
-                    }
-
-                    build.try_compile(target.to_str().unwrap())?;
-                }
+                ModuleSpec::SourcePath(source) => utils::copy_lua_to_module_path(source, destination_path, &output_paths.src)?,
+                ModuleSpec::SourcePaths(files) => utils::compile_c_files(files, destination_path, &output_paths.lib)?,
+                ModuleSpec::ModulePaths(data) => utils::compile_c_modules(data, destination_path, &output_paths.lib)?,
             }
         }
 
