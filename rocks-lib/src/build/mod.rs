@@ -80,7 +80,9 @@ pub fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
 
     // TODO: Ensure dependencies and build dependencies.
     match rockspec.build.default.build_backend.as_ref().cloned() {
-        Some(BuildBackendSpec::Builtin(build_spec)) => build_spec.run(rockspec, output_paths, false)?,
+        Some(BuildBackendSpec::Builtin(build_spec)) => {
+            build_spec.run(rockspec, output_paths, false)?
+        }
         _ => unimplemented!(),
     };
 

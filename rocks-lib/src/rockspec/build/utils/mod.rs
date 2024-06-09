@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
 use eyre::Result;
+use std::path::{Path, PathBuf};
 
 use super::ModulePaths;
 
@@ -9,7 +9,11 @@ fn lua_module_to_pathbuf(path: &str, extension: &str) -> PathBuf {
 
 /// Copies a lua source file to a specific destination. The destination is described by a
 /// `module.path` syntax (equivalent to the syntax provided to Lua's `require()` function).
-pub fn copy_lua_to_module_path(source: &PathBuf, target_module_name: &str, target_dir: &Path) -> Result<()> {
+pub fn copy_lua_to_module_path(
+    source: &PathBuf,
+    target_module_name: &str,
+    target_dir: &Path,
+) -> Result<()> {
     let target = lua_module_to_pathbuf(target_module_name, ".lua");
     let target = target_dir.join(target);
 
@@ -22,8 +26,7 @@ pub fn copy_lua_to_module_path(source: &PathBuf, target_module_name: &str, targe
 
 /// Compiles a set of C files into a single dynamic library and places them under `{target_dir}/{target_file}`.
 pub fn compile_c_files(files: &Vec<PathBuf>, target_file: &str, target_dir: &Path) -> Result<()> {
-    let target =
-        lua_module_to_pathbuf(target_file, std::env::consts::DLL_SUFFIX);
+    let target = lua_module_to_pathbuf(target_file, std::env::consts::DLL_SUFFIX);
     let target = target_dir.join(target);
 
     let parent = target.parent().expect("TODO");
@@ -47,8 +50,7 @@ pub fn compile_c_files(files: &Vec<PathBuf>, target_file: &str, target_dir: &Pat
 
 /// Compiles a set of C files (with extra metadata) to a given destination.
 pub fn compile_c_modules(data: &ModulePaths, target_file: &str, target_dir: &Path) -> Result<()> {
-    let target =
-        lua_module_to_pathbuf(target_file, std::env::consts::DLL_SUFFIX);
+    let target = lua_module_to_pathbuf(target_file, std::env::consts::DLL_SUFFIX);
     let target = target_dir.join(target);
 
     std::fs::create_dir_all(target.parent().unwrap())?;
@@ -59,7 +61,7 @@ pub fn compile_c_modules(data: &ModulePaths, target_file: &str, target_dir: &Pat
         .debug(false)
         .host(std::env::consts::OS)
         .opt_level(3)
-        .out_dir(std::env::current_dir()?)
+        .out_dir(target_dir)
         .target(std::env::consts::ARCH)
         .shared_flag(true)
         .files(&data.sources)
@@ -79,7 +81,9 @@ pub fn compile_c_modules(data: &ModulePaths, target_file: &str, target_dir: &Pat
         build.flag(&("-l".to_string() + library.to_str().unwrap()));
     }
 
-    build.try_compile(target.to_str().unwrap())?;
+    let file = target.file_name().expect("TODO");
+
+    build.try_compile(file.to_str().unwrap())?;
 
     Ok(())
 }

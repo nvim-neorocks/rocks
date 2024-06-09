@@ -105,9 +105,15 @@ impl Build for BuiltinBuildSpec {
 
         for (destination_path, module_type) in &modules {
             match module_type {
-                ModuleSpec::SourcePath(source) => utils::copy_lua_to_module_path(source, destination_path, &output_paths.src)?,
-                ModuleSpec::SourcePaths(files) => utils::compile_c_files(files, destination_path, &output_paths.lib)?,
-                ModuleSpec::ModulePaths(data) => utils::compile_c_modules(data, destination_path, &output_paths.lib)?,
+                ModuleSpec::SourcePath(source) => {
+                    utils::copy_lua_to_module_path(source, destination_path, &output_paths.src)?
+                }
+                ModuleSpec::SourcePaths(files) => {
+                    utils::compile_c_files(files, destination_path, &output_paths.lib)?
+                }
+                ModuleSpec::ModulePaths(data) => {
+                    utils::compile_c_modules(data, destination_path, &output_paths.lib)?
+                }
             }
         }
 
