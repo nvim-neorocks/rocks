@@ -7,12 +7,12 @@ use rocks_lib::{config::Config, rockspec::Rockspec};
 
 #[derive(Args)]
 pub struct Build {
-    directory: PathBuf,
+    rockspec_path: PathBuf,
 }
 
 pub fn build(data: Build, config: &Config) -> Result<()> {
     if data
-        .directory
+        .rockspec_path
         .extension()
         .map(|ext| ext != "rockspec")
         .unwrap_or(true)
@@ -20,10 +20,10 @@ pub fn build(data: Build, config: &Config) -> Result<()> {
         return Err(eyre!("Provided path is not a valid rockspec!"));
     }
 
-    let rockspec = String::from_utf8(std::fs::read(data.directory)?)?;
+    let rockspec = String::from_utf8(std::fs::read(data.rockspec_path)?)?;
     let rockspec = Rockspec::new(&rockspec)?;
 
-    rocks_lib::build::build(rockspec, config, false)?;
+    rocks_lib::build::build(rockspec, config)?;
 
     Ok(())
 }

@@ -24,7 +24,7 @@ fn install(rockspec: &Rockspec, tree: &Tree, output_paths: &RockLayout) -> Resul
     Ok(())
 }
 
-pub fn build(rockspec: Rockspec, config: &Config, no_install: bool) -> Result<()> {
+pub fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
     // TODO(vhyrro): Use a more serious isolation strategy here.
     let temp_dir = tempdir::TempDir::new(&rockspec.package)?;
 
@@ -80,7 +80,7 @@ pub fn build(rockspec: Rockspec, config: &Config, no_install: bool) -> Result<()
 
     // TODO: Ensure dependencies and build dependencies.
     match rockspec.build.default.build_backend.as_ref().cloned() {
-        Some(BuildBackendSpec::Builtin(build_spec)) => build_spec.run(rockspec, output_paths, no_install)?,
+        Some(BuildBackendSpec::Builtin(build_spec)) => build_spec.run(rockspec, output_paths, false)?,
         _ => unimplemented!(),
     };
 
