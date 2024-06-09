@@ -51,6 +51,14 @@ where
 {
     let values = serde_json::Value::deserialize(deserializer)?;
 
+    // If `defines` is an empty Lua table, it's treated as a dictionary.
+    // This case is handled here.
+    if let Some(values_as_obj) = values.as_object() {
+        if values_as_obj.is_empty() {
+            return Ok(Vec::default());
+        }
+    }
+
     values
         .as_array()
         .ok_or_else(|| de::Error::custom("expected `defines` to be a list of strings"))?
