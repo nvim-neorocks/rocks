@@ -30,8 +30,11 @@ pub struct RockLayout {
 
 impl<'a> Tree<'a> {
     pub fn new(root: &'a PathBuf, version: &'a LuaVersion) -> Result<Self> {
-        // Ensure that the root and the version directory exists.
+        // Ensure that the root and the version directory exist.
         std::fs::create_dir_all(root.join(version.to_string()))?;
+
+        // Ensure that the bin directory exists.
+        std::fs::create_dir_all(root.join("bin"))?;
 
         Ok(Self { root, version })
     }
@@ -41,7 +44,7 @@ impl<'a> Tree<'a> {
     }
 
     pub fn bin(&self) -> PathBuf {
-        self.root().join("bin")
+        self.root.join("bin")
     }
 
     pub fn rock(&self, rock_name: &String, rock_version: &String) -> Result<RockLayout> {
