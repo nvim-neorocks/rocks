@@ -345,7 +345,8 @@ where
         // Add extended platform dependencies (without base deps) for each platform
         for extended_platform in &platform.get_extended_platforms() {
             let extended_overrides = per_platform
-                .get(extended_platform).cloned()
+                .get(extended_platform)
+                .cloned()
                 .unwrap_or_default();
             per_platform.insert(
                 *extended_platform,

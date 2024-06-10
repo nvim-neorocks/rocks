@@ -1,10 +1,12 @@
 use crate::{
     config::Config,
-    rockspec::{utils, Build, BuildBackendSpec, RockSourceSpec, Rockspec},
+    rockspec::{utils, Build as _, BuildBackendSpec, RockSourceSpec, Rockspec},
     tree::{RockLayout, Tree},
 };
 use eyre::Result;
 use git2::Repository;
+
+mod builtin;
 
 fn install(rockspec: &Rockspec, tree: &Tree, output_paths: &RockLayout) -> Result<()> {
     let install_spec = &rockspec.build.current_platform().install;
