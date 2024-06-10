@@ -134,7 +134,7 @@ impl PlatformSupport {
                 let (is_positive_assertion, platform) = platform
                     .strip_prefix('!')
                     .map(|str| (false, str))
-                    .unwrap_or((true, &platform));
+                    .unwrap_or((true, platform));
 
                 let platform_identifier: PlatformIdentifier = platform.parse()?;
 
@@ -345,8 +345,7 @@ where
         // Add extended platform dependencies (without base deps) for each platform
         for extended_platform in &platform.get_extended_platforms() {
             let extended_overrides = per_platform
-                .get(extended_platform)
-                .map(T::clone)
+                .get(extended_platform).cloned()
                 .unwrap_or_default();
             per_platform.insert(
                 *extended_platform,
