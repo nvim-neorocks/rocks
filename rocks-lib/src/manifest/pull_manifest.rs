@@ -65,7 +65,6 @@ mod tests {
     use super::*;
 
     fn reset_cache() {
-        let config = Config::default();
         let cache_path = Config::get_default_cache_path().unwrap();
         let _ = fs::remove_dir_all(&cache_path);
         fs::create_dir_all(cache_path).unwrap();
@@ -120,7 +119,7 @@ mod tests {
         let server = start_test_server("manifest".into());
         let mut url_str = server.url_str(""); // Remove trailing "/"
         url_str.pop();
-        let manifest_content = "dummy content";
+        let manifest_content = "dummy data";
         let config = Config::default();
         let cache_dir = Config::get_default_cache_path().unwrap();
         let cache = cache_dir.join("manifest");
