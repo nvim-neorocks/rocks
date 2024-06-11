@@ -3,7 +3,7 @@ use crate::{
     rockspec::{utils, Build as _, BuildBackendSpec, RockSourceSpec, Rockspec},
     tree::{RockLayout, Tree},
 };
-use eyre::Result;
+use eyre::{OptionExt as _, Result};
 use git2::Repository;
 
 mod builtin;
@@ -61,7 +61,7 @@ pub fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
         config
             .lua_version
             .as_ref()
-            .unwrap_or(&crate::config::LuaVersion::Lua51),
+            .ok_or_eyre("No Lua version specified!")?,
     )?;
 
     let output_paths = tree.rock(&rockspec.package, &rockspec.version)?;
