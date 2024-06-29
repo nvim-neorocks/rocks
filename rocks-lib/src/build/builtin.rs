@@ -96,7 +96,9 @@ mod tests {
         .unwrap();
         let rockspec = Rockspec::new(&content).unwrap();
 
-        let config = Config::new().tree(Some(dir.into_path()));
+        let config = Config::new()
+            .tree(Some(dir.into_path()))
+            .lua_version(Some(crate::config::LuaVersion::Lua51));
 
         crate::build::build(rockspec, &config).unwrap();
     }
