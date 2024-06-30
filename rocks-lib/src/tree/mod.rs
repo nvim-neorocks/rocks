@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use crate::config::LuaVersion;
 use eyre::Result;
 
+mod list;
+
 /// A tree is a collection of files where installed rocks are located.
 ///
 /// `rocks` diverges from the traditional hierarchy employed by luarocks.
@@ -22,6 +24,7 @@ pub struct Tree<'a> {
 }
 
 /// Change-agnostic way of referencing various paths for a rock.
+#[derive(Debug, PartialEq)]
 pub struct RockLayout {
     pub etc: PathBuf,
     pub lib: PathBuf,
@@ -61,5 +64,60 @@ impl<'a> Tree<'a> {
         std::fs::create_dir_all(&src)?;
 
         Ok(RockLayout { etc, lib, src })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use insta::{assert_yaml_snapshot, sorted_redaction};
+
+    use crate::{config::LuaVersion, tree::RockLayout};
+
+    use super::Tree;
+
+    #[test]
+    fn rock_layout() {
+        let tree_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-tree");
+
+        let tree = Tree::new(&tree_path, &LuaVersion::Lua51).unwrap();
+
+        let neorg = tree
+            .rock(&"neorg".to_string(), &"8.0.0-1".to_string())
+            .unwrap();
+
+        assert_eq!(
+            neorg,
+            RockLayout {
+                etc: tree_path.join("5.1/neorg@8.0.0-1/etc"),
+                lib: tree_path.join("5.1/neorg@8.0.0-1/lib"),
+                src: tree_path.join("5.1/neorg@8.0.0-1/src"),
+            }
+        );
+
+        let lua_cjson = tree
+            .rock(&"lua-cjson".to_string(), &"2.1.0.9-1".to_string())
+            .unwrap();
+
+        assert_eq!(
+            lua_cjson,
+            RockLayout {
+                etc: tree_path.join("5.1/lua-cjson@2.1.0.9-1/etc"),
+                lib: tree_path.join("5.1/lua-cjson@2.1.0.9-1/lib"),
+                src: tree_path.join("5.1/lua-cjson@2.1.0.9-1/src"),
+            }
+        );
+    }
+
+    #[test]
+    fn tree_list() {
+        let tree_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-tree");
+
+        let tree = Tree::new(&tree_path, &LuaVersion::Lua51).unwrap();
+
+        assert_yaml_snapshot!(tree.list(), { "." => sorted_redaction() })
     }
 }

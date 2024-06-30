@@ -29,6 +29,7 @@ tempdir = "0.3.7"
 vfs = "0.12.0"
 walkdir = "2.4.0"
 zip = "0.6.6"
+insta = { version = "1.39.0", features = ["redactions", "yaml"] }
 
 [dev-dependencies]
 httptest = { version = "0.15.5" }
