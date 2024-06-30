@@ -2145,6 +2145,7 @@ dependencies = [
  "octocrab",
  "rocks-lib",
  "rustyline",
+ "serde_json",
  "spdx",
  "spinners",
  "termcolor",

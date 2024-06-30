@@ -25,9 +25,7 @@ pub fn list(list_data: List, config: &Config) -> Result<()> {
     // TODO(vhyrro): Add `outdated` support.
 
     if list_data.porcelain {
-        for (name, versions) in available_rocks {
-            println!("{}: {}", name, versions.join(" "));
-        }
+        println!("{}", serde_json::to_string(&available_rocks)?);
     } else {
         let formatting = TreeFormatting::dir_tree(FormatCharacters::box_chars());
         for (name, versions) in available_rocks.into_iter().sorted() {
