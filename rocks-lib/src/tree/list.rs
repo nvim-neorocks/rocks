@@ -7,7 +7,7 @@ use super::Tree;
 
 impl<'a> Tree<'a> {
     pub fn list(&self) -> HashMap<String, Vec<String>> {
-        WalkDir::new(dbg!(self.root()))
+        WalkDir::new(self.root())
             .min_depth(1)
             .max_depth(1)
             .into_iter()

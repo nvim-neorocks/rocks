@@ -8,6 +8,7 @@ mod download;
 mod rockspec;
 mod search;
 mod unpack;
+mod list;
 
 fn parse_lua_version(s: &str) -> Result<LuaVersion, String> {
     match s {
@@ -108,7 +109,7 @@ enum Commands {
     /// Check syntax of a rockspec.
     Lint,
     /// List currently installed rocks.
-    List,
+    List(list::List),
     /// Compile package in current directory using a rockspec.
     Make,
     /// Auto-write a rockspec for a new version of the rock.
@@ -176,6 +177,7 @@ async fn main() {
                 rockspec::write_rockspec(rockspec_data).await.unwrap()
             }
             Commands::Build(build_data) => build::build(build_data, &config).unwrap(),
+            Commands::List(list_data) => list::list(list_data, &config).unwrap(),
             _ => unimplemented!(),
         },
         None => {
