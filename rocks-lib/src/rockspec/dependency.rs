@@ -1,9 +1,10 @@
 use std::{collections::HashMap, str::FromStr};
 
 use eyre::{eyre, Result};
-use html_escape::decode_html_entities;
-use semver::{Version, VersionReq};
+use semver::VersionReq;
 use serde::{de, Deserialize, Deserializer};
+
+use crate::luarock::{parse_version_req, LuaRock};
 
 use super::{PartialOverride, PerPlatform, PlatformOverridable};
 
@@ -43,10 +44,11 @@ impl LuaDependency {
     }
 
     pub fn matches(&self, rock: &LuaRock) -> bool {
-        if self.rock_name != rock.name {
-            return false;
+        if self.rock_name == rock.name {
+            self.rock_version_req.matches(&rock.version)
+        } else {
+            false
         }
-        self.rock_version_req.matches(&rock.version)
     }
 }
 
@@ -119,69 +121,10 @@ impl PlatformOverridable for HashMap<String, ExternalDependency> {
     }
 }
 
-// TODO(mrcjkb): Move this somewhere more suitable
-pub struct LuaRock {
-    pub name: String,
-    pub version: Version,
-}
-
-impl LuaRock {
-    pub fn new(name: String, version: String) -> Result<Self> {
-        Ok(Self {
-            name,
-            version: Version::parse(append_minor_patch_if_missing(version).as_str())?,
-        })
-    }
-}
-
-/// Transform LuaRocks constraints into constraints that can be parsed by the semver crate.
-fn parse_version_req(version_constraints: &str) -> Result<VersionReq> {
-    let unescaped = decode_html_entities(version_constraints)
-        .to_string()
-        .as_str()
-        .to_owned();
-    let transformed = match unescaped {
-        s if s.starts_with("~>") => parse_pessimistic_version_constraint(s)?,
-        s => s,
-    };
-    let version_req = VersionReq::parse(&transformed)?;
-    Ok(version_req)
-}
-
-fn parse_pessimistic_version_constraint(version_constraint: String) -> Result<String> {
-    // pessimistic operator
-    let min_version_str = &version_constraint[2..].trim();
-    let min_version =
-        Version::parse(append_minor_patch_if_missing(min_version_str.to_string()).as_str())?;
-    let max_version = match min_version_str.matches('.').count() {
-        0 => Version {
-            major: &min_version.major + 1,
-            ..min_version.clone()
-        },
-        1 => Version {
-            minor: &min_version.minor + 1,
-            ..min_version.clone()
-        },
-        _ => Version {
-            patch: &min_version.patch + 1,
-            ..min_version.clone()
-        },
-    };
-    Ok(">= ".to_string() + &min_version.to_string() + ", < " + &max_version.to_string())
-}
-
-/// Recursively append .0 until the version string has a minor or patch version
-fn append_minor_patch_if_missing(version: String) -> String {
-    if version.matches('.').count() < 2 {
-        return append_minor_patch_if_missing(version + ".0");
-    }
-    version
-}
-
 #[cfg(test)]
 mod tests {
-
     use super::*;
+    use semver::Version;
 
     #[tokio::test]
     async fn parse_luarock() {
