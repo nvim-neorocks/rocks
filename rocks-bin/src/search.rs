@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use clap::Args;
 use eyre::Result;
 use itertools::Itertools;
@@ -23,35 +25,36 @@ pub struct Search {
 pub async fn search(data: Search, config: &Config) -> Result<()> {
     let formatting = TreeFormatting::dir_tree(FormatCharacters::box_chars());
 
-    // TODO(vhyrro): Pull in global configuration in the form of a second parameter (including which server to use for the manifest).
-
     let manifest = manifest_from_server(config.server.to_owned(), config).await?;
 
     let metadata = ManifestMetadata::new(&manifest)?;
 
-    for key in metadata
+    let rock_to_version_map: HashMap<&String, Vec<&String>> = metadata
         .repository
-        .keys()
-        .sorted()
-        .collect::<Vec<&String>>()
-    {
-        // TODO(vhyrro): Use fuzzy matching here instead.
-        if key.contains(&data.name) {
-            let versions = metadata.repository[key]
-                .keys()
-                .sorted_by(|a, b| Ord::cmp(b, a));
-
-            if data.porcelain {
-                versions.for_each(|version| {
-                    println!("{} {} src|rockspec {}", key, version, config.server)
-                });
+        .iter()
+        .filter_map(|(key, value)| {
+            if key.contains(&data.name) {
+                Some((
+                    key,
+                    value.keys().sorted_by(|a, b| Ord::cmp(b, a)).collect_vec(),
+                ))
             } else {
-                let mut tree = StringTreeNode::new(key.to_owned());
-
-                versions.for_each(|version| tree.push(version.to_owned()));
-
-                println!("{}", tree.to_string_with_format(&formatting)?);
+                None
             }
+        })
+        .collect();
+
+    if data.porcelain {
+        println!("{}", serde_json::to_string(&rock_to_version_map)?);
+    } else {
+        for (key, versions) in rock_to_version_map.into_iter().sorted() {
+            let mut tree = StringTreeNode::new(key.to_owned());
+
+            for version in versions {
+                tree.push(version.to_owned());
+            }
+
+            println!("{}", tree.to_string_with_format(&formatting).unwrap());
         }
     }
 
