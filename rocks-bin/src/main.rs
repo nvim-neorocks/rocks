@@ -109,7 +109,7 @@ enum Commands {
     /// Check syntax of a rockspec.
     Lint,
     /// List currently installed rocks.
-    List(list::List),
+    List(list::ListCmd),
     /// Compile package in current directory using a rockspec.
     Make,
     /// Auto-write a rockspec for a new version of the rock.
@@ -177,7 +177,7 @@ async fn main() {
                 rockspec::write_rockspec(rockspec_data).await.unwrap()
             }
             Commands::Build(build_data) => build::build(build_data, &config).unwrap(),
-            Commands::List(list_data) => list::list(list_data, &config).unwrap(),
+            Commands::List(list_data) => list::list_installed(list_data, &config).unwrap(),
             _ => unimplemented!(),
         },
         None => {

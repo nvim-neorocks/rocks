@@ -5,14 +5,14 @@ use rocks_lib::{config::Config, tree::Tree};
 use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
 
 #[derive(Args)]
-pub struct List {
+pub struct ListCmd {
     #[arg(long)]
     outdated: bool,
     #[arg(long)]
     porcelain: bool,
 }
 
-pub fn list(list_data: List, config: &Config) -> Result<()> {
+pub fn list_installed(list_data: ListCmd, config: &Config) -> Result<()> {
     let tree = Tree::new(
         &config.tree,
         config
