@@ -5,10 +5,10 @@ use rocks_lib::config::{Config, LuaVersion};
 
 mod build;
 mod download;
+mod list;
 mod rockspec;
 mod search;
 mod unpack;
-mod list;
 
 fn parse_lua_version(s: &str) -> Result<LuaVersion, String> {
     match s {

@@ -13,9 +13,15 @@ pub struct List {
 }
 
 pub fn list(list_data: List, config: &Config) -> Result<()> {
-    let tree = Tree::new(&config.tree, config.lua_version.as_ref().ok_or_eyre("lua version not supplied!")?)?;
+    let tree = Tree::new(
+        &config.tree,
+        config
+            .lua_version
+            .as_ref()
+            .ok_or_eyre("lua version not supplied!")?,
+    )?;
     let available_rocks = tree.list();
-    
+
     // TODO(vhyrro): Add `outdated` support.
 
     if list_data.porcelain {
