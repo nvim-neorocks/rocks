@@ -7,8 +7,6 @@ use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
 #[derive(Args)]
 pub struct ListCmd {
     #[arg(long)]
-    outdated: bool,
-    #[arg(long)]
     porcelain: bool,
 }
 
@@ -21,8 +19,6 @@ pub fn list_installed(list_data: ListCmd, config: &Config) -> Result<()> {
             .ok_or_eyre("lua version not supplied!")?,
     )?;
     let available_rocks = tree.list();
-
-    // TODO(vhyrro): Add `outdated` support.
 
     if list_data.porcelain {
         println!("{}", serde_json::to_string(&available_rocks)?);

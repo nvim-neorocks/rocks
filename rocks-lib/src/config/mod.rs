@@ -35,8 +35,6 @@ pub struct Config {
     pub lua_dir: Option<PathBuf>,
     pub lua_version: Option<LuaVersion>,
     pub tree: PathBuf,
-    pub local: bool,
-    pub global: bool,
     pub no_project: bool,
     pub verbose: bool,
     pub timeout: Duration,
@@ -122,14 +120,6 @@ impl Config {
         }
     }
 
-    pub fn local(self, local: bool) -> Config {
-        Config { local, ..self }
-    }
-
-    pub fn global(self, global: bool) -> Config {
-        Config { global, ..self }
-    }
-
     pub fn no_project(self, no_project: bool) -> Config {
         Config { no_project, ..self }
     }
@@ -157,8 +147,6 @@ impl Default for Config {
             lua_dir: None,
             lua_version: None,
             tree: Config::get_default_data_path().unwrap(), // TODO: Remove this unwrap
-            local: true,
-            global: false,
             no_project: false,
             verbose: false,
             timeout: Duration::from_secs(30),
