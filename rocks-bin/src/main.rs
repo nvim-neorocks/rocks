@@ -65,16 +65,6 @@ struct Cli {
     #[arg(long, value_name = "path")]
     cache_path: Option<PathBuf>,
 
-    /// Use the tree in the user's home directory.
-    /// To enable it, see `rocks help path`.
-    #[arg(long)]
-    local: bool,
-
-    /// Use the system tree when `local_by_default` is `true`.
-    // TODO(vhyrro): Add more insightful description.
-    #[arg(long)]
-    global: bool,
-
     /// Do not use project tree even if running from a project folder.
     #[arg(long)]
     no_project: bool,
@@ -94,6 +84,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Add a dependency to the current project.
+    Add,
     /// Build/compile a rock.
     Build(build::Build),
     /// Query information about Rocks's configuration.
@@ -104,7 +96,7 @@ enum Commands {
     Download(download::Download),
     /// Initialize a directory for a Lua project using Rocks.
     Init,
-    /// Install a rock.
+    /// Install a rock for use on the system.
     Install,
     /// Check syntax of a rockspec.
     Lint,
@@ -128,6 +120,10 @@ enum Commands {
     Show,
     /// Run the test suite in the current directory.
     Test,
+    /// Uninstall a rock from the system.
+    Uninstall,
+    /// Updates all rocks in a project.
+    Update,
     /// Unpack the contents of a rock.
     Unpack(unpack::Unpack),
     /// Download a rock and unpack it.
@@ -153,9 +149,7 @@ async fn main() {
         .only_sources(cli.only_sources)
         .server(cli.server)
         .tree(cli.tree)
-        .global(cli.global)
         // .cache_path(cli.cache_path)
-        .local(cli.local)
         .timeout(
             cli.timeout
                 .map(|duration| Duration::from_secs(duration as u64)),
