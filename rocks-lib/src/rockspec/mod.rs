@@ -122,7 +122,8 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use crate::rockspec::{LuaRock, PlatformIdentifier};
+    use crate::luarock::LuaRock;
+    use crate::rockspec::PlatformIdentifier;
 
     use super::*;
 
