@@ -13,6 +13,7 @@ To achieve this, we seek to refactor various aspects of `luarocks`, including:
   Either that, or we only keep `--global` as a flag.
 - Several Lua versions - certain rocks are built up of C files which access Lua headers. `rocks` will be able to install library headers for various Lua versions automatically,
   without relying on the user to have those present on their system.
+- Moving as many subcommands (`unpack`, `unpack-remote`) as possible into a `debug` subcommand (unpacking local rockspecs is usually only done for debugging purposes).
 
 # TODOs
 
