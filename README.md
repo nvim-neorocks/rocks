@@ -7,9 +7,8 @@ Rocks serves as an application for:
 - Embedding rock manipulation logic into your own application
 
 > [!NOTE]
-> This project does not aim to supercede `luarocks` itself.
-> Rather, it is designed to complement luarocks and retain backwards compatibility where
-  possible.
+> This aims to be a full rewrite of `luarocks`, with many flags altered to be more
+> ergonomic. This is not a drop-in replacement for `luarocks` commands you may have in scripts.
 
 # Usage
 
