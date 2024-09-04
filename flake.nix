@@ -4,10 +4,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    pre-commit-hooks = {
-      # TODO: https://github.com/cachix/pre-commit-hooks.nix/pull/396
-      # url = "github:cachix/pre-commit-hooks.nix";
-      url = "github:mrcjkb/pre-commit-hooks.nix/clippy";
+    git-hooks = {
+      # TODO: https://github.com/cachix/git-hooks.nix/pull/396
+      # url = "github:cachix/git-hooks.nix";
+      url = "github:mrcjkb/git-hooks.nix?ref=clippy";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -16,7 +16,7 @@
     self,
     nixpkgs,
     flake-parts,
-    pre-commit-hooks,
+    git-hooks,
     ...
   }: let
     overlay = import ./nix/overlay.nix {inherit self;};
@@ -41,7 +41,7 @@
             overlay
           ];
         };
-        pre-commit-check = pre-commit-hooks.lib.${system}.run {
+        git-check = git-hooks.lib.${system}.run {
           src = self;
           hooks = {
             alejandra.enable = true;
@@ -52,12 +52,12 @@
                 denyWarnings = true;
                 allFeatures = true;
               };
+              extraPackages = pkgs.rocks.buildInputs ++ pkgs.rocks.nativeBuildInputs;
             };
             cargo-check.enable = true;
           };
           settings = {
-            runtimeDeps = pkgs.rocks.buildInputs ++ pkgs.rocks.nativeBuildInputs;
-            rust.cargoDeps = pkgs.rustPlatform.importCargoLock {
+            rust.check.cargoDeps = pkgs.rustPlatform.importCargoLock {
               lockFile = ./Cargo.lock;
             };
           };
@@ -70,13 +70,13 @@
 
         devShells.default = pkgs.mkShell {
           name = "rocks devShell";
-          inherit (pre-commit-check) shellHook;
+          inherit (git-check) shellHook;
           buildInputs =
             (with pkgs; [
               rust-analyzer
               cargo-nextest
             ])
-            ++ (with pre-commit-hooks.packages.${system}; [
+            ++ (with git-hooks.packages.${system}; [
               alejandra
               rustfmt
               clippy
@@ -87,7 +87,7 @@
 
         checks = with pkgs; {
           inherit
-            pre-commit-check
+            git-check
             rocks
             ;
         };
