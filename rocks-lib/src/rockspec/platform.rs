@@ -50,17 +50,17 @@ impl PartialOrd for PlatformIdentifier {
 
 /// Retrieves the target compilation platform and returns it as an identifier.
 pub fn get_platform() -> PlatformIdentifier {
-    if cfg!(linux) {
+    if cfg!(target_os = "linux") {
         PlatformIdentifier::Linux
-    } else if cfg!(macos) {
+    } else if cfg!(target_os = "macos") {
         PlatformIdentifier::MacOSX
-    } else if cfg!(cygwin) {
-        PlatformIdentifier::Cygwin
-    } else if cfg!(freebsd) {
+    } else if cfg!(target_os = "freebsd") {
         PlatformIdentifier::FreeBSD
+    } else if which::which("cygpath").is_ok() {
+        PlatformIdentifier::Cygwin
     } else if cfg!(unix) {
         PlatformIdentifier::Unix
-    } else if cfg!(target_os = "windows") && cfg!(target_arch = "x86") {
+    } else if cfg!(all(target_os = "windows", target_arch = "x86")) {
         PlatformIdentifier::Win32
     } else if cfg!(windows) {
         PlatformIdentifier::Windows
