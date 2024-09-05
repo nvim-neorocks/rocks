@@ -22,7 +22,7 @@ fn parse_lua_version(s: &str) -> Result<LuaVersion, String> {
     }
 }
 
-/// An small and efficient Lua package manager.
+/// A fast and efficient Lua package manager.
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
