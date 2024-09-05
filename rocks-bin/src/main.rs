@@ -1,9 +1,16 @@
 use std::{path::PathBuf, time::Duration};
 
+use build::Build;
 use clap::{Parser, Subcommand};
+use debug::Debug;
+use download::Download;
+use list::ListCmd;
 use rocks_lib::config::{Config, LuaVersion};
+use rockspec::WriteRockspec;
+use search::Search;
 
 mod build;
+mod debug;
 mod download;
 mod list;
 mod rockspec;
@@ -87,13 +94,16 @@ enum Commands {
     /// Add a dependency to the current project.
     Add,
     /// Build/compile a rock.
-    Build(build::Build),
+    Build(Build),
     /// Query information about Rocks's configuration.
     Config,
+    /// Various debugging utilities.
+    #[command(subcommand)]
+    Debug(Debug),
     /// Show documentation for an installed rock.
     Doc,
     /// Download a specific rock file from a rocks server.
-    Download(download::Download),
+    Download(Download),
     /// Initialize a directory for a Lua project using Rocks.
     Init,
     /// Install a rock for use on the system.
@@ -101,11 +111,7 @@ enum Commands {
     /// Check syntax of a rockspec.
     Lint,
     /// List currently installed rocks.
-    List(list::ListCmd),
-    /// Compile package in current directory using a rockspec.
-    Make,
-    /// Auto-write a rockspec for a new version of the rock.
-    NewVersion,
+    List(ListCmd),
     /// Create a rock, packing sources or binaries.
     Pack,
     /// Return the currently configured package path.
@@ -115,7 +121,7 @@ enum Commands {
     /// Uninstall a rock.
     Remove,
     /// Query the Luarocks servers.
-    Search(search::Search),
+    Search(Search),
     /// Show information about an installed rock.
     Show,
     /// Run the test suite in the current directory.
@@ -124,16 +130,12 @@ enum Commands {
     Uninstall,
     /// Updates all rocks in a project.
     Update,
-    /// Unpack the contents of a rock.
-    Unpack(unpack::Unpack),
-    /// Download a rock and unpack it.
-    UnpackRemote(unpack::UnpackRemote),
     /// Upload a rockspec to the public rocks repository.
     Upload,
     /// Tell which file corresponds to a given module name.
     Which,
     /// Write a template for a rockspec file.
-    WriteRockspec(rockspec::WriteRockspec),
+    WriteRockspec(WriteRockspec),
 }
 
 #[tokio::main]
@@ -163,9 +165,11 @@ async fn main() {
             Commands::Download(download_data) => {
                 download::download(download_data, &config).await.unwrap()
             }
-            Commands::Unpack(unpack_data) => unpack::unpack(unpack_data).await.unwrap(),
-            Commands::UnpackRemote(unpack_data) => {
-                unpack::unpack_remote(unpack_data, &config).await.unwrap()
+            Commands::Debug(debug) => match debug {
+                Debug::Unpack(unpack_data) => unpack::unpack(unpack_data).await.unwrap(),
+                Debug::UnpackRemote(unpack_data) => {
+                    unpack::unpack_remote(unpack_data, &config).await.unwrap()
+                }
             }
             Commands::WriteRockspec(rockspec_data) => {
                 rockspec::write_rockspec(rockspec_data).await.unwrap()
