@@ -70,7 +70,7 @@
 
         devShells.default = pkgs.mkShell {
           name = "rocks devShell";
-          inherit (git-check) shellHook;
+          inherit (git-hooks-check) shellHook;
           buildInputs =
             (with pkgs; [
               rust-analyzer
