@@ -41,7 +41,7 @@
             overlay
           ];
         };
-        git-check = git-hooks.lib.${system}.run {
+        git-hooks-check = git-hooks.lib.${system}.run {
           src = self;
           hooks = {
             alejandra.enable = true;
@@ -70,7 +70,7 @@
 
         devShells.default = pkgs.mkShell {
           name = "rocks devShell";
-          inherit (git-check) shellHook;
+          inherit (git-hooks-check) shellHook;
           buildInputs =
             (with pkgs; [
               rust-analyzer
@@ -87,7 +87,7 @@
 
         checks = with pkgs; {
           inherit
-            git-check
+            git-hooks-check
             rocks
             ;
         };

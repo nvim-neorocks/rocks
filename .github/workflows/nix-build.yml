@@ -16,7 +16,7 @@ jobs:
         attribute:
           - .#devShells.x86_64-linux.default
           - .#packages.x86_64-linux.rocks
-          - .#checks.x86_64-linux.pre-commit-check
+          - .#checks.x86_64-linux.git-hooks-check
     steps:
     - uses: actions/checkout@v4
     - uses: DeterminateSystems/nix-installer-action@v9
