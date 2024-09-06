@@ -41,7 +41,7 @@
             overlay
           ];
         };
-        git-check = git-hooks.lib.${system}.run {
+        git-hooks-check = git-hooks.lib.${system}.run {
           src = self;
           hooks = {
             alejandra.enable = true;
@@ -87,7 +87,7 @@
 
         checks = with pkgs; {
           inherit
-            git-check
+            git-hooks-check
             rocks
             ;
         };
