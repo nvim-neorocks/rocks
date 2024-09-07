@@ -1,3 +1,4 @@
+use crate::project::write_new::NewProject;
 use std::{path::PathBuf, time::Duration};
 
 use build::Build;
@@ -6,7 +7,6 @@ use debug::Debug;
 use download::Download;
 use list::ListCmd;
 use rocks_lib::config::{Config, LuaVersion};
-use rockspec::WriteRockspec;
 use search::Search;
 use update::Update;
 
@@ -14,10 +14,11 @@ mod build;
 mod debug;
 mod download;
 mod list;
-mod rockspec;
+mod project;
 mod search;
 mod unpack;
 mod update;
+mod utils;
 
 fn parse_lua_version(s: &str) -> Result<LuaVersion, String> {
     match s {
@@ -114,6 +115,8 @@ enum Commands {
     Lint,
     /// List currently installed rocks.
     List(ListCmd),
+    /// Create a new Lua project.
+    New(NewProject),
     /// List outdated rocks.
     Outdated,
     /// Create a rock, packing sources or binaries.
@@ -138,8 +141,6 @@ enum Commands {
     Upload,
     /// Tell which file corresponds to a given module name.
     Which,
-    /// Write a template for a rockspec file.
-    WriteRockspec(WriteRockspec),
 }
 
 #[tokio::main]
@@ -174,10 +175,10 @@ async fn main() {
                 Debug::UnpackRemote(unpack_data) => {
                     unpack::unpack_remote(unpack_data, &config).await.unwrap()
                 }
-            }
-            Commands::WriteRockspec(rockspec_data) => {
-                rockspec::write_rockspec(rockspec_data).await.unwrap()
-            }
+            },
+            Commands::New(project_data) => project::write_new::write_project_rockspec(project_data)
+                .await
+                .unwrap(),
             Commands::Build(build_data) => build::build(build_data, &config).unwrap(),
             Commands::List(list_data) => list::list_installed(list_data, &config).unwrap(),
             _ => unimplemented!(),
