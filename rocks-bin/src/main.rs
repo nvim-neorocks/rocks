@@ -8,6 +8,7 @@ use list::ListCmd;
 use rocks_lib::config::{Config, LuaVersion};
 use rockspec::WriteRockspec;
 use search::Search;
+use update::Update;
 
 mod build;
 mod debug;
@@ -16,6 +17,7 @@ mod list;
 mod rockspec;
 mod search;
 mod unpack;
+mod update;
 
 fn parse_lua_version(s: &str) -> Result<LuaVersion, String> {
     match s {
@@ -129,7 +131,7 @@ enum Commands {
     /// Uninstall a rock from the system.
     Uninstall,
     /// Updates all rocks in a project.
-    Update,
+    Update(Update),
     /// Upload a rockspec to the public rocks repository.
     Upload,
     /// Tell which file corresponds to a given module name.
