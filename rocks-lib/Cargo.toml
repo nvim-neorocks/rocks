@@ -31,6 +31,7 @@ walkdir = "2.4.0"
 zip = "0.6.6"
 insta = { version = "1.39.0", features = ["redactions", "yaml"] }
 which = "6.0.3"
+lets_find_up = "0.0.3"
 
 [dev-dependencies]
 httptest = { version = "0.15.5" }
