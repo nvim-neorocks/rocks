@@ -34,7 +34,7 @@ pub struct NewProject {
     description: Option<String>,
 
     /// The license of the project. Generic license names will be inferred.
-    #[arg(long, value_parser = parse_license_wrapper)]
+    #[arg(long, value_parser = clap_parse_license)]
     license: Option<LicenseId>,
 
     /// The maintainer of this project. Does not have to be the code author.
@@ -42,44 +42,45 @@ pub struct NewProject {
     maintainer: Option<String>,
 
     /// A comma-separated list of labels to apply to this project.
-    #[arg(long, value_parser = parse_list_wrapper)]
+    #[arg(long, value_parser = clap_parse_list)]
     labels: Option<std::vec::Vec<String>>, // Note: full qualified name required, see https://github.com/clap-rs/clap/issues/4626
 
     /// A version constraint on the required Lua version for this project.
     /// Examples: ">=5.1", "5.1"
-    #[arg(long, value_parser = parse_version_wrapper)]
+    #[arg(long, value_parser = clap_parse_version)]
     lua_versions: Option<LuaDependency>,
 }
 
-fn parse_license_wrapper(s: &str) -> std::result::Result<LicenseId, String> {
+fn clap_parse_license(s: &str) -> std::result::Result<LicenseId, String> {
     match validate_license(s) {
-        Ok(Validation::Valid) => Ok(parse_license(s)),
+        Ok(Validation::Valid) => Ok(parse_license_unchecked(s)),
         Err(_) | Ok(Validation::Invalid(_)) => {
             Err(format!("unable to identify license {s}, please try again!"))
         }
     }
 }
 
-fn parse_version_wrapper(s: &str) -> std::result::Result<LuaDependency, String> {
-    parse_version(s.to_string()).map_err(|err| err.to_string())
+fn clap_parse_version(input: &str) -> std::result::Result<LuaDependency, String> {
+    LuaDependency::from_str(format!("lua {}", input).as_str()).map_err(|err| err.to_string())
 }
 
-fn parse_list_wrapper(s: &str) -> std::result::Result<Vec<String>, String> {
-    parse_list(s.to_string()).map_err(|err| err.to_string())
-}
-
-fn parse_list(input: String) -> Result<Vec<String>> {
+fn clap_parse_list(input: &str) -> std::result::Result<Vec<String>, String> {
     if let Some((pos, char)) = input
         .chars()
         .find_position(|&c| c != '-' && c != '_' && c != ',' && c.is_ascii_punctuation())
     {
-        Err(eyre!("Unexpected punctuation '{}' found at column {}. Lists are comma separated but names should not contain punctuation!", char, pos))
+        Err(format!("Unexpected punctuation '{}' found at column {}. Lists are comma separated but names should not contain punctuation!", char, pos))
     } else {
         Ok(input.split(',').map(|str| str.trim().to_string()).collect())
     }
 }
 
-fn parse_license(input: &str) -> LicenseId {
+/// Parses a license and panics upon failure.
+///
+/// # Security
+///
+/// This should only be invoked after validating the license with [`validate_license`].
+fn parse_license_unchecked(input: &str) -> LicenseId {
     spdx::imprecise_license_id(input).unwrap().0
 }
 
@@ -97,10 +98,6 @@ fn validate_license(input: &str) -> std::result::Result<Validation, Box<dyn Erro
             Err(err) => Validation::Invalid(err.into()),
         },
     )
-}
-
-fn parse_version(input: String) -> Result<LuaDependency> {
-    LuaDependency::from_str(format!("lua {}", input).as_str())
 }
 
 pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
@@ -189,7 +186,7 @@ pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
                             .as_str()
                         {
                             "none" => None,
-                            license => Some(parse_license(license)),
+                            license => Some(parse_license_unchecked(license)),
                         },
                     )
                 },
