@@ -2,8 +2,6 @@ use eyre::Result;
 use lets_find_up::{find_up_with, FindUpKind, FindUpOptions};
 use std::path::PathBuf;
 
-use crate::rockspec::Rockspec;
-
 pub struct Project {
     /// The path where the `project.rockspec` resides.
     pub root: PathBuf,
