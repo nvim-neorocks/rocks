@@ -1,5 +1,5 @@
 use crate::{
-    config::Config,
+    config::{Config, LuaVersion},
     rockspec::{utils, Build as _, BuildBackendSpec, RockSourceSpec, Rockspec},
     tree::{RockLayout, Tree},
 };
@@ -56,11 +56,35 @@ pub fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
     // operations in the temporary directory itself and then copy all results over once they've
     // succeeded.
 
+    let lua_dependency = rockspec
+        .dependencies
+        .current_platform()
+        .iter()
+        .find(|val| val.rock_name == "lua")
+        .map(|dependency| {
+            for (possibility, version) in [
+                ("5.4.0", LuaVersion::Lua54),
+                ("5.3.0", LuaVersion::Lua53),
+                ("5.2.0", LuaVersion::Lua52),
+                ("5.1.0", LuaVersion::Lua51),
+            ] {
+                if dependency
+                    .rock_version_req
+                    .matches(&possibility.parse().unwrap())
+                {
+                    return version;
+                }
+            }
+
+            unreachable!()
+        });
+
     let tree = Tree::new(
         &config.tree,
         config
             .lua_version
             .as_ref()
+            .or(lua_dependency.as_ref())
             .ok_or_eyre("No Lua version specified!")?,
     )?;
 
