@@ -1,6 +1,7 @@
 use std::{collections::HashMap, str::FromStr};
 
 use eyre::{eyre, Result};
+use itertools::Itertools;
 use semver::VersionReq;
 use serde::{de, Deserialize, Deserializer};
 
@@ -19,14 +20,18 @@ impl FromStr for LuaDependency {
 
     fn from_str(str: &str) -> Result<Self> {
         let rock_name = str
-            .split_whitespace()
-            .next()
-            .map(|str| str.to_string())
-            .ok_or(eyre!(
+            .chars()
+            .peeking_take_while(|t| t.is_alphanumeric() || matches!(t, '-' | '_'))
+            .collect::<String>();
+
+        if rock_name.is_empty() {
+            return Err(eyre!(
                 "Could not parse dependency name from {}",
                 str.to_string()
-            ))?;
-        let constraints = str.trim_start_matches(&rock_name);
+            ));
+        }
+
+        let constraints = str.trim_start_matches(&rock_name).trim();
         let rock_version_req = match constraints {
             "" => VersionReq::default(),
             constraints => parse_version_req(constraints.trim_start())?,
@@ -140,6 +145,12 @@ mod tests {
 
     #[tokio::test]
     async fn parse_dependency() {
+        let dep: LuaDependency = "lua >= 5.1".parse().unwrap();
+        assert_eq!(dep.rock_name, "lua");
+        let dep: LuaDependency = "lua>=5.1".parse().unwrap();
+        assert_eq!(dep.rock_name, "lua");
+        let dep: LuaDependency = "toml-edit >= 0.1.0".parse().unwrap();
+        assert_eq!(dep.rock_name, "toml-edit");
         let dep: LuaDependency = "lfs".parse().unwrap();
         assert_eq!(dep.rock_name, "lfs");
         let dep: LuaDependency = "neorg 1.0.0".parse().unwrap();
