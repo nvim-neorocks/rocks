@@ -193,7 +193,7 @@ pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
                 |license| Ok(Some(license)),
             )?;
 
-            let labels = labels.map_or_else(
+            let labels = labels.or(repo_metadata.labels).map_or_else(
                 || {
                     Ok::<_, eyre::Error>(
                         Text::new("Labels:")
@@ -293,10 +293,12 @@ build = {{
                 .into_iter()
                 .map(|label| "\"".to_string() + &label + "\"")
                 .join(", "),
-            version = lua_versions.rock_version_req.to_string().replace('^', "~>"),
+            version = lua_versions.rock_version_req,
         )
         .trim(),
     )?;
+
+    println!("Done! Please enter the `project.rockspec` and provide a URL for your project.");
 
     Ok(())
 }
