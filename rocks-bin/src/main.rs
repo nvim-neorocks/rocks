@@ -5,6 +5,7 @@ use build::Build;
 use clap::{Parser, Subcommand};
 use debug::Debug;
 use download::Download;
+use install::Install;
 use list::ListCmd;
 use rocks_lib::config::{Config, LuaVersion};
 use search::Search;
@@ -13,6 +14,7 @@ use update::Update;
 mod build;
 mod debug;
 mod download;
+mod install;
 mod list;
 mod project;
 mod search;
@@ -110,7 +112,7 @@ enum Commands {
     /// Initialize a directory for a Lua project using Rocks.
     Init,
     /// Install a rock for use on the system.
-    Install,
+    Install(Install),
     /// Check syntax of a rockspec.
     Lint,
     /// List currently installed rocks.
@@ -181,6 +183,9 @@ async fn main() {
                 .unwrap(),
             Commands::Build(build_data) => build::build(build_data, &config).unwrap(),
             Commands::List(list_data) => list::list_installed(list_data, &config).unwrap(),
+            Commands::Install(install_data) => {
+                install::install(install_data, &config).await.unwrap()
+            }
             _ => unimplemented!(),
         },
         None => {
