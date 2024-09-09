@@ -27,7 +27,7 @@ pub struct UnpackRemote {
 }
 
 pub async fn unpack(data: Unpack) -> Result<()> {
-    let unpack_path = rocks_lib::rocks::unpack_src_rock(data.path, data.destination)?;
+    let unpack_path = rocks_lib::operations::unpack_src_rock(data.path, data.destination)?;
 
     println!("Done. You may now enter the following directory:");
     println!("{}", unpack_path.display());
@@ -39,15 +39,16 @@ pub async fn unpack(data: Unpack) -> Result<()> {
 pub async fn unpack_remote(data: UnpackRemote, config: &Config) -> Result<()> {
     println!("Downloading {}...", data.name);
 
-    let rock = rocks_lib::rocks::download(&data.name, data.version.as_ref(), None, config).await?;
+    let rock =
+        rocks_lib::operations::download(&data.name, data.version.as_ref(), None, config).await?;
 
     println!("Unpacking {}...", rock.path.display());
 
-    let unpack_path = rocks_lib::rocks::unpack_src_rock(rock.path.clone(), data.path)?;
+    let unpack_path = rocks_lib::operations::unpack_src_rock(rock.path.clone(), data.path)?;
 
     println!("Done. You may now enter the following directory:");
     println!("{}", unpack_path.display());
-    println!("and type `rocks make` to build.");
+    println!("and type `rocks build` to build.");
 
     if !data.keep_rockspec {
         std::fs::remove_file(rock.path)?;
