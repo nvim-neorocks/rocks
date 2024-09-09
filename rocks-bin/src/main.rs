@@ -114,6 +114,8 @@ enum Commands {
     Lint,
     /// List currently installed rocks.
     List(ListCmd),
+    /// List outdated rocks.
+    Outdated,
     /// Create a rock, packing sources or binaries.
     Pack,
     /// Return the currently configured package path.
