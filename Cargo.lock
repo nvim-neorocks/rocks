@@ -2165,6 +2165,7 @@ dependencies = [
  "text_trees",
  "tokio",
  "users",
+ "walkdir",
 ]
 
 [[package]]
