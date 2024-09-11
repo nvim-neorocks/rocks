@@ -1,6 +1,6 @@
 use eyre::Result;
 use semver::Version;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
 mod version;
@@ -29,7 +29,7 @@ impl LuaPackage {
 }
 
 /// A luarocks package name, which is always lowercase
-#[derive(Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct PackageName {
     name: String,
 }
@@ -40,6 +40,24 @@ impl PackageName {
             // TODO: validations?
             name: name.to_lowercase(),
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for PackageName {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(PackageName::new(String::deserialize(deserializer)?))
+    }
+}
+
+impl Serialize for PackageName {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.name.serialize(serializer)
     }
 }
 

@@ -1,10 +1,10 @@
 use clap::Args;
 use eyre::Result;
-use rocks_lib::config::Config;
+use rocks_lib::{config::Config, lua_package::PackageName};
 
 #[derive(Args)]
 pub struct Download {
-    name: String,
+    name: PackageName,
     version: Option<String>,
 }
 

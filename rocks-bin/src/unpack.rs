@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Args;
 use eyre::Result;
-use rocks_lib::config::Config;
+use rocks_lib::{config::Config, lua_package::PackageName};
 
 #[derive(Args)]
 pub struct Unpack {
@@ -15,7 +15,7 @@ pub struct Unpack {
 #[derive(Args)]
 pub struct UnpackRemote {
     /// The name of the rock to unpack
-    name: String,
+    name: PackageName,
     /// The version of the rock to download (defaults to latest version)
     version: Option<String>,
     /// The directory to unpack to
