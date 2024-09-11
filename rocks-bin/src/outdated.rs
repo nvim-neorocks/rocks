@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use clap::Args;
 use eyre::{OptionExt as _, Result};
 use itertools::Itertools;
@@ -14,7 +16,7 @@ pub struct Outdated {
     porcelain: bool,
 }
 
-pub async fn outdated(oudated_data: Outdated, config: &Config) -> Result<()> {
+pub async fn outdated(outdated_data: Outdated, config: &Config) -> Result<()> {
     let tree = Tree::new(
         &config.tree,
         config
@@ -41,31 +43,34 @@ pub async fn outdated(oudated_data: Outdated, config: &Config) -> Result<()> {
         .sorted_by_key(|(rock, _)| rock.name.clone())
         .into_group_map_by(|(rock, _)| rock.name.clone());
 
-    let formatting = TreeFormatting::dir_tree(FormatCharacters::box_chars());
-    for (rock, updates) in rock_list {
-        let mut tree = StringTreeNode::new(rock);
+    if outdated_data.porcelain {
+        let jsonified_rock_list = rock_list
+            .iter()
+            .map(|(key, values)| {
+                (
+                    key,
+                    values
+                        .iter()
+                        .map(|(k, v)| (k.version.to_string(), v.to_string()))
+                        .collect::<HashMap<_, _>>(),
+                )
+            })
+            .collect::<HashMap<_, _>>();
 
-        for (rock, latest_version) in updates {
-            tree.push(format!("{} => {}", rock.version, latest_version));
+        println!("{}", serde_json::to_string(&jsonified_rock_list)?);
+    } else {
+        let formatting = TreeFormatting::dir_tree(FormatCharacters::box_chars());
+
+        for (rock, updates) in rock_list {
+            let mut tree = StringTreeNode::new(rock);
+
+            for (rock, latest_version) in updates {
+                tree.push(format!("{} => {}", rock.version, latest_version));
+            }
+
+            println!("{}", tree.to_string_with_format(&formatting)?);
         }
-
-        println!("{}", tree.to_string_with_format(&formatting)?);
     }
-
-    //if list_data.porcelain {
-    //    println!("{}", serde_json::to_string(&available_rocks)?);
-    //} else {
-    //    let formatting = TreeFormatting::dir_tree(FormatCharacters::box_chars());
-    //    for (name, versions) in available_rocks.into_iter().sorted() {
-    //        let mut tree = StringTreeNode::new(name.to_owned());
-    //
-    //        for version in versions {
-    //            tree.push(version);
-    //        }
-    //
-    //        println!("{}", tree.to_string_with_format(&formatting)?);
-    //    }
-    //}
 
     Ok(())
 }
