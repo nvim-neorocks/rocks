@@ -10,6 +10,8 @@ use serde::{
     Deserialize, Deserializer, Serialize,
 };
 
+use crate::lua_package::LuaPackageReq;
+
 /// Identifier by a platform.
 /// The `PartialOrd` instance views more specific platforms as `Greater`
 #[derive(
@@ -205,11 +207,40 @@ pub trait PartialOverride {
     fn apply_overrides(&self, override_val: &Self) -> Self;
 }
 
+/// Override `base_deps` with `override_deps`
+/// - Adds missing dependencies
+/// - Replaces dependencies with the same name
+impl PartialOverride for Vec<LuaPackageReq> {
+    fn apply_overrides(&self, override_vec: &Self) -> Self {
+        let mut result_map: HashMap<String, LuaPackageReq> = self
+            .iter()
+            .map(|dep| (dep.name().clone().to_string(), dep.clone()))
+            .collect();
+        for override_dep in override_vec {
+            result_map.insert(
+                override_dep.name().clone().to_string(),
+                override_dep.clone(),
+            );
+        }
+        result_map.into_values().collect()
+    }
+}
+
 pub trait PlatformOverridable: PartialOverride {
     fn on_nil<T>() -> Result<PerPlatform<T>>
     where
         T: PlatformOverridable,
         T: Default;
+}
+
+impl PlatformOverridable for Vec<LuaPackageReq> {
+    fn on_nil<T>() -> Result<super::PerPlatform<T>>
+    where
+        T: PlatformOverridable,
+        T: Default,
+    {
+        Ok(PerPlatform::default())
+    }
 }
 
 pub trait FromPlatformOverridable<T: PlatformOverridable, G: FromPlatformOverridable<T, G>> {
@@ -430,6 +461,25 @@ mod tests {
         assert_eq!(*foo.get(&PlatformIdentifier::FreeBSD), "freebsd");
         assert_eq!(*foo.get(&PlatformIdentifier::Cygwin), "cygwin");
         assert_eq!(*foo.get(&PlatformIdentifier::Windows), "default");
+    }
+
+    #[tokio::test]
+    async fn test_override_lua_package_req() {
+        let neorg_a: LuaPackageReq = "neorg 1.0.0".parse().unwrap();
+        let neorg_b: LuaPackageReq = "neorg 2.0.0".parse().unwrap();
+        let foo: LuaPackageReq = "foo 1.0.0".parse().unwrap();
+        let bar: LuaPackageReq = "bar 1.0.0".parse().unwrap();
+        let base_vec = vec![neorg_a, foo.clone()];
+        let override_vec = vec![neorg_b.clone(), bar.clone()];
+        let result = base_vec.apply_overrides(&override_vec);
+        assert_eq!(result.clone().len(), 3);
+        assert_eq!(
+            result
+                .into_iter()
+                .filter(|dep| *dep == neorg_b || *dep == foo || *dep == bar)
+                .count(),
+            3
+        );
     }
 
     proptest! {

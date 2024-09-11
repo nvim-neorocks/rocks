@@ -12,7 +12,7 @@ use spdx::LicenseId;
 use spinners::{Spinner, Spinners};
 
 use crate::utils::github_metadata::{self, RepoMetadata};
-use rocks_lib::{project::Project, rockspec::LuaDependency};
+use rocks_lib::{lua_package::LuaPackageReq, project::Project};
 
 // General notes and ideas:
 // - Create a subdirectory for the project, unless a path is explicitly passed.
@@ -48,7 +48,7 @@ pub struct NewProject {
     /// A version constraint on the required Lua version for this project.
     /// Examples: ">=5.1", "5.1"
     #[arg(long, value_parser = clap_parse_version)]
-    lua_versions: Option<LuaDependency>,
+    lua_versions: Option<LuaPackageReq>,
 }
 
 fn clap_parse_license(s: &str) -> std::result::Result<LicenseId, String> {
@@ -60,8 +60,8 @@ fn clap_parse_license(s: &str) -> std::result::Result<LicenseId, String> {
     }
 }
 
-fn clap_parse_version(input: &str) -> std::result::Result<LuaDependency, String> {
-    LuaDependency::from_str(format!("lua {}", input).as_str()).map_err(|err| err.to_string())
+fn clap_parse_version(input: &str) -> std::result::Result<LuaPackageReq, String> {
+    LuaPackageReq::from_str(format!("lua {}", input).as_str()).map_err(|err| err.to_string())
 }
 
 fn clap_parse_list(input: &str) -> std::result::Result<Vec<String>, String> {
@@ -293,7 +293,7 @@ build = {{
                 .into_iter()
                 .map(|label| "\"".to_string() + &label + "\"")
                 .join(", "),
-            version = lua_versions.rock_version_req,
+            version = lua_versions.version_req(),
         )
         .trim(),
     )?;
