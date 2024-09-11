@@ -1410,6 +1410,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
 
 [[package]]
+name = "lua-src"
+version = "547.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1edaf29e3517b49b8b746701e5648ccb5785cde1c119062cbabbc5d5cd115e42"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "luajit-src"
+version = "210.5.10+f725e44"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18a0fa0df28e21f785c48d9c0f0be355cf40658badb667284207dbb4d1e574a9"
+dependencies = [
+ "cc",
+ "which",
+]
+
+[[package]]
 name = "lzma-rs"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2198,6 +2217,8 @@ dependencies = [
  "insta",
  "itertools",
  "lets_find_up",
+ "lua-src",
+ "luajit-src",
  "mlua",
  "openssl",
  "pathdiff",
@@ -2212,6 +2233,7 @@ dependencies = [
  "ssri",
  "strum 0.26.3",
  "strum_macros 0.26.4",
+ "target-lexicon",
  "tempdir",
  "tokio",
  "vfs",
@@ -2797,6 +2819,12 @@ dependencies = [
  "core-foundation-sys",
  "libc",
 ]
+
+[[package]]
+name = "target-lexicon"
+version = "0.12.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
 
 [[package]]
 name = "tempdir"

@@ -41,8 +41,8 @@ pub async fn outdated(outdated_data: Outdated, config: &Config) -> Result<()> {
                 .expect("TODO")
                 .map(|version| (rock, version))
         })
-        .sorted_by_key(|(rock, _)| rock.name.clone())
-        .into_group_map_by(|(rock, _)| rock.name.clone());
+        .sorted_by_key(|(rock, _)| rock.name().to_owned())
+        .into_group_map_by(|(rock, _)| rock.name().to_owned());
 
     if outdated_data.porcelain {
         let jsonified_rock_list = rock_list
@@ -52,7 +52,7 @@ pub async fn outdated(outdated_data: Outdated, config: &Config) -> Result<()> {
                     key,
                     values
                         .iter()
-                        .map(|(k, v)| (k.version.to_string(), v.to_string()))
+                        .map(|(k, v)| (k.version().to_string(), v.to_string()))
                         .collect::<HashMap<_, _>>(),
                 )
             })
@@ -62,11 +62,11 @@ pub async fn outdated(outdated_data: Outdated, config: &Config) -> Result<()> {
     } else {
         let formatting = TreeFormatting::dir_tree(FormatCharacters::box_chars());
 
-        for (rock, updates) in rock_list {
-            let mut tree = StringTreeNode::new(rock);
+        for (rock_name, updates) in rock_list {
+            let mut tree = StringTreeNode::new(rock_name.to_string());
 
             for (rock, latest_version) in updates {
-                tree.push(format!("{} => {}", rock.version, latest_version));
+                tree.push(format!("{} => {}", rock.version(), latest_version));
             }
 
             println!("{}", tree.to_string_with_format(&formatting)?);
