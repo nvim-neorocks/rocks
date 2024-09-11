@@ -1,6 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
+    lua::Lua,
     rockspec::{utils, Build, BuiltinBuildSpec, ModuleSpec, Rockspec},
     tree::RockLayout,
 };
@@ -9,7 +10,13 @@ use itertools::Itertools as _;
 use walkdir::WalkDir;
 
 impl Build for BuiltinBuildSpec {
-    fn run(self, _rockspec: Rockspec, output_paths: RockLayout, _no_install: bool) -> Result<()> {
+    fn run(
+        self,
+        _rockspec: Rockspec,
+        output_paths: RockLayout,
+        _no_install: bool,
+        lua: &Lua,
+    ) -> Result<()> {
         // Detect all Lua modules
         let modules = autodetect_modules()?
             .into_iter()
@@ -22,10 +29,10 @@ impl Build for BuiltinBuildSpec {
                     utils::copy_lua_to_module_path(source, destination_path, &output_paths.src)?
                 }
                 ModuleSpec::SourcePaths(files) => {
-                    utils::compile_c_files(files, destination_path, &output_paths.lib)?
+                    utils::compile_c_files(files, destination_path, &output_paths.lib, &lua)?
                 }
                 ModuleSpec::ModulePaths(data) => {
-                    utils::compile_c_modules(data, destination_path, &output_paths.lib)?
+                    utils::compile_c_modules(data, destination_path, &output_paths.lib, &lua)?
                 }
             }
         }

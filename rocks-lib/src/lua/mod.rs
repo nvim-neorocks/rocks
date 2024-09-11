@@ -25,6 +25,19 @@ impl Lua {
 
             let (include_dir, lib_dir) = match version {
                 LuaVersion::LuaJIT => {
+                    let build = luajit_src::Build::new()
+                        .target(target)
+                        .host(host_operating_system)
+                        .out_dir(output)
+                        .lua52compat(true)
+                        .build();
+
+                    (
+                        build.include_dir().to_path_buf(),
+                        build.lib_dir().to_path_buf(),
+                    )
+                }
+                _ => {
                     let build = lua_src::Build::new()
                         .target(target)
                         .host(host_operating_system)
@@ -36,18 +49,6 @@ impl Lua {
                             LuaVersion::Lua54 => lua_src::Version::Lua54,
                             LuaVersion::LuaJIT => unreachable!(),
                         });
-
-                    (
-                        build.include_dir().to_path_buf(),
-                        build.lib_dir().to_path_buf(),
-                    )
-                }
-                _ => {
-                    let build = luajit_src::Build::new()
-                        .target(target)
-                        .host(host_operating_system)
-                        .out_dir(output)
-                        .build();
 
                     (
                         build.include_dir().to_path_buf(),
