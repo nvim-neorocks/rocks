@@ -7,13 +7,14 @@ use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
 
 use rocks_lib::{
     config::Config,
+    lua_package::PackageName,
     manifest::{manifest_from_server, ManifestMetadata},
 };
 
 #[derive(Args)]
 pub struct Search {
     /// Name of the rock to search for.
-    name: String,
+    name: PackageName,
     /// Rocks version to search for.
     version: Option<String>,
     // TODO(vhyrro): Add options.
@@ -29,11 +30,11 @@ pub async fn search(data: Search, config: &Config) -> Result<()> {
 
     let metadata = ManifestMetadata::new(&manifest)?;
 
-    let rock_to_version_map: HashMap<&String, Vec<&String>> = metadata
+    let rock_to_version_map: HashMap<&PackageName, Vec<&String>> = metadata
         .repository
         .iter()
         .filter_map(|(key, value)| {
-            if key.contains(&data.name) {
+            if key.to_string().contains(&data.name.to_string()) {
                 Some((
                     key,
                     value.keys().sorted_by(|a, b| Ord::cmp(b, a)).collect_vec(),
@@ -48,7 +49,7 @@ pub async fn search(data: Search, config: &Config) -> Result<()> {
         println!("{}", serde_json::to_string(&rock_to_version_map)?);
     } else {
         for (key, versions) in rock_to_version_map.into_iter().sorted() {
-            let mut tree = StringTreeNode::new(key.to_owned());
+            let mut tree = StringTreeNode::new(key.to_string().to_owned());
 
             for version in versions {
                 tree.push(version.to_owned());

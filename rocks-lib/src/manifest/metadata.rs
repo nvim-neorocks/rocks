@@ -3,11 +3,18 @@ use itertools::Itertools;
 use mlua::{Lua, LuaSerdeExt};
 use std::collections::HashMap;
 
-use crate::config::Config;
+use crate::{config::Config, lua_package::PackageName};
 
 #[derive(serde::Deserialize)]
 pub struct ManifestMetadata {
-    pub repository: HashMap<String, HashMap<String, Vec<HashMap<String, String>>>>,
+    /// The key of each package's HashMap is the version string
+    pub repository: HashMap<PackageName, HashMap<String, Vec<ManifestRockEntry>>>,
+}
+
+#[derive(serde::Deserialize)]
+pub struct ManifestRockEntry {
+    /// e.g. "linux-x86_64", "rockspec", "src", ...
+    pub arch: String,
 }
 
 impl ManifestMetadata {
@@ -31,11 +38,11 @@ impl ManifestMetadata {
         Self::new(&manifest)
     }
 
-    pub fn has_rock(&self, rock_name: &String) -> bool {
+    pub fn has_rock(&self, rock_name: &PackageName) -> bool {
         self.repository.contains_key(rock_name)
     }
 
-    pub fn available_versions(&self, rock_name: &String) -> Option<Vec<&String>> {
+    pub fn available_versions(&self, rock_name: &PackageName) -> Option<Vec<&String>> {
         if !self.has_rock(rock_name) {
             return None;
         }
@@ -43,7 +50,7 @@ impl ManifestMetadata {
         Some(self.repository[rock_name].keys().collect())
     }
 
-    pub fn latest_version(&self, rock_name: &String) -> Option<&String> {
+    pub fn latest_version(&self, rock_name: &PackageName) -> Option<&String> {
         if !self.has_rock(rock_name) {
             return None;
         }

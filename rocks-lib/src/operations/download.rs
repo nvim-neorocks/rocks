@@ -2,16 +2,16 @@ use std::path::PathBuf;
 
 use eyre::{eyre, Result};
 
-use crate::config::Config;
+use crate::{config::Config, lua_package::PackageName};
 
 pub struct DownloadedRock {
-    pub name: String,
+    pub name: PackageName,
     pub version: String,
     pub path: PathBuf,
 }
 
 pub async fn download(
-    rock_name: &String,
+    rock_name: &PackageName,
     rock_version: Option<&String>,
     destination_dir: Option<PathBuf>,
     config: &Config,

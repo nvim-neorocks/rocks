@@ -1,10 +1,10 @@
 use eyre::Result;
-use rocks_lib::config::Config;
+use rocks_lib::{config::Config, lua_package::PackageName};
 
 #[derive(clap::Args)]
 pub struct Install {
     /// Name of the rock to install.
-    name: String,
+    name: PackageName,
     /// Rocks version to install.
     version: Option<String>,
 }
