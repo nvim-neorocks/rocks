@@ -1,6 +1,6 @@
 use directories::ProjectDirs;
 use eyre::{eyre, Result};
-use std::{fmt::Display, path::PathBuf, time::Duration};
+use std::{fmt::Display, path::PathBuf, str::FromStr, time::Duration};
 
 #[derive(Clone)]
 pub enum LuaVersion {
@@ -13,13 +13,32 @@ pub enum LuaVersion {
     // LuaU,
 }
 
+impl FromStr for LuaVersion {
+    type Err = String;
+
+    fn from_str(s: &str) -> std::prelude::v1::Result<Self, Self::Err> {
+        match s {
+            "5.1" | "51" => Ok(LuaVersion::Lua51),
+            "5.2" | "52" => Ok(LuaVersion::Lua52),
+            "5.3" | "53" => Ok(LuaVersion::Lua53),
+            "5.4" | "54" => Ok(LuaVersion::Lua54),
+            "jit" | "luajit" => Ok(LuaVersion::LuaJIT),
+            _ => Err(
+                "unrecognized Lua version. Allowed versions: '5.1', '5.2', '5.3', '5.4', 'jit'."
+                    .into(),
+            ),
+        }
+    }
+}
+
 impl Display for LuaVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            LuaVersion::Lua51 | LuaVersion::LuaJIT => "5.1",
+            LuaVersion::Lua51 => "5.1",
             LuaVersion::Lua52 => "5.2",
             LuaVersion::Lua53 => "5.3",
             LuaVersion::Lua54 => "5.4",
+            LuaVersion::LuaJIT => "jit",
         })
     }
 }

@@ -4,6 +4,7 @@ use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{fmt::Display, str::FromStr};
 use version::{PackageVersion, PackageVersionReq};
 
+mod outdated;
 mod version;
 
 // TODO: We probably need a better name for this

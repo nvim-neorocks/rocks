@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use itertools::Itertools;
 use walkdir::WalkDir;
 
-use crate::luarock::LuaRock;
+use crate::lua_package::LuaPackage;
 
 use super::Tree;
 
@@ -27,22 +27,22 @@ impl<'a> Tree<'a> {
             .into_group_map()
     }
 
-    pub fn into_rock_list(self) -> Result<Vec<LuaRock>> {
+    pub fn into_rock_list(self) -> Result<Vec<LuaPackage>> {
         let rock_list = self.list();
 
-        Ok(rock_list
+        rock_list
             .into_iter()
             .flat_map(|(name, versions)| {
                 versions
                     .into_iter()
-                    .map(|version| LuaRock::new(name.clone(), version))
+                    .map(|version| LuaPackage::new(name.clone(), version))
                     .collect_vec()
             })
-            .try_collect()?)
+            .try_collect()
     }
 }
 
-impl<'a> TryFrom<Tree<'a>> for Vec<LuaRock> {
+impl<'a> TryFrom<Tree<'a>> for Vec<LuaPackage> {
     type Error = eyre::Report;
 
     fn try_from(tree: Tree<'a>) -> Result<Self> {

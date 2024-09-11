@@ -1,9 +1,0 @@
----
-source: rocks-lib/src/tree/mod.rs
-assertion_line: 123
-expression: tree.list()
----
-lua-cjson:
-  - 2.1.0.9-1
-neorg:
-  - 8.0.0-1

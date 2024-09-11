@@ -6,6 +6,7 @@ use clap::{Parser, Subcommand};
 use debug::Debug;
 use download::Download;
 use install::Install;
+use install_lua::InstallLua;
 use list::ListCmd;
 use outdated::Outdated;
 use rocks_lib::config::{Config, LuaVersion};
@@ -16,6 +17,7 @@ mod build;
 mod debug;
 mod download;
 mod install;
+mod install_lua;
 mod list;
 mod outdated;
 mod project;
@@ -23,18 +25,6 @@ mod search;
 mod unpack;
 mod update;
 mod utils;
-
-fn parse_lua_version(s: &str) -> Result<LuaVersion, String> {
-    match s {
-        "5.1" | "51" | "jit" | "luajit" => Ok(LuaVersion::Lua51),
-        "5.2" | "52" => Ok(LuaVersion::Lua52),
-        "5.3" | "53" => Ok(LuaVersion::Lua53),
-        "5.4" | "54" => Ok(LuaVersion::Lua54),
-        _ => Err(
-            "unrecognized Lua version. Allowed versions: '5.1', '5.2', '5.3', '5.4', 'jit'.".into(),
-        ),
-    }
-}
 
 /// A fast and efficient Lua package manager.
 #[derive(Parser)]
@@ -68,7 +58,7 @@ struct Cli {
     lua_dir: Option<PathBuf>,
 
     /// Which Lua installation to use.
-    #[arg(long, value_name = "ver", value_parser = parse_lua_version)]
+    #[arg(long, value_name = "ver")]
     lua_version: Option<LuaVersion>,
 
     /// Which tree to operate on.
@@ -115,6 +105,8 @@ enum Commands {
     Init,
     /// Install a rock for use on the system.
     Install(Install),
+    /// Manually install and manage Lua headers for various Lua versions.
+    InstallLua(InstallLua),
     /// Check syntax of a rockspec.
     Lint,
     /// List currently installed rocks.
@@ -189,6 +181,9 @@ async fn main() {
                 install::install(install_data, &config).await.unwrap()
             }
             Commands::Outdated(outdated) => outdated::outdated(outdated, &config).await.unwrap(),
+            Commands::InstallLua(install_lua) => {
+                install_lua::install_lua(install_lua, &config).unwrap()
+            }
             _ => unimplemented!(),
         },
         None => {
