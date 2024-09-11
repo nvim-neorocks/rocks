@@ -17,12 +17,13 @@ pub struct Outdated {
 }
 
 pub async fn outdated(outdated_data: Outdated, config: &Config) -> Result<()> {
+    // TODO: Don't perform error checks everywhere, instead add a single function that ensures a
+    // version is set.
     let tree = Tree::new(
         &config.tree,
-        config
-            .lua_version
-            .as_ref()
-            .ok_or_eyre("lua version not supplied!")?,
+        config.lua_version.as_ref().ok_or_eyre(
+            "lua version not set. You can supply it via '--lua-version' or set it in the config.",
+        )?,
     )?;
 
     let manifest = manifest_from_server(config.server.to_owned(), config).await?;
