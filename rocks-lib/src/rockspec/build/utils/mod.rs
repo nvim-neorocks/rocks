@@ -25,12 +25,24 @@ pub fn copy_lua_to_module_path(
 }
 
 /// Compiles a set of C files into a single dynamic library and places them under `{target_dir}/{target_file}`.
+/// # Panics
+/// Panics if no parent or no filename can be determined for the target path.
 pub fn compile_c_files(files: &Vec<PathBuf>, target_file: &str, target_dir: &Path) -> Result<()> {
     let target = lua_module_to_pathbuf(target_file, std::env::consts::DLL_SUFFIX);
     let target = target_dir.join(target);
 
-    let parent = target.parent().expect("TODO");
-    let file = target.file_name().expect("TODO");
+    let parent = target.parent().unwrap_or_else(|| {
+        panic!(
+            "Couldn't determine parent for path {}",
+            target.to_str().unwrap_or("")
+        )
+    });
+    let file = target.file_name().unwrap_or_else(|| {
+        panic!(
+            "Couldn't determine filename for path {}",
+            target.to_str().unwrap_or("")
+        )
+    });
 
     std::fs::create_dir_all(parent)?;
 
@@ -49,6 +61,8 @@ pub fn compile_c_files(files: &Vec<PathBuf>, target_file: &str, target_dir: &Pat
 }
 
 /// Compiles a set of C files (with extra metadata) to a given destination.
+/// # Panics
+/// Panics if no filename for the target path can be determined.
 pub fn compile_c_modules(data: &ModulePaths, target_file: &str, target_dir: &Path) -> Result<()> {
     let target = lua_module_to_pathbuf(target_file, std::env::consts::DLL_SUFFIX);
     let target = target_dir.join(target);
@@ -81,7 +95,12 @@ pub fn compile_c_modules(data: &ModulePaths, target_file: &str, target_dir: &Pat
         build.flag(&("-l".to_string() + library.to_str().unwrap()));
     }
 
-    let file = target.file_name().expect("TODO");
+    let file = target.file_name().unwrap_or_else(|| {
+        panic!(
+            "Couldn't determine filename for path {}",
+            target.to_str().unwrap_or("")
+        )
+    });
 
     build.try_compile(file.to_str().unwrap())?;
 
