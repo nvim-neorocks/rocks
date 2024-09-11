@@ -5,13 +5,13 @@ use itertools::Itertools;
 use semver::VersionReq;
 use serde::{de, Deserialize, Deserializer};
 
-use crate::luarock::{parse_version_req, LuaRock};
+use crate::lua_package::{parse_version_req, LuaPackage, PackageName};
 
 use super::{PartialOverride, PerPlatform, PlatformOverridable};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LuaDependency {
-    pub rock_name: String,
+    pub rock_name: PackageName,
     pub rock_version_req: VersionReq,
 }
 
@@ -19,25 +19,25 @@ impl FromStr for LuaDependency {
     type Err = eyre::Error;
 
     fn from_str(str: &str) -> Result<Self> {
-        let rock_name = str
+        let rock_name_str = str
             .chars()
             .peeking_take_while(|t| t.is_alphanumeric() || matches!(t, '-' | '_'))
             .collect::<String>();
 
-        if rock_name.is_empty() {
+        if rock_name_str.is_empty() {
             return Err(eyre!(
                 "Could not parse dependency name from {}",
                 str.to_string()
             ));
         }
 
-        let constraints = str.trim_start_matches(&rock_name).trim();
+        let constraints = str.trim_start_matches(&rock_name_str).trim();
         let rock_version_req = match constraints {
             "" => VersionReq::default(),
             constraints => parse_version_req(constraints.trim_start())?,
         };
         Ok(Self {
-            rock_name,
+            rock_name: PackageName::new(rock_name_str),
             rock_version_req,
         })
     }
@@ -48,9 +48,9 @@ impl LuaDependency {
         Self::from_str(&pkg_constraints.to_string())
     }
 
-    pub fn matches(&self, rock: &LuaRock) -> bool {
-        if self.rock_name == rock.name {
-            self.rock_version_req.matches(&rock.version)
+    pub fn matches(&self, rock: &LuaPackage) -> bool {
+        if &self.rock_name == rock.name() {
+            self.rock_version_req.matches(rock.version())
         } else {
             false
         }
@@ -74,10 +74,13 @@ impl PartialOverride for Vec<LuaDependency> {
     fn apply_overrides(&self, override_vec: &Self) -> Self {
         let mut result_map: HashMap<String, LuaDependency> = self
             .iter()
-            .map(|dep| (dep.rock_name.clone(), dep.clone()))
+            .map(|dep| (dep.rock_name.clone().to_string(), dep.clone()))
             .collect();
         for override_dep in override_vec {
-            result_map.insert(override_dep.rock_name.clone(), override_dep.clone());
+            result_map.insert(
+                override_dep.rock_name.clone().to_string(),
+                override_dep.clone(),
+            );
         }
         result_map.into_values().collect()
     }
@@ -133,31 +136,31 @@ mod tests {
 
     #[tokio::test]
     async fn parse_luarock() {
-        let neorg = LuaRock::new("neorg".into(), "1.0.0".into()).unwrap();
+        let neorg = LuaPackage::new("neorg".into(), "1.0.0".into()).unwrap();
         let expected_version = Version::parse("1.0.0").unwrap();
-        assert_eq!(neorg.name, "neorg");
-        assert_eq!(neorg.version, expected_version);
-        let neorg = LuaRock::new("neorg".into(), "1.0".into()).unwrap();
-        assert_eq!(neorg.version, expected_version);
-        let neorg = LuaRock::new("neorg".into(), "1".into()).unwrap();
-        assert_eq!(neorg.version, expected_version);
+        assert_eq!(neorg.name().to_string(), "neorg");
+        assert_eq!(*neorg.version(), expected_version);
+        let neorg = LuaPackage::new("neorg".into(), "1.0".into()).unwrap();
+        assert_eq!(*neorg.version(), expected_version);
+        let neorg = LuaPackage::new("neorg".into(), "1".into()).unwrap();
+        assert_eq!(*neorg.version(), expected_version);
     }
 
     #[tokio::test]
     async fn parse_dependency() {
         let dep: LuaDependency = "lua >= 5.1".parse().unwrap();
-        assert_eq!(dep.rock_name, "lua");
+        assert_eq!(dep.rock_name.to_string(), "lua");
         let dep: LuaDependency = "lua>=5.1".parse().unwrap();
-        assert_eq!(dep.rock_name, "lua");
+        assert_eq!(dep.rock_name.to_string(), "lua");
         let dep: LuaDependency = "toml-edit >= 0.1.0".parse().unwrap();
-        assert_eq!(dep.rock_name, "toml-edit");
+        assert_eq!(dep.rock_name.to_string(), "toml-edit");
         let dep: LuaDependency = "lfs".parse().unwrap();
-        assert_eq!(dep.rock_name, "lfs");
+        assert_eq!(dep.rock_name.to_string(), "lfs");
         let dep: LuaDependency = "neorg 1.0.0".parse().unwrap();
-        assert_eq!(dep.rock_name, "neorg");
-        let neorg = LuaRock::new("neorg".into(), "1.0.0".into()).unwrap();
+        assert_eq!(dep.rock_name.to_string(), "neorg");
+        let neorg = LuaPackage::new("neorg".into(), "1.0.0".into()).unwrap();
         assert!(dep.matches(&neorg));
-        let neorg = LuaRock::new("neorg".into(), "2.0.0".into()).unwrap();
+        let neorg = LuaPackage::new("neorg".into(), "2.0.0".into()).unwrap();
         assert!(!dep.matches(&neorg));
         let dep: LuaDependency = "neorg 2.0.0".parse().unwrap();
         assert!(dep.matches(&neorg));
@@ -168,36 +171,36 @@ mod tests {
         let dep: LuaDependency = "neorg &equals; 2.0.0".parse().unwrap();
         assert!(dep.matches(&neorg));
         let dep: LuaDependency = "neorg >= 1.0, &lt; 2.0".parse().unwrap();
-        let neorg = LuaRock::new("neorg".into(), "1.5".into()).unwrap();
+        let neorg = LuaPackage::new("neorg".into(), "1.5".into()).unwrap();
         assert!(dep.matches(&neorg));
         let dep: LuaDependency = "neorg &gt; 1.0, &lt; 2.0".parse().unwrap();
-        let neorg = LuaRock::new("neorg".into(), "1.11.0".into()).unwrap();
+        let neorg = LuaPackage::new("neorg".into(), "1.11.0".into()).unwrap();
         assert!(dep.matches(&neorg));
-        let neorg = LuaRock::new("neorg".into(), "3.0.0".into()).unwrap();
+        let neorg = LuaPackage::new("neorg".into(), "3.0.0".into()).unwrap();
         assert!(!dep.matches(&neorg));
-        let neorg = LuaRock::new("neorg".into(), "0.5".into()).unwrap();
+        let neorg = LuaPackage::new("neorg".into(), "0.5".into()).unwrap();
         assert!(!dep.matches(&neorg));
         let dep: LuaDependency = "neorg ~> 1".parse().unwrap();
         assert!(!dep.matches(&neorg));
-        let neorg = LuaRock::new("neorg".into(), "3".into()).unwrap();
+        let neorg = LuaPackage::new("neorg".into(), "3".into()).unwrap();
         assert!(!dep.matches(&neorg));
-        let neorg = LuaRock::new("neorg".into(), "1.5".into()).unwrap();
+        let neorg = LuaPackage::new("neorg".into(), "1.5".into()).unwrap();
         assert!(dep.matches(&neorg));
         let dep: LuaDependency = "neorg ~> 1.4".parse().unwrap();
-        let neorg = LuaRock::new("neorg".into(), "1.3".into()).unwrap();
+        let neorg = LuaPackage::new("neorg".into(), "1.3".into()).unwrap();
         assert!(!dep.matches(&neorg));
-        let neorg = LuaRock::new("neorg".into(), "1.5".into()).unwrap();
+        let neorg = LuaPackage::new("neorg".into(), "1.5".into()).unwrap();
         assert!(!dep.matches(&neorg));
-        let neorg = LuaRock::new("neorg".into(), "1.4.10".into()).unwrap();
+        let neorg = LuaPackage::new("neorg".into(), "1.4.10".into()).unwrap();
         assert!(dep.matches(&neorg));
-        let neorg = LuaRock::new("neorg".into(), "1.4".into()).unwrap();
+        let neorg = LuaPackage::new("neorg".into(), "1.4".into()).unwrap();
         assert!(dep.matches(&neorg));
         let dep: LuaDependency = "neorg ~> 1.0.5".parse().unwrap();
-        let neorg = LuaRock::new("neorg".into(), "1.0.4".into()).unwrap();
+        let neorg = LuaPackage::new("neorg".into(), "1.0.4".into()).unwrap();
         assert!(!dep.matches(&neorg));
-        let neorg = LuaRock::new("neorg".into(), "1.0.5".into()).unwrap();
+        let neorg = LuaPackage::new("neorg".into(), "1.0.5".into()).unwrap();
         assert!(dep.matches(&neorg));
-        let neorg = LuaRock::new("neorg".into(), "1.0.6".into()).unwrap();
+        let neorg = LuaPackage::new("neorg".into(), "1.0.6".into()).unwrap();
         assert!(!dep.matches(&neorg));
     }
 

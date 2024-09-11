@@ -122,7 +122,7 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use crate::luarock::LuaRock;
+    use crate::lua_package::LuaPackage;
     use crate::rockspec::PlatformIdentifier;
 
     use super::*;
@@ -270,19 +270,19 @@ mod tests {
         assert!(!rockspec
             .supported_platforms
             .is_supported(&PlatformIdentifier::Windows));
-        let neorg = LuaRock::new("neorg".into(), "6.0.0".into()).unwrap();
+        let neorg = LuaPackage::new("neorg".into(), "6.0.0".into()).unwrap();
         assert!(rockspec
             .dependencies
             .default
             .into_iter()
             .any(|dep| dep.matches(&neorg)));
-        let foo = LuaRock::new("foo".into(), "1.0.0".into()).unwrap();
+        let foo = LuaPackage::new("foo".into(), "1.0.0".into()).unwrap();
         assert!(rockspec
             .build_dependencies
             .default
             .into_iter()
             .any(|dep| dep.matches(&foo)));
-        let busted = LuaRock::new("busted".into(), "2.2.0".into()).unwrap();
+        let busted = LuaPackage::new("busted".into(), "2.2.0".into()).unwrap();
         assert_eq!(
             *rockspec.external_dependencies.default.get("FOO").unwrap(),
             ExternalDependency::Header("foo.h".into())
@@ -584,9 +584,9 @@ mod tests {
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
-        let neorg_override = LuaRock::new("neorg".into(), "5.0.0".into()).unwrap();
-        let toml_edit = LuaRock::new("toml-edit".into(), "1.0.0".into()).unwrap();
-        let toml = LuaRock::new("toml".into(), "1.0.0".into()).unwrap();
+        let neorg_override = LuaPackage::new("neorg".into(), "5.0.0".into()).unwrap();
+        let toml_edit = LuaPackage::new("toml-edit".into(), "1.0.0".into()).unwrap();
+        let toml = LuaPackage::new("toml".into(), "1.0.0".into()).unwrap();
         assert_eq!(rockspec.dependencies.default.len(), 2);
         let per_platform = &rockspec.dependencies.per_platform;
         assert_eq!(
