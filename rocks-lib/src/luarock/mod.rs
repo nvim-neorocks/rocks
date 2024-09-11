@@ -5,6 +5,7 @@
  
  pub use version::{parse_version, parse_version_req};
  
+ #[derive(Hash, PartialEq, Eq)]
  pub struct LuaRock {
      pub name: String,
      pub version: Version,
