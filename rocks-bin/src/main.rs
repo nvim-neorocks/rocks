@@ -7,6 +7,7 @@ use debug::Debug;
 use download::Download;
 use install::Install;
 use list::ListCmd;
+use outdated::Outdated;
 use rocks_lib::config::{Config, LuaVersion};
 use search::Search;
 use update::Update;
@@ -16,6 +17,7 @@ mod debug;
 mod download;
 mod install;
 mod list;
+mod outdated;
 mod project;
 mod search;
 mod unpack;
@@ -120,7 +122,7 @@ enum Commands {
     /// Create a new Lua project.
     New(NewProject),
     /// List outdated rocks.
-    Outdated,
+    Outdated(Outdated),
     /// Create a rock, packing sources or binaries.
     Pack,
     /// Return the currently configured package path.
@@ -186,6 +188,7 @@ async fn main() {
             Commands::Install(install_data) => {
                 install::install(install_data, &config).await.unwrap()
             }
+            Commands::Outdated(outdated) => outdated::outdated(outdated, &config).await.unwrap(),
             _ => unimplemented!(),
         },
         None => {
