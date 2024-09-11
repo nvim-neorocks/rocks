@@ -24,6 +24,7 @@ impl Display for LuaVersion {
     }
 }
 
+// TODO: Make all fields private and add getters that return references to the data - they needn't be modified at runtime.
 pub struct Config {
     pub enable_development_rockspecs: bool,
     pub server: String,
