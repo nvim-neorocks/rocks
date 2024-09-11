@@ -161,6 +161,12 @@ mod tests {
         assert!(!dep.matches(&neorg));
         let dep: LuaDependency = "neorg 2.0.0".parse().unwrap();
         assert!(dep.matches(&neorg));
+        let dep: LuaDependency = "neorg = 2.0.0".parse().unwrap();
+        assert!(dep.matches(&neorg));
+        let dep: LuaDependency = "neorg == 2.0.0".parse().unwrap();
+        assert!(dep.matches(&neorg));
+        let dep: LuaDependency = "neorg &equals; 2.0.0".parse().unwrap();
+        assert!(dep.matches(&neorg));
         let dep: LuaDependency = "neorg >= 1.0, &lt; 2.0".parse().unwrap();
         let neorg = LuaRock::new("neorg".into(), "1.5".into()).unwrap();
         assert!(dep.matches(&neorg));
