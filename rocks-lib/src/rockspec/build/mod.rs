@@ -15,7 +15,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
-use crate::tree::RockLayout;
+use crate::{config::Config, tree::RockLayout};
 
 use super::{PerPlatform, PlatformIdentifier, Rockspec};
 
@@ -402,7 +402,13 @@ impl Default for BuildType {
 
 // TODO(vhyrro): Move this to the dedicated build.rs module
 pub trait Build {
-    fn run(self, rockspec: Rockspec, output_paths: RockLayout, no_install: bool) -> Result<()>;
+    fn run(
+        self,
+        rockspec: Rockspec,
+        output_paths: RockLayout,
+        no_install: bool,
+        lua: &crate::lua::Lua,
+    ) -> Result<()>;
 }
 
 #[cfg(test)]

@@ -36,8 +36,8 @@ lets_find_up = "0.0.3"
 remove_dir_all = "0.8.3"
 openssl = "0.10.66"
 lua-src = "547.0.0"
-target-lexicon = "0.12.16"
 luajit-src = "210.5.10"
+target-lexicon = "0.12.16"
 
 [dev-dependencies]
 httptest = { version = "0.16.1" }

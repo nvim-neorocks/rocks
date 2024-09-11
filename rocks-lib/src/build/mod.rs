@@ -1,14 +1,12 @@
 use crate::{
-    config::{Config, LuaVersion},
-    rockspec::{utils, Build as _, BuildBackendSpec, RockSourceSpec, Rockspec},
-    tree::{RockLayout, Tree},
+    config::{Config, LuaVersion}, lua::Lua, rockspec::{utils, Build as _, BuildBackendSpec, RockSourceSpec, Rockspec}, tree::{RockLayout, Tree}
 };
 use eyre::{OptionExt as _, Result};
 use git2::Repository;
 
 mod builtin;
 
-fn install(rockspec: &Rockspec, tree: &Tree, output_paths: &RockLayout) -> Result<()> {
+fn install(rockspec: &Rockspec, tree: &Tree, output_paths: &RockLayout, lua: &Lua) -> Result<()> {
     let install_spec = &rockspec.build.current_platform().install;
 
     for (target, source) in &install_spec.lua {
@@ -16,7 +14,7 @@ fn install(rockspec: &Rockspec, tree: &Tree, output_paths: &RockLayout) -> Resul
     }
 
     for (target, source) in &install_spec.lib {
-        utils::compile_c_files(&vec![source.into()], target, &output_paths.lib)?;
+        utils::compile_c_files(&vec![source.into()], target, &output_paths.lib, lua)?;
     }
 
     for (target, source) in &install_spec.bin {
@@ -90,7 +88,9 @@ pub fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
 
     let output_paths = tree.rock(&rockspec.package, &rockspec.version)?;
 
-    install(&rockspec, &tree, &output_paths)?;
+    let lua = Lua::new(lua_dependency.as_ref().or(config.lua_version.as_ref()).unwrap())?;
+
+    install(&rockspec, &tree, &output_paths, &lua)?;
 
     // Copy over all `copy_directories` to their respective paths
     for directory in &rockspec.build.current_platform().copy_directories {
@@ -107,7 +107,7 @@ pub fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
     // TODO: Ensure dependencies and build dependencies.
     match rockspec.build.default.build_backend.as_ref().cloned() {
         Some(BuildBackendSpec::Builtin(build_spec)) => {
-            build_spec.run(rockspec, output_paths, false)?
+            build_spec.run(rockspec, output_paths, false, &lua)?
         }
         _ => unimplemented!(),
     };
