@@ -1,5 +1,10 @@
 {
-  description = "Luarocks <3 Rust";
+  description = "A library and client implementation of luarocks";
+
+  nixConfig = {
+    extra-substituters = "https://neorocks.cachix.org";
+    extra-trusted-public-keys = "neorocks.cachix.org-1:WqMESxmVTOJX7qoBC54TwrMMoVI1xAM+7yFin8NRfwk=";
+  };
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -24,17 +29,11 @@
     flake-parts.lib.mkFlake {inherit inputs;} {
       systems = [
         "x86_64-linux"
+        "aarch64-linux"
         "x86_64-darwin"
         "aarch64-darwin"
       ];
-      perSystem = {
-        config,
-        self',
-        inputs',
-        pkgs,
-        system,
-        ...
-      }: let
+      perSystem = {system, ...}: let
         pkgs = import nixpkgs {
           inherit system;
           overlays = [
@@ -76,19 +75,15 @@
               rust-analyzer
               cargo-nextest
             ])
-            ++ (with git-hooks.packages.${system}; [
-              alejandra
-              rustfmt
-              clippy
-            ])
+            ++ self.checks.${system}.git-hooks-check.enabledPackages
             ++ pkgs.rocks.buildInputs
             ++ pkgs.rocks.nativeBuildInputs;
         };
 
-        checks = with pkgs; {
+        checks = rec {
+          default = git-hooks-check;
           inherit
             git-hooks-check
-            rocks
             ;
         };
       };

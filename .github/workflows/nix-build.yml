@@ -25,4 +25,4 @@ jobs:
         name: neorocks
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       # Some of the tests query luarocks.org. TODO: Get sandboxed tests working
-    - run: nix build "${{matrix.attribute}}"
+    - run: nix build "${{matrix.attribute}}" --accept-flake-config
