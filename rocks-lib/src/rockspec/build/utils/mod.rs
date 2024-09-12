@@ -1,7 +1,7 @@
 use eyre::Result;
 use std::path::{Path, PathBuf};
 
-use crate::lua::Lua;
+use crate::lua_installation::LuaInstallation;
 
 use super::ModulePaths;
 
@@ -33,7 +33,7 @@ pub fn compile_c_files(
     files: &Vec<PathBuf>,
     target_file: &str,
     target_dir: &Path,
-    lua: &Lua,
+    lua: &LuaInstallation,
 ) -> Result<()> {
     let target = lua_module_to_pathbuf(target_file, std::env::consts::DLL_SUFFIX);
     let target = target_dir.join(target);
@@ -77,7 +77,7 @@ pub fn compile_c_modules(
     data: &ModulePaths,
     target_file: &str,
     target_dir: &Path,
-    lua: &Lua,
+    lua: &LuaInstallation,
 ) -> Result<()> {
     let target = lua_module_to_pathbuf(target_file, std::env::consts::DLL_SUFFIX);
     let target = target_dir.join(target);

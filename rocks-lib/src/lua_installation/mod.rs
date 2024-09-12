@@ -4,17 +4,17 @@ use target_lexicon::Triple;
 
 use crate::config::{Config, LuaVersion};
 
-pub struct Lua {
+pub struct LuaInstallation {
     pub include_dir: PathBuf,
     pub lib_dir: PathBuf,
 }
 
-impl Lua {
+impl LuaInstallation {
     pub fn new(version: &LuaVersion, config: &Config) -> Result<Self> {
         let output = Self::path(version, config)?;
 
         if output.exists() {
-            Ok(Lua {
+            Ok(LuaInstallation {
                 include_dir: output.join("include"),
                 lib_dir: output.join("lib"),
             })
@@ -57,7 +57,7 @@ impl Lua {
                 }
             };
 
-            Ok(Lua {
+            Ok(LuaInstallation {
                 include_dir,
                 lib_dir,
             })

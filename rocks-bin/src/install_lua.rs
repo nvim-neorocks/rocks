@@ -2,7 +2,7 @@ use clap::Args;
 use eyre::Result;
 use rocks_lib::{
     config::{Config, LuaVersion},
-    lua::Lua,
+    lua_installation::LuaInstallation,
 };
 
 #[derive(Args)]
@@ -15,7 +15,7 @@ pub fn install_lua(install_data: InstallLua, config: &Config) -> Result<()> {
 
     // TODO: Detect when path already exists by checking `Lua::path()` and prompt the user
     // whether they'd like to forcefully reinstall.
-    Lua::new(&install_data.version, config)?;
+    LuaInstallation::new(&install_data.version, config)?;
 
     print!("Succesfully installed Lua {version_stringified}.");
 

@@ -1,6 +1,6 @@
 use crate::{
     config::{Config, LuaVersion},
-    lua::Lua,
+    lua_installation::LuaInstallation,
     rockspec::{utils, Build as _, BuildBackendSpec, RockSourceSpec, Rockspec},
     tree::{RockLayout, Tree},
 };
@@ -9,7 +9,7 @@ use git2::Repository;
 
 mod builtin;
 
-fn install(rockspec: &Rockspec, tree: &Tree, output_paths: &RockLayout, lua: &Lua) -> Result<()> {
+fn install(rockspec: &Rockspec, tree: &Tree, output_paths: &RockLayout, lua: &LuaInstallation) -> Result<()> {
     let install_spec = &rockspec.build.current_platform().install;
 
     for (target, source) in &install_spec.lua {
@@ -91,7 +91,7 @@ pub fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
 
     let output_paths = tree.rock(&rockspec.package, &rockspec.version)?;
 
-    let lua = Lua::new(
+    let lua = LuaInstallation::new(
         lua_dependency
             .as_ref()
             .or(config.lua_version.as_ref())

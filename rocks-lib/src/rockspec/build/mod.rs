@@ -407,7 +407,7 @@ pub trait Build {
         rockspec: Rockspec,
         output_paths: RockLayout,
         no_install: bool,
-        lua: &crate::lua::Lua,
+        lua: &crate::lua_installation::LuaInstallation,
     ) -> Result<()>;
 }
 
