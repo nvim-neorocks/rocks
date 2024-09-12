@@ -50,9 +50,7 @@ pub struct Config {
     pub only_server: Option<String>,
     pub only_sources: Option<String>,
     pub namespace: String,
-    // TODO(vhyrro): Make both of these non-options and autodetect
-    // this in Config::default()
-    pub lua_dir: Option<PathBuf>,
+    pub lua_dir: PathBuf,
     pub lua_version: Option<LuaVersion>,
     pub tree: PathBuf,
     pub no_project: bool,
@@ -123,7 +121,11 @@ impl Config {
     }
 
     pub fn lua_dir(self, lua_dir: Option<PathBuf>) -> Config {
-        Config { lua_dir, ..self }
+        if let Some(lua_dir) = lua_dir {
+            Config { lua_dir, ..self }
+        } else {
+            self
+        }
     }
 
     pub fn lua_version(self, lua_version: Option<LuaVersion>) -> Config {
@@ -164,7 +166,7 @@ impl Default for Config {
             only_server: None,
             only_sources: None,
             namespace: "".into(),
-            lua_dir: None,
+            lua_dir: Config::get_default_cache_path().unwrap().join("lua"),
             lua_version: None,
             tree: Config::get_default_data_path().unwrap(), // TODO: Remove this unwrap
             no_project: false,

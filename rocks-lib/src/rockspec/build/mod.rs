@@ -15,7 +15,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
-use crate::{config::Config, tree::RockLayout};
+use crate::tree::RockLayout;
 
 use super::{PerPlatform, PlatformIdentifier, Rockspec};
 

@@ -29,10 +29,10 @@ impl Build for BuiltinBuildSpec {
                     utils::copy_lua_to_module_path(source, destination_path, &output_paths.src)?
                 }
                 ModuleSpec::SourcePaths(files) => {
-                    utils::compile_c_files(files, destination_path, &output_paths.lib, &lua)?
+                    utils::compile_c_files(files, destination_path, &output_paths.lib, lua)?
                 }
                 ModuleSpec::ModulePaths(data) => {
-                    utils::compile_c_modules(data, destination_path, &output_paths.lib, &lua)?
+                    utils::compile_c_modules(data, destination_path, &output_paths.lib, lua)?
                 }
             }
         }
