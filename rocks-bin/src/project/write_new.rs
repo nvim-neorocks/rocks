@@ -276,7 +276,7 @@ description = {{
 }}
 
 dependencies = {{
-    "lua{version}",
+    "lua{lua_version_req}",
 }}
 
 build = {{
@@ -293,7 +293,7 @@ build = {{
                 .into_iter()
                 .map(|label| "\"".to_string() + &label + "\"")
                 .join(", "),
-            version = lua_versions.version_req(),
+            lua_version_req = lua_versions.version_req(),
         )
         .trim(),
     )?;
