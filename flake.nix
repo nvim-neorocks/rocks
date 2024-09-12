@@ -81,10 +81,11 @@
         };
 
         checks = rec {
-          default = git-hooks-check;
+          default = tests;
           inherit
             git-hooks-check
             ;
+          tests = pkgs.rocks-debug;
         };
       };
       flake = {

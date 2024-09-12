@@ -7,11 +7,11 @@ edition = "2021"
 clap = { version = "4.5.3", features = ["derive"] }
 eyre = "0.6.12"
 git-url-parse = "0.4.4"
-git2 = "0.18.3"
+git2 = "0.19.0"
 inquire = "0.7.5"
-itertools = "0.12.1"
-nucleo = "0.4.1"
-octocrab = "0.36.0"
+itertools = "0.13.0"
+nucleo = "0.5.0"
+octocrab = "0.39.0"
 serde_json = "1.0.118"
 spdx = "0.10.4"
 spinners = "4.1.1"
@@ -23,4 +23,3 @@ walkdir = "2.5.0"
 
 [dependencies.rocks-lib]
 path = "../rocks-lib/"
-

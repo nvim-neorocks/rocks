@@ -1,7 +1,6 @@
 ---
-name: "Nix build"
+name: "Nix release build"
 on:
-  pull_request:
   push:
     branches: [ master ]
 jobs:
@@ -22,13 +21,6 @@ jobs:
       with:
         name: neorocks
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-    - name: Checks
-      run: nix build ".#checks.${{matrix.job.target}}.git-hooks-check" --accept-flake-config --log-lines 500
-      if: ${{ matrix.job.target == 'x86_64-linux' }}
-      shell: bash
-    - name: Tests
-      run: nix build ".#checks.${{matrix.job.target}}.tests" --accept-flake-config --log-lines 500
-      shell: bash
-    - name: Build devShell
-      run: nix build ".#devShells.${{matrix.job.target}}.default" --accept-flake-config --log-lines 500
+    - name: Build package
+      run: nix build ".#packages.${{matrix.job.target}}.default" -Lv --accept-flake-config
       shell: bash
