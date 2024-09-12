@@ -1,5 +1,8 @@
 use crate::{
-    config::{Config, LuaVersion}, lua::Lua, rockspec::{utils, Build as _, BuildBackendSpec, RockSourceSpec, Rockspec}, tree::{RockLayout, Tree}
+    config::{Config, LuaVersion},
+    lua::Lua,
+    rockspec::{utils, Build as _, BuildBackendSpec, RockSourceSpec, Rockspec},
+    tree::{RockLayout, Tree},
 };
 use eyre::{OptionExt as _, Result};
 use git2::Repository;
@@ -88,7 +91,13 @@ pub fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
 
     let output_paths = tree.rock(&rockspec.package, &rockspec.version)?;
 
-    let lua = Lua::new(lua_dependency.as_ref().or(config.lua_version.as_ref()).unwrap())?;
+    let lua = Lua::new(
+        lua_dependency
+            .as_ref()
+            .or(config.lua_version.as_ref())
+            .unwrap(),
+        config,
+    )?;
 
     install(&rockspec, &tree, &output_paths, &lua)?;
 

@@ -10,8 +10,8 @@ pub struct Lua {
 }
 
 impl Lua {
-    pub fn new(version: &LuaVersion) -> Result<Self> {
-        let output = Self::path(version)?;
+    pub fn new(version: &LuaVersion, config: &Config) -> Result<Self> {
+        let output = Self::path(version, config)?;
 
         if output.exists() {
             Ok(Lua {
@@ -64,9 +64,7 @@ impl Lua {
         }
     }
 
-    pub fn path(version: &LuaVersion) -> Result<PathBuf> {
-        Ok(Config::get_default_cache_path()?
-            .join("lua")
-            .join(version.to_string()))
+    pub fn path(version: &LuaVersion, config: &Config) -> Result<PathBuf> {
+        Ok(config.lua_dir.join(version.to_string()))
     }
 }
