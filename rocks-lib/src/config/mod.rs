@@ -160,15 +160,18 @@ impl Config {
 
 impl Default for Config {
     fn default() -> Config {
+        // TODO: Remove this unwrap
+        let data_path = Config::get_default_data_path().unwrap();
+
         Config {
             enable_development_rockspecs: false,
             server: "https://luarocks.org/".into(),
             only_server: None,
             only_sources: None,
             namespace: "".into(),
-            lua_dir: Config::get_default_cache_path().unwrap().join("lua"),
+            lua_dir: data_path.join("lua"),
             lua_version: None,
-            tree: Config::get_default_data_path().unwrap(), // TODO: Remove this unwrap
+            tree: data_path,
             no_project: false,
             verbose: false,
             timeout: Duration::from_secs(30),
