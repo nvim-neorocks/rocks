@@ -71,7 +71,8 @@ impl<'a> Tree<'a> {
 mod tests {
     use std::path::PathBuf;
 
-    // use insta::{assert_yaml_snapshot, sorted_redaction};
+    #[cfg(feature = "test_nosandbox")]
+    use insta::{assert_yaml_snapshot, sorted_redaction};
 
     use crate::{config::LuaVersion, tree::RockLayout};
 
@@ -111,14 +112,14 @@ mod tests {
         );
     }
 
-    // FIXME: This fails in nix checks
-    // #[test]
-    // fn tree_list() {
-    //     let tree_path =
-    //         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-tree");
-    //
-    //     let tree = Tree::new(&tree_path, &LuaVersion::Lua51).unwrap();
-    //
-    //     assert_yaml_snapshot!(tree.list(), { "." => sorted_redaction() })
-    // }
+    #[test]
+    #[cfg(feature = "test_nosandbox")]
+    fn tree_list() {
+        let tree_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-tree");
+
+        let tree = Tree::new(&tree_path, &LuaVersion::Lua51).unwrap();
+
+        assert_yaml_snapshot!(tree.list(), { "." => sorted_redaction() })
+    }
 }
