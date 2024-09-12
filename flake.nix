@@ -43,6 +43,8 @@
         git-hooks-check = git-hooks.lib.${system}.run {
           src = self;
           hooks = {
+            # NOTE: When adding/removing hooks, make sure
+            # to update CONTRIBUTING.md for non-nix users.
             alejandra.enable = true;
             rustfmt.enable = true;
             clippy = {
