@@ -24,12 +24,12 @@ impl LuaInstallation {
             let host_operating_system = &host.operating_system.to_string();
 
             let (include_dir, lib_dir) = match version {
-                LuaVersion::LuaJIT => {
+                LuaVersion::LuaJIT | LuaVersion::LuaJIT52 => {
                     let build = luajit_src::Build::new()
                         .target(target)
                         .host(host_operating_system)
                         .out_dir(output)
-                        .lua52compat(true)
+                        .lua52compat(matches!(version, LuaVersion::LuaJIT52))
                         .build();
 
                     (
@@ -47,7 +47,7 @@ impl LuaInstallation {
                             LuaVersion::Lua52 => lua_src::Version::Lua52,
                             LuaVersion::Lua53 => lua_src::Version::Lua53,
                             LuaVersion::Lua54 => lua_src::Version::Lua54,
-                            LuaVersion::LuaJIT => unreachable!(),
+                            _ => unreachable!(),
                         });
 
                     (
