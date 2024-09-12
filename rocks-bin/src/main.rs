@@ -6,7 +6,6 @@ use clap::{Parser, Subcommand};
 use debug::Debug;
 use download::Download;
 use install::Install;
-use install_lua::InstallLua;
 use list::ListCmd;
 use outdated::Outdated;
 use rocks_lib::config::{Config, LuaVersion};
@@ -106,7 +105,7 @@ enum Commands {
     /// Install a rock for use on the system.
     Install(Install),
     /// Manually install and manage Lua headers for various Lua versions.
-    InstallLua(InstallLua),
+    InstallLua,
     /// Check syntax of a rockspec.
     Lint,
     /// List currently installed rocks.
@@ -181,9 +180,7 @@ async fn main() {
                 install::install(install_data, &config).await.unwrap()
             }
             Commands::Outdated(outdated) => outdated::outdated(outdated, &config).await.unwrap(),
-            Commands::InstallLua(install_lua) => {
-                install_lua::install_lua(install_lua, &config).unwrap()
-            }
+            Commands::InstallLua => install_lua::install_lua(&config).unwrap(),
             _ => unimplemented!(),
         },
         None => {
