@@ -10,10 +10,10 @@ cc = "1.0.98"
 directories = "5.0.1"
 eyre = "0.6.12"
 git-url-parse = "0.4.4"
-git2 = "0.18.3"
+git2 = "0.19.0"
 html-escape = "0.2.13"
 httpdate = "1.0.3"
-itertools = "0.12.1"
+itertools = "0.13.0"
 mlua = { version = "0.9.6", features = ["luajit52", "serialize"] }
 pathdiff = "0.2.1"
 regex = "1.10.3"
@@ -28,13 +28,13 @@ tokio = { version = "1.36.0", features = ["macros"] }
 tempdir = "0.3.7"
 vfs = "0.12.0"
 walkdir = "2.4.0"
-zip = "0.6.6"
+zip = "2.2.0"
 insta = { version = "1.39.0", features = ["redactions", "yaml"] }
 which = "6.0.3"
 lets_find_up = "0.0.3"
 
 [dev-dependencies]
-httptest = { version = "0.15.5" }
+httptest = { version = "0.16.1" }
 serial_test = { version = "3.0.0" }
 proptest = "1.4.0"
 dir-diff = "0.3.3"
