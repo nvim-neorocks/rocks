@@ -1,30 +1,28 @@
 use eyre::{eyre, Result};
 use itertools::Itertools;
-use semver::{Version, VersionReq};
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{fmt::Display, str::FromStr};
+use version::{PackageVersion, PackageVersionReq};
 
 mod version;
-
-pub use version::{parse_version, parse_version_req};
 
 // TODO: We probably need a better name for this
 pub struct LuaPackage {
     name: PackageName,
-    version: Version,
+    version: PackageVersion,
 }
 
 impl LuaPackage {
     pub fn new(name: String, version: String) -> Result<Self> {
         Ok(Self {
             name: PackageName::new(name),
-            version: parse_version(&version)?,
+            version: PackageVersion::parse(&version)?,
         })
     }
     pub fn name(&self) -> &PackageName {
         &self.name
     }
-    pub fn version(&self) -> &Version {
+    pub fn version(&self) -> &PackageVersion {
         &self.version
     }
 }
@@ -33,7 +31,7 @@ impl LuaPackage {
 #[derive(Debug, Clone, PartialEq)]
 pub struct LuaPackageReq {
     name: PackageName,
-    version_req: VersionReq,
+    version_req: PackageVersionReq,
 }
 
 impl LuaPackageReq {
@@ -41,8 +39,8 @@ impl LuaPackageReq {
         Ok(Self {
             name: PackageName::new(name),
             version_req: match version {
-                Some(version_req_str) => parse_version_req(version_req_str.as_str())?,
-                None => VersionReq::default(),
+                Some(version_req_str) => PackageVersionReq::parse(version_req_str.as_str())?,
+                None => PackageVersionReq::default(),
             },
         })
     }
@@ -52,7 +50,7 @@ impl LuaPackageReq {
     pub fn name(&self) -> &PackageName {
         &self.name
     }
-    pub fn version_req(&self) -> &VersionReq {
+    pub fn version_req(&self) -> &PackageVersionReq {
         &self.version_req
     }
     /// Evaluate whether the given package satisfies the package requirement
@@ -80,8 +78,8 @@ impl FromStr for LuaPackageReq {
 
         let constraints = str.trim_start_matches(&rock_name_str).trim();
         let version_req = match constraints {
-            "" => VersionReq::default(),
-            constraints => parse_version_req(constraints.trim_start())?,
+            "" => PackageVersionReq::default(),
+            constraints => PackageVersionReq::parse(constraints.trim_start())?,
         };
         Ok(Self {
             name: PackageName::new(rock_name_str),
@@ -160,7 +158,7 @@ mod tests {
     #[tokio::test]
     async fn parse_lua_package() {
         let neorg = LuaPackage::new("neorg".into(), "1.0.0".into()).unwrap();
-        let expected_version = Version::parse("1.0.0").unwrap();
+        let expected_version = PackageVersion::parse("1.0.0").unwrap();
         assert_eq!(neorg.name().to_string(), "neorg");
         assert_eq!(*neorg.version(), expected_version);
         let neorg = LuaPackage::new("neorg".into(), "1.0".into()).unwrap();

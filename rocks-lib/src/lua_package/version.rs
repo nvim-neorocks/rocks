@@ -1,15 +1,134 @@
+use std::{cmp::Ordering, fmt::Display, str::FromStr};
+
 use eyre::Result;
 use html_escape::decode_html_entities;
 use semver::{Error, Version, VersionReq};
 
+/// **SemVer version** as defined by <https://semver.org>.
+/// or a **Dev** version, which can be one of "dev", "scm", or "git"
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+pub enum PackageVersion {
+    SemVer { version: Version },
+    Dev { name: String },
+}
+
+impl PackageVersion {
+    pub fn parse(text: &str) -> Result<Self> {
+        PackageVersion::from_str(text)
+    }
+}
+
+impl Display for PackageVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PackageVersion::SemVer { version } => version.fmt(f),
+            PackageVersion::Dev { name } => f.write_str(name.as_str()),
+        }
+    }
+}
+
+impl PartialOrd for PackageVersion {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PackageVersion {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (PackageVersion::SemVer { version: a }, PackageVersion::SemVer { version: b }) => {
+                a.cmp(b)
+            }
+            (PackageVersion::SemVer { .. }, PackageVersion::Dev { .. }) => Ordering::Less,
+            (PackageVersion::Dev { .. }, PackageVersion::SemVer { .. }) => Ordering::Greater,
+            (PackageVersion::Dev { name: a }, PackageVersion::Dev { name: b }) => a.cmp(b),
+        }
+    }
+}
+
+impl FromStr for PackageVersion {
+    type Err = eyre::Error;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        if is_dev_version_str(text) {
+            return Ok(PackageVersion::Dev { name: text.into() });
+        }
+        Ok(PackageVersion::SemVer {
+            version: parse_version(text)?,
+        })
+    }
+}
+
+/// **SemVer version** requirement as defined by <https://semver.org>.
+/// or a **Dev** version requirement, which can be one of "dev", "scm", or "git"
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+pub enum PackageVersionReq {
+    SemVer { version_req: VersionReq },
+    Dev { name_req: String },
+}
+
+impl PackageVersionReq {
+    pub fn parse(text: &str) -> Result<Self> {
+        PackageVersionReq::from_str(text)
+    }
+    pub fn matches(&self, version: &PackageVersion) -> bool {
+        match (self, version) {
+            (PackageVersionReq::SemVer { version_req }, PackageVersion::SemVer { version }) => {
+                version_req.matches(version)
+            }
+            (PackageVersionReq::SemVer { .. }, PackageVersion::Dev { .. }) => true,
+            (PackageVersionReq::Dev { .. }, PackageVersion::SemVer { .. }) => false,
+            (PackageVersionReq::Dev { name_req }, PackageVersion::Dev { name }) => {
+                name_req.ends_with(name)
+            }
+        }
+    }
+}
+
+impl Display for PackageVersionReq {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PackageVersionReq::SemVer { version_req } => version_req.fmt(f),
+            PackageVersionReq::Dev { name_req } => f.write_str(name_req.as_str()),
+        }
+    }
+}
+
+impl Default for PackageVersionReq {
+    fn default() -> Self {
+        PackageVersionReq::SemVer {
+            version_req: VersionReq::default(),
+        }
+    }
+}
+
+impl FromStr for PackageVersionReq {
+    type Err = eyre::Error;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        if is_dev_version_str(text.trim_start_matches("==").trim()) {
+            return Ok(PackageVersionReq::Dev {
+                name_req: text.into(),
+            });
+        }
+        Ok(PackageVersionReq::SemVer {
+            version_req: parse_version_req(text)?,
+        })
+    }
+}
+
+fn is_dev_version_str(text: &str) -> bool {
+    matches!(text, "dev" | "scm" | "git")
+}
+
 /// Parses a Version from a string, automatically supplying any missing details (i.e. missing
 /// minor/patch sections).
-pub fn parse_version(s: &str) -> Result<Version, Error> {
+fn parse_version(s: &str) -> Result<Version, Error> {
     Version::parse(&append_minor_patch_if_missing(s.to_string()))
 }
 
 /// Transform LuaRocks constraints into constraints that can be parsed by the semver crate.
-pub fn parse_version_req(version_constraints: &str) -> Result<VersionReq, Error> {
+fn parse_version_req(version_constraints: &str) -> Result<VersionReq, Error> {
     let unescaped = decode_html_entities(version_constraints)
         .to_string()
         .as_str()
@@ -54,5 +173,72 @@ fn append_minor_patch_if_missing(version: String) -> String {
         append_minor_patch_if_missing(version + ".0")
     } else {
         version
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn parse_dev_version() {
+        assert_eq!(
+            PackageVersion::parse("dev").unwrap(),
+            PackageVersion::Dev { name: "dev".into() }
+        );
+        assert_eq!(
+            PackageVersion::parse("scm").unwrap(),
+            PackageVersion::Dev { name: "scm".into() }
+        );
+        assert_eq!(
+            PackageVersion::parse("git").unwrap(),
+            PackageVersion::Dev { name: "git".into() }
+        );
+    }
+
+    #[tokio::test]
+    async fn parse_dev_version_req() {
+        assert_eq!(
+            PackageVersionReq::parse("dev").unwrap(),
+            PackageVersionReq::Dev {
+                name_req: "dev".into()
+            }
+        );
+        assert_eq!(
+            PackageVersionReq::parse("scm").unwrap(),
+            PackageVersionReq::Dev {
+                name_req: "scm".into()
+            }
+        );
+        assert_eq!(
+            PackageVersionReq::parse("git").unwrap(),
+            PackageVersionReq::Dev {
+                name_req: "git".into()
+            }
+        );
+        assert_eq!(
+            PackageVersionReq::parse("==dev").unwrap(),
+            PackageVersionReq::Dev {
+                name_req: "==dev".into()
+            }
+        );
+        assert_eq!(
+            PackageVersionReq::parse("==git").unwrap(),
+            PackageVersionReq::Dev {
+                name_req: "==git".into()
+            }
+        );
+        assert_eq!(
+            PackageVersionReq::parse("== dev").unwrap(),
+            PackageVersionReq::Dev {
+                name_req: "== dev".into()
+            }
+        );
+        assert_eq!(
+            PackageVersionReq::parse("== scm").unwrap(),
+            PackageVersionReq::Dev {
+                name_req: "== scm".into()
+            }
+        );
     }
 }
