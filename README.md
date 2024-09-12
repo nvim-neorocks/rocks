@@ -10,10 +10,19 @@ Rocks serves as an application for:
 > This aims to be a full rewrite of `luarocks`, with many flags altered to be more
 > ergonomic. This is not a drop-in replacement for `luarocks` commands you may have in scripts.
 
-# Usage
+## :books: Usage
 
 ```sh
 rocks <command> <options>
 ```
 
 To view available options and their descriptions, run `rocks --help`.
+
+## :book: License
+
+`rocks` is licensed under [MIT](./LICENSE).
+
+## :green_heart: Contributing
+
+Contributions are more than welcome!
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for a guide.
