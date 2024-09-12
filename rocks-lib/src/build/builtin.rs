@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
-    lua::Lua,
+    lua_installation::LuaInstallation,
     rockspec::{utils, Build, BuiltinBuildSpec, ModuleSpec, Rockspec},
     tree::RockLayout,
 };
@@ -15,7 +15,7 @@ impl Build for BuiltinBuildSpec {
         _rockspec: Rockspec,
         output_paths: RockLayout,
         _no_install: bool,
-        lua: &Lua,
+        lua: &LuaInstallation,
     ) -> Result<()> {
         // Detect all Lua modules
         let modules = autodetect_modules()?
