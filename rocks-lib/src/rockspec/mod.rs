@@ -16,6 +16,8 @@ pub use platform::*;
 pub use rock_source::*;
 pub use test_spec::*;
 
+use crate::lua_package::LuaPackageReq;
+
 #[derive(Debug)]
 pub struct Rockspec {
     /// The file format version. Example: "1.0"
@@ -26,10 +28,10 @@ pub struct Rockspec {
     pub version: String, // TODO: This shouldn't be stringly typed!
     pub description: RockDescription,
     pub supported_platforms: PlatformSupport,
-    pub dependencies: PerPlatform<Vec<LuaDependency>>,
-    pub build_dependencies: PerPlatform<Vec<LuaDependency>>,
+    pub dependencies: PerPlatform<Vec<LuaPackageReq>>,
+    pub build_dependencies: PerPlatform<Vec<LuaPackageReq>>,
     pub external_dependencies: PerPlatform<HashMap<String, ExternalDependency>>,
-    pub test_dependencies: PerPlatform<Vec<LuaDependency>>,
+    pub test_dependencies: PerPlatform<Vec<LuaPackageReq>>,
     pub source: PerPlatform<RockSource>,
     pub build: PerPlatform<BuildSpec>,
     pub test: PerPlatform<TestSpec>,

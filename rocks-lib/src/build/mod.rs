@@ -60,7 +60,7 @@ pub fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
         .dependencies
         .current_platform()
         .iter()
-        .find(|val| val.rock_name == "lua".into())
+        .find(|val| *val.name() == "lua".into())
         .map(|dependency| {
             for (possibility, version) in [
                 ("5.4.0", LuaVersion::Lua54),
@@ -69,7 +69,7 @@ pub fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
                 ("5.1.0", LuaVersion::Lua51),
             ] {
                 if dependency
-                    .rock_version_req
+                    .version_req()
                     .matches(&possibility.parse().unwrap())
                 {
                     return version;
