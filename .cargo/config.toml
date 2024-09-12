@@ -1,0 +1,2 @@
+[alias]
+tt = "nextest run --features=test_nosandbox"

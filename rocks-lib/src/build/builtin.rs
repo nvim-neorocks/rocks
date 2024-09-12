@@ -81,27 +81,26 @@ fn autodetect_modules() -> Result<HashMap<String, ModuleSpec>> {
 }
 
 #[cfg(test)]
+#[cfg(feature = "test_nosandbox")]
 mod tests {
-    // FIXME: This fails in nix flake checks
+    use tempdir::TempDir;
 
-    // use tempdir::TempDir;
+    use crate::{config::Config, rockspec::Rockspec};
 
-    // use crate::{config::Config, rockspec::Rockspec};
+    #[test]
+    fn builtin_build() {
+        let dir = TempDir::new("rocks-test").unwrap();
 
-    // #[test]
-    // fn builtin_build() {
-    //     let dir = TempDir::new("rocks-test").unwrap();
-    //
-    //     let content = String::from_utf8(
-    //         std::fs::read("resources/test/lua-cjson-2.1.0.9-1.rockspec").unwrap(),
-    //     )
-    //     .unwrap();
-    //     let rockspec = Rockspec::new(&content).unwrap();
-    //
-    //     let config = Config::new()
-    //         .tree(Some(dir.into_path()))
-    //         .lua_version(Some(crate::config::LuaVersion::Lua51));
-    //
-    //     crate::build::build(rockspec, &config).unwrap();
-    // }
+        let content = String::from_utf8(
+            std::fs::read("resources/test/lua-cjson-2.1.0.9-1.rockspec").unwrap(),
+        )
+        .unwrap();
+        let rockspec = Rockspec::new(&content).unwrap();
+
+        let config = Config::new()
+            .tree(Some(dir.into_path()))
+            .lua_version(Some(crate::config::LuaVersion::Lua51));
+
+        crate::build::build(rockspec, &config).unwrap();
+    }
 }
