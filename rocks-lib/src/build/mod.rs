@@ -9,7 +9,12 @@ use git2::Repository;
 
 mod builtin;
 
-fn install(rockspec: &Rockspec, tree: &Tree, output_paths: &RockLayout, lua: &LuaInstallation) -> Result<()> {
+fn install(
+    rockspec: &Rockspec,
+    tree: &Tree,
+    output_paths: &RockLayout,
+    lua: &LuaInstallation,
+) -> Result<()> {
     let install_spec = &rockspec.build.current_platform().install;
 
     for (target, source) in &install_spec.lua {

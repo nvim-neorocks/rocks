@@ -9,6 +9,7 @@ pub enum LuaVersion {
     Lua53,
     Lua54,
     LuaJIT,
+    LuaJIT52,
     // TODO(vhyrro): Support luau?
     // LuaU,
 }
@@ -23,8 +24,9 @@ impl FromStr for LuaVersion {
             "5.3" | "53" => Ok(LuaVersion::Lua53),
             "5.4" | "54" => Ok(LuaVersion::Lua54),
             "jit" | "luajit" => Ok(LuaVersion::LuaJIT),
+            "jit52" | "luajit52" => Ok(LuaVersion::LuaJIT52),
             _ => Err(
-                "unrecognized Lua version. Allowed versions: '5.1', '5.2', '5.3', '5.4', 'jit'."
+                "unrecognized Lua version. Allowed versions: '5.1', '5.2', '5.3', '5.4', 'jit', 'jit52'."
                     .into(),
             ),
         }
@@ -39,6 +41,7 @@ impl Display for LuaVersion {
             LuaVersion::Lua53 => "5.3",
             LuaVersion::Lua54 => "5.4",
             LuaVersion::LuaJIT => "jit",
+            LuaVersion::LuaJIT52 => "jit52",
         })
     }
 }
