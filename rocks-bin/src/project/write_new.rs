@@ -263,6 +263,7 @@ pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
             r#"
 rockspec_format = "3.0"
 package = "{package_name}"
+version = "0.1.0"
 
 source = {{
     url = "*** provide a url here ***",
