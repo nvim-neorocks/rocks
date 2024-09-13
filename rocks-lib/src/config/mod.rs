@@ -1,8 +1,10 @@
 use directories::ProjectDirs;
-use eyre::{eyre, Result};
+use eyre::{eyre, OptionExt as _, Result};
 use std::{fmt::Display, path::PathBuf, str::FromStr, time::Duration};
 
-#[derive(Clone)]
+use crate::{project::Project, rockspec::Rockspec};
+
+#[derive(Debug, Clone)]
 pub enum LuaVersion {
     Lua51,
     Lua52,
@@ -30,6 +32,32 @@ impl FromStr for LuaVersion {
                     .into(),
             ),
         }
+    }
+}
+
+impl TryFrom<&Rockspec> for LuaVersion {
+    type Error = eyre::Report;
+
+    fn try_from(rockspec: &Rockspec) -> std::result::Result<Self, Self::Error> {
+        let lua = rockspec
+            .dependencies
+            .current_platform()
+            .iter()
+            .find(|val| *val.name() == "lua".into())
+            .ok_or_eyre("no `lua` dependency found!")?;
+
+        for (possibility, version) in [
+            ("5.4.0", LuaVersion::Lua54),
+            ("5.3.0", LuaVersion::Lua53),
+            ("5.2.0", LuaVersion::Lua52),
+            ("5.1.0", LuaVersion::Lua51),
+        ] {
+            if lua.version_req().matches(&possibility.parse().unwrap()) {
+                return Ok(version);
+            }
+        }
+
+        Err(eyre!("no valid matches for `lua` found!"))
     }
 }
 
@@ -90,59 +118,42 @@ impl Config {
         }
     }
 
-    pub fn server(self, server: Option<String>) -> Config {
-        if self.only_server.is_some() {
-            self
-        } else {
-            Config {
-                server: server.unwrap_or_else(|| Config::default().server),
-                ..self
-            }
-        }
+    pub fn server(self, server: String) -> Config {
+        Config { server, ..self }
     }
 
-    pub fn only_server(self, server: Option<String>) -> Config {
+    pub fn only_server(self, server: String) -> Config {
         Config {
-            only_server: server.clone(),
-            server: server.unwrap_or(self.server),
+            only_server: Some(server.clone()),
+            server,
             ..self
         }
     }
 
-    pub fn only_sources(self, sources: Option<String>) -> Config {
+    pub fn only_sources(self, sources: String) -> Config {
         Config {
-            only_sources: sources,
+            only_sources: Some(sources),
             ..self
         }
     }
 
-    pub fn namespace(self, namespace: Option<String>) -> Config {
+    pub fn namespace(self, namespace: String) -> Config {
+        Config { namespace, ..self }
+    }
+
+    pub fn lua_dir(self, lua_dir: PathBuf) -> Config {
+        Config { lua_dir, ..self }
+    }
+
+    pub fn lua_version(self, lua_version: LuaVersion) -> Config {
         Config {
-            namespace: namespace.unwrap_or_else(|| Config::default().namespace),
+            lua_version: Some(lua_version),
             ..self
         }
     }
 
-    pub fn lua_dir(self, lua_dir: Option<PathBuf>) -> Config {
-        if let Some(lua_dir) = lua_dir {
-            Config { lua_dir, ..self }
-        } else {
-            self
-        }
-    }
-
-    pub fn lua_version(self, lua_version: Option<LuaVersion>) -> Config {
-        Config {
-            lua_version,
-            ..self
-        }
-    }
-
-    pub fn tree(self, tree: Option<PathBuf>) -> Config {
-        Config {
-            tree: tree.unwrap_or_else(|| Config::default().tree),
-            ..self
-        }
+    pub fn tree(self, tree: PathBuf) -> Config {
+        Config { tree, ..self }
     }
 
     pub fn no_project(self, no_project: bool) -> Config {
@@ -163,8 +174,9 @@ impl Config {
 
 impl Default for Config {
     fn default() -> Config {
-        // TODO: Remove this unwrap
+        // TODO: Remove these unwraps
         let data_path = Config::get_default_data_path().unwrap();
+        let current_project = Project::current().unwrap();
 
         Config {
             enable_development_rockspecs: false,
@@ -173,8 +185,16 @@ impl Default for Config {
             only_sources: None,
             namespace: "".into(),
             lua_dir: data_path.join("lua"),
-            lua_version: None,
-            tree: data_path,
+            lua_version: current_project
+                .as_ref()
+                .map(|project| LuaVersion::try_from(project.rockspec()))
+                .transpose()
+                .unwrap(),
+            tree: current_project
+                .as_ref()
+                .map(|project| project.root().join("tree"))
+                .unwrap_or(data_path)
+                .to_path_buf(),
             no_project: false,
             verbose: false,
             timeout: Duration::from_secs(30),

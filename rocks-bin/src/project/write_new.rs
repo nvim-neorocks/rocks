@@ -101,7 +101,7 @@ fn validate_license(input: &str) -> std::result::Result<Validation, Box<dyn Erro
 }
 
 pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
-    let project = Project::new(None)?;
+    let project = Project::current()?;
     let render_config = RenderConfig::default_colored()
         .with_prompt_prefix(Styled::new(">").with_fg(inquire::ui::Color::LightGreen));
 
