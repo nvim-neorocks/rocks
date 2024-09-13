@@ -23,7 +23,7 @@ impl Default for RepoMetadata {
                 .to_string(),
             description: None,
             license: None,
-            contributors: vec![users::get_current_username()
+            contributors: vec![uzers::get_current_username()
                 .unwrap_or_default()
                 .to_string_lossy()
                 .to_string()],
