@@ -32,6 +32,8 @@ zip = "2.2.0"
 insta = { version = "1.39.0", features = ["redactions", "yaml"] }
 which = "6.0.3"
 lets_find_up = "0.0.3"
+remove_dir_all = "0.8.3"
+openssl = "0.10.66"
 
 [dev-dependencies]
 httptest = { version = "0.16.1" }

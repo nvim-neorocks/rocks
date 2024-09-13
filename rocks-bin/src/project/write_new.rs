@@ -215,7 +215,7 @@ pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
                         .first()
                         .cloned()
                         .unwrap_or_else(|| {
-                            users::get_current_username()
+                            uzers::get_current_username()
                                 .expect("current user could not be found. Was it deleted?")
                                 .to_string_lossy()
                                 .to_string()
