@@ -2,7 +2,7 @@ use eyre::{eyre, Result};
 use itertools::Itertools;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{fmt::Display, str::FromStr};
-use version::{PackageVersion, PackageVersionReq};
+pub use version::{PackageVersion, PackageVersionReq};
 
 mod outdated;
 mod version;
@@ -14,11 +14,14 @@ pub struct LuaPackage {
 }
 
 impl LuaPackage {
-    pub fn new(name: String, version: String) -> Result<Self> {
-        Ok(Self {
-            name: PackageName::new(name),
-            version: PackageVersion::parse(&version)?,
-        })
+    pub fn new(name: PackageName, version: PackageVersion) -> Self {
+        Self { name, version }
+    }
+    pub fn parse(name: String, version: String) -> Result<Self> {
+        Ok(Self::new(
+            PackageName::new(name),
+            PackageVersion::parse(&version)?,
+        ))
     }
     pub fn name(&self) -> &PackageName {
         &self.name
@@ -30,8 +33,12 @@ impl LuaPackage {
 
 /// A lua package requirement with a name and an optional version requirement.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "clap", derive(clap::Args))]
 pub struct LuaPackageReq {
+    /// The name of the package.
     name: PackageName,
+    /// The version requirement, for example "1.0.0" or ">=1.0.0".
+    #[cfg_attr(feature = "clap", clap(default_value_t = PackageVersionReq::default()))]
     version_req: PackageVersionReq,
 }
 
@@ -158,24 +165,24 @@ mod tests {
 
     #[tokio::test]
     async fn parse_lua_package() {
-        let neorg = LuaPackage::new("neorg".into(), "1.0.0".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "1.0.0".into()).unwrap();
         let expected_version = PackageVersion::parse("1.0.0").unwrap();
         assert_eq!(neorg.name().to_string(), "neorg");
         assert_eq!(*neorg.version(), expected_version);
-        let neorg = LuaPackage::new("neorg".into(), "1.0".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "1.0".into()).unwrap();
         assert_eq!(*neorg.version(), expected_version);
-        let neorg = LuaPackage::new("neorg".into(), "1".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "1".into()).unwrap();
         assert_eq!(*neorg.version(), expected_version);
     }
 
     #[tokio::test]
     async fn parse_lua_package_req() {
         let mut package_req = LuaPackageReq::new("foo".into(), Some("1.0.0".into())).unwrap();
-        assert!(package_req.matches(&LuaPackage::new("foo".into(), "1.0.0".into()).unwrap()));
-        assert!(!package_req.matches(&LuaPackage::new("bar".into(), "1.0.0".into()).unwrap()));
-        assert!(!package_req.matches(&LuaPackage::new("foo".into(), "2.0.0".into()).unwrap()));
+        assert!(package_req.matches(&LuaPackage::parse("foo".into(), "1.0.0".into()).unwrap()));
+        assert!(!package_req.matches(&LuaPackage::parse("bar".into(), "1.0.0".into()).unwrap()));
+        assert!(!package_req.matches(&LuaPackage::parse("foo".into(), "2.0.0".into()).unwrap()));
         package_req = LuaPackageReq::new("foo".into(), Some(">= 1.0.0".into())).unwrap();
-        assert!(package_req.matches(&LuaPackage::new("foo".into(), "2.0.0".into()).unwrap()));
+        assert!(package_req.matches(&LuaPackage::parse("foo".into(), "2.0.0".into()).unwrap()));
         let package_req: LuaPackageReq = "lua >= 5.1".parse().unwrap();
         assert_eq!(package_req.name.to_string(), "lua");
         let package_req: LuaPackageReq = "lua>=5.1".parse().unwrap();
@@ -186,9 +193,9 @@ mod tests {
         assert_eq!(package_req.name.to_string(), "lfs");
         let package_req: LuaPackageReq = "neorg 1.0.0".parse().unwrap();
         assert_eq!(package_req.name.to_string(), "neorg");
-        let neorg = LuaPackage::new("neorg".into(), "1.0.0".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "1.0.0".into()).unwrap();
         assert!(package_req.matches(&neorg));
-        let neorg = LuaPackage::new("neorg".into(), "2.0.0".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "2.0.0".into()).unwrap();
         assert!(!package_req.matches(&neorg));
         let package_req: LuaPackageReq = "neorg 2.0.0".parse().unwrap();
         assert!(package_req.matches(&neorg));
@@ -199,36 +206,36 @@ mod tests {
         let package_req: LuaPackageReq = "neorg &equals; 2.0.0".parse().unwrap();
         assert!(package_req.matches(&neorg));
         let package_req: LuaPackageReq = "neorg >= 1.0, &lt; 2.0".parse().unwrap();
-        let neorg = LuaPackage::new("neorg".into(), "1.5".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "1.5".into()).unwrap();
         assert!(package_req.matches(&neorg));
         let package_req: LuaPackageReq = "neorg &gt; 1.0, &lt; 2.0".parse().unwrap();
-        let neorg = LuaPackage::new("neorg".into(), "1.11.0".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "1.11.0".into()).unwrap();
         assert!(package_req.matches(&neorg));
-        let neorg = LuaPackage::new("neorg".into(), "3.0.0".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "3.0.0".into()).unwrap();
         assert!(!package_req.matches(&neorg));
-        let neorg = LuaPackage::new("neorg".into(), "0.5".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "0.5".into()).unwrap();
         assert!(!package_req.matches(&neorg));
         let package_req: LuaPackageReq = "neorg ~> 1".parse().unwrap();
         assert!(!package_req.matches(&neorg));
-        let neorg = LuaPackage::new("neorg".into(), "3".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "3".into()).unwrap();
         assert!(!package_req.matches(&neorg));
-        let neorg = LuaPackage::new("neorg".into(), "1.5".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "1.5".into()).unwrap();
         assert!(package_req.matches(&neorg));
         let package_req: LuaPackageReq = "neorg ~> 1.4".parse().unwrap();
-        let neorg = LuaPackage::new("neorg".into(), "1.3".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "1.3".into()).unwrap();
         assert!(!package_req.matches(&neorg));
-        let neorg = LuaPackage::new("neorg".into(), "1.5".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "1.5".into()).unwrap();
         assert!(!package_req.matches(&neorg));
-        let neorg = LuaPackage::new("neorg".into(), "1.4.10".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "1.4.10".into()).unwrap();
         assert!(package_req.matches(&neorg));
-        let neorg = LuaPackage::new("neorg".into(), "1.4".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "1.4".into()).unwrap();
         assert!(package_req.matches(&neorg));
         let package_req: LuaPackageReq = "neorg ~> 1.0.5".parse().unwrap();
-        let neorg = LuaPackage::new("neorg".into(), "1.0.4".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "1.0.4".into()).unwrap();
         assert!(!package_req.matches(&neorg));
-        let neorg = LuaPackage::new("neorg".into(), "1.0.5".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "1.0.5".into()).unwrap();
         assert!(package_req.matches(&neorg));
-        let neorg = LuaPackage::new("neorg".into(), "1.0.6".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "1.0.6".into()).unwrap();
         assert!(!package_req.matches(&neorg));
     }
 }

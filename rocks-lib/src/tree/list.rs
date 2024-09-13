@@ -35,7 +35,7 @@ impl<'a> Tree<'a> {
             .flat_map(|(name, versions)| {
                 versions
                     .into_iter()
-                    .map(|version| LuaPackage::new(name.clone(), version))
+                    .map(|version| LuaPackage::parse(name.clone(), version))
                     .collect_vec()
             })
             .try_collect()

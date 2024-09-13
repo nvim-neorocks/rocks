@@ -3,6 +3,7 @@ use std::{cmp::Ordering, fmt::Display, str::FromStr};
 use eyre::Result;
 use html_escape::decode_html_entities;
 use semver::{Error, Version, VersionReq};
+use serde::{de, Deserialize, Deserializer, Serialize};
 
 /// **SemVer version** as defined by <https://semver.org>.
 /// or a **Dev** version, which can be one of "dev", "scm", or "git"
@@ -15,6 +16,28 @@ pub enum PackageVersion {
 impl PackageVersion {
     pub fn parse(text: &str) -> Result<Self> {
         PackageVersion::from_str(text)
+    }
+}
+
+impl Serialize for PackageVersion {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            PackageVersion::SemVer { version } => version.to_string().serialize(serializer),
+            PackageVersion::Dev { name } => name.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for PackageVersion {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(de::Error::custom)
     }
 }
 

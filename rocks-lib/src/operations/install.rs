@@ -1,22 +1,12 @@
 use eyre::Result;
 use tempdir::TempDir;
 
-use crate::{config::Config, lua_package::PackageName, rockspec::Rockspec};
+use crate::{config::Config, lua_package::LuaPackageReq, rockspec::Rockspec};
 
-pub async fn install(
-    rock_name: PackageName,
-    rock_version: Option<String>,
-    config: &Config,
-) -> Result<()> {
-    let temp = TempDir::new(&rock_name.to_string())?;
+pub async fn install(package_req: LuaPackageReq, config: &Config) -> Result<()> {
+    let temp = TempDir::new(&package_req.name().to_string())?;
 
-    let rock = super::download(
-        &rock_name,
-        rock_version.as_ref(),
-        Some(temp.path().to_path_buf()),
-        config,
-    )
-    .await?;
+    let rock = super::download(&package_req, Some(temp.path().to_path_buf()), config).await?;
 
     super::unpack_src_rock(temp.path().join(rock.path), Some(temp.path().to_path_buf()))?;
 

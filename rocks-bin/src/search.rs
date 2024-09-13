@@ -7,16 +7,14 @@ use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
 
 use rocks_lib::{
     config::Config,
-    lua_package::PackageName,
+    lua_package::{LuaPackageReq, PackageName, PackageVersion},
     manifest::{manifest_from_server, ManifestMetadata},
 };
 
 #[derive(Args)]
 pub struct Search {
-    /// Name of the rock to search for.
-    name: PackageName,
-    /// Rocks version to search for.
-    version: Option<String>,
+    #[clap(flatten)]
+    lua_package_req: LuaPackageReq,
     // TODO(vhyrro): Add options.
     /// Return a machine readable format.
     #[arg(long)]
@@ -30,14 +28,23 @@ pub async fn search(data: Search, config: &Config) -> Result<()> {
 
     let metadata = ManifestMetadata::new(&manifest)?;
 
-    let rock_to_version_map: HashMap<&PackageName, Vec<&String>> = metadata
+    let lua_package_req = data.lua_package_req;
+
+    let rock_to_version_map: HashMap<&PackageName, Vec<&PackageVersion>> = metadata
         .repository
         .iter()
-        .filter_map(|(key, value)| {
-            if key.to_string().contains(&data.name.to_string()) {
+        .filter_map(|(name, elements)| {
+            if name
+                .to_string()
+                .contains(&lua_package_req.name().to_string())
+            {
                 Some((
-                    key,
-                    value.keys().sorted_by(|a, b| Ord::cmp(b, a)).collect_vec(),
+                    name,
+                    elements
+                        .keys()
+                        .filter(|version| lua_package_req.version_req().matches(version))
+                        .sorted_by(|a, b| Ord::cmp(b, a))
+                        .collect_vec(),
                 ))
             } else {
                 None
@@ -52,7 +59,7 @@ pub async fn search(data: Search, config: &Config) -> Result<()> {
             let mut tree = StringTreeNode::new(key.to_string().to_owned());
 
             for version in versions {
-                tree.push(version.to_owned());
+                tree.push(version.to_string());
             }
 
             println!("{}", tree.to_string_with_format(&formatting).unwrap());
