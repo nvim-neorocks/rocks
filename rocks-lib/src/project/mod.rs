@@ -1,32 +1,69 @@
 use eyre::Result;
 use lets_find_up::{find_up_with, FindUpKind, FindUpOptions};
-use std::path::PathBuf;
+use std::{
+    borrow::Borrow,
+    path::{Path, PathBuf},
+};
 
+use crate::{config::LuaVersion, rockspec::Rockspec, tree::Tree};
+
+#[derive(Debug)]
 pub struct Project {
     /// The path where the `project.rockspec` resides.
-    pub root: PathBuf,
-    //pub rockspec: Rockspec,
+    root: PathBuf,
+    /// The parsed rockspec.
+    rockspec: Rockspec,
+    /// The tree of the project.
+    tree: Tree,
 }
 
 impl Project {
-    pub fn new(start: Option<PathBuf>) -> Result<Option<Self>> {
+    pub fn current() -> Result<Option<Self>> {
+        Self::from(std::env::current_dir()?)
+    }
+
+    pub fn from(start: PathBuf) -> Result<Option<Self>> {
         match find_up_with(
             "project.rockspec",
             FindUpOptions {
-                cwd: &start.unwrap_or(std::env::current_dir()?),
+                cwd: &start,
                 kind: FindUpKind::File,
             },
         )? {
             Some(path) => {
-                //let content = std::fs::read_to_string(&path)?;
-                //let rockspec = Rockspec::new(&content)?;
+                let rockspec_content = std::fs::read_to_string(&path)?;
+                let rockspec = Rockspec::new(&rockspec_content)?;
+                // NOTE: This will error if the project doesn't specify a Lua dependency.
+                // Should we enforce `lua >= xyz` in our `project.rockspec`s?
+                let lua_version: LuaVersion = rockspec.borrow().try_into()?;
+
+                let root = path.parent().unwrap().to_path_buf().join(".rocks");
+
+                std::fs::create_dir_all(&root)?;
 
                 Ok(Some(Project {
-                    root: path.parent().unwrap().to_path_buf(),
-                    //rockspec,
+                    tree: Tree::new(root.join("tree"), lua_version)?,
+                    root,
+                    rockspec,
                 }))
             }
             None => Ok(None),
         }
     }
 }
+
+impl Project {
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    pub fn rockspec(&self) -> &Rockspec {
+        &self.rockspec
+    }
+
+    pub fn tree(&self) -> &Tree {
+        &self.tree
+    }
+}
+
+// TODO: Add plenty of tests

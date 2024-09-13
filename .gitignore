@@ -13,3 +13,4 @@
 /rocks-lib/proptest-regressions/
 /*.rockspec
 *.snap.new
+/.rocks

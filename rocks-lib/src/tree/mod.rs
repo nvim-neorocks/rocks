@@ -19,11 +19,12 @@ mod list;
 /// - /rocks/<lua-version>/<rock>/src - library code for the rock
 /// - /bin - binary files produced by various rocks
 
-pub struct Tree<'a> {
+#[derive(Debug)]
+pub struct Tree {
     /// The Lua version of the tree.
-    version: &'a LuaVersion,
+    version: LuaVersion,
     /// The root of the tree.
-    root: &'a PathBuf,
+    root: PathBuf,
 }
 
 /// Change-agnostic way of referencing various paths for a rock.
@@ -34,8 +35,8 @@ pub struct RockLayout {
     pub src: PathBuf,
 }
 
-impl<'a> Tree<'a> {
-    pub fn new(root: &'a PathBuf, version: &'a LuaVersion) -> Result<Self> {
+impl Tree {
+    pub fn new(root: PathBuf, version: LuaVersion) -> Result<Self> {
         // Ensure that the root and the version directory exist.
         std::fs::create_dir_all(root.join(version.to_string()))?;
 
@@ -90,7 +91,7 @@ mod tests {
         let tree_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-tree");
 
-        let tree = Tree::new(&tree_path, &LuaVersion::Lua51).unwrap();
+        let tree = Tree::new(tree_path.clone(), LuaVersion::Lua51).unwrap();
 
         let neorg = tree
             .rock(&"neorg".into(), &"8.0.0-1".parse().unwrap())

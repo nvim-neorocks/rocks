@@ -4,7 +4,7 @@ use crate::{
     rockspec::{utils, Build as _, BuildBackendSpec, RockSourceSpec, Rockspec},
     tree::{RockLayout, Tree},
 };
-use eyre::{OptionExt as _, Result};
+use eyre::Result;
 use git2::Repository;
 
 mod builtin;
@@ -62,47 +62,16 @@ pub fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
     // operations in the temporary directory itself and then copy all results over once they've
     // succeeded.
 
-    let lua_dependency = rockspec
-        .dependencies
-        .current_platform()
-        .iter()
-        .find(|val| *val.name() == "lua".into())
-        .map(|dependency| {
-            for (possibility, version) in [
-                ("5.4.0", LuaVersion::Lua54),
-                ("5.3.0", LuaVersion::Lua53),
-                ("5.2.0", LuaVersion::Lua52),
-                ("5.1.0", LuaVersion::Lua51),
-            ] {
-                if dependency
-                    .version_req()
-                    .matches(&possibility.parse().unwrap())
-                {
-                    return version;
-                }
-            }
-
-            unreachable!()
-        });
+    let lua_version = LuaVersion::try_from(&rockspec)?;
 
     let tree = Tree::new(
-        &config.tree,
-        config
-            .lua_version
-            .as_ref()
-            .or(lua_dependency.as_ref())
-            .ok_or_eyre("No Lua version specified!")?,
+        config.tree.clone(),
+        config.lua_version.clone().unwrap_or(lua_version.clone()),
     )?;
 
     let output_paths = tree.rock(&rockspec.package, &rockspec.version)?;
 
-    let lua = LuaInstallation::new(
-        lua_dependency
-            .as_ref()
-            .or(config.lua_version.as_ref())
-            .unwrap(),
-        config,
-    )?;
+    let lua = LuaInstallation::new(config.lua_version.as_ref().unwrap_or(&lua_version), config)?;
 
     install(&rockspec, &tree, &output_paths, &lua)?;
 

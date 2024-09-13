@@ -8,7 +8,7 @@ use crate::lua_package::LuaPackage;
 
 use super::Tree;
 
-impl<'a> Tree<'a> {
+impl Tree {
     pub fn list(&self) -> HashMap<String, Vec<String>> {
         WalkDir::new(self.root())
             .min_depth(1)
@@ -42,10 +42,10 @@ impl<'a> Tree<'a> {
     }
 }
 
-impl<'a> TryFrom<Tree<'a>> for Vec<LuaPackage> {
+impl TryFrom<Tree> for Vec<LuaPackage> {
     type Error = eyre::Report;
 
-    fn try_from(tree: Tree<'a>) -> Result<Self> {
+    fn try_from(tree: Tree) -> Result<Self> {
         tree.into_rock_list()
     }
 }
