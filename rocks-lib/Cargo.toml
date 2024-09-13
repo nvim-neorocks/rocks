@@ -38,6 +38,7 @@ openssl = "0.10.66"
 lua-src = "547.0.0"
 luajit-src = "210.5.10"
 target-lexicon = "0.12.16"
+clap = { version = "4.5.3", features = ["derive"], optional = true}
 
 [dev-dependencies]
 httptest = { version = "0.16.1" }
@@ -48,3 +49,4 @@ insta = "1.39.0"
 
 [features]
 test_nosandbox = [] # Run tests without sandboxing
+clap = ["dep:clap"]

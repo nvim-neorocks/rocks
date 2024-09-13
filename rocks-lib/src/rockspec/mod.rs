@@ -25,7 +25,7 @@ pub struct Rockspec {
     /// The name of the package. Example: "LuaSocket"
     pub package: String,
     /// The version of the package, plus a suffix indicating the revision of the rockspec. Example: "2.0.1-1"
-    pub version: String, // TODO: This shouldn't be stringly typed!
+    pub version: String,
     pub description: RockDescription,
     pub supported_platforms: PlatformSupport,
     pub dependencies: PerPlatform<Vec<LuaPackageReq>>,
@@ -272,19 +272,19 @@ mod tests {
         assert!(!rockspec
             .supported_platforms
             .is_supported(&PlatformIdentifier::Windows));
-        let neorg = LuaPackage::new("neorg".into(), "6.0.0".into()).unwrap();
+        let neorg = LuaPackage::parse("neorg".into(), "6.0.0".into()).unwrap();
         assert!(rockspec
             .dependencies
             .default
             .into_iter()
             .any(|dep| dep.matches(&neorg)));
-        let foo = LuaPackage::new("foo".into(), "1.0.0".into()).unwrap();
+        let foo = LuaPackage::parse("foo".into(), "1.0.0".into()).unwrap();
         assert!(rockspec
             .build_dependencies
             .default
             .into_iter()
             .any(|dep| dep.matches(&foo)));
-        let busted = LuaPackage::new("busted".into(), "2.2.0".into()).unwrap();
+        let busted = LuaPackage::parse("busted".into(), "2.2.0".into()).unwrap();
         assert_eq!(
             *rockspec.external_dependencies.default.get("FOO").unwrap(),
             ExternalDependency::Header("foo.h".into())
@@ -586,9 +586,9 @@ mod tests {
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
-        let neorg_override = LuaPackage::new("neorg".into(), "5.0.0".into()).unwrap();
-        let toml_edit = LuaPackage::new("toml-edit".into(), "1.0.0".into()).unwrap();
-        let toml = LuaPackage::new("toml".into(), "1.0.0".into()).unwrap();
+        let neorg_override = LuaPackage::parse("neorg".into(), "5.0.0".into()).unwrap();
+        let toml_edit = LuaPackage::parse("toml-edit".into(), "1.0.0".into()).unwrap();
+        let toml = LuaPackage::parse("toml".into(), "1.0.0".into()).unwrap();
         assert_eq!(rockspec.dependencies.default.len(), 2);
         let per_platform = &rockspec.dependencies.per_platform;
         assert_eq!(

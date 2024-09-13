@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Args;
 use eyre::Result;
-use rocks_lib::{config::Config, lua_package::PackageName};
+use rocks_lib::{config::Config, lua_package::LuaPackageReq};
 
 #[derive(Args)]
 pub struct Unpack {
@@ -14,10 +14,8 @@ pub struct Unpack {
 
 #[derive(Args)]
 pub struct UnpackRemote {
-    /// The name of the rock to unpack
-    name: PackageName,
-    /// The version of the rock to download (defaults to latest version)
-    version: Option<String>,
+    #[clap(flatten)]
+    package_req: LuaPackageReq,
     /// The directory to unpack to
     path: Option<PathBuf>,
 
@@ -37,10 +35,10 @@ pub async fn unpack(data: Unpack) -> Result<()> {
 }
 
 pub async fn unpack_remote(data: UnpackRemote, config: &Config) -> Result<()> {
-    println!("Downloading {}...", data.name);
+    let package_req = data.package_req;
+    println!("Downloading {}...", package_req.name());
 
-    let rock =
-        rocks_lib::operations::download(&data.name, data.version.as_ref(), None, config).await?;
+    let rock = rocks_lib::operations::download(&package_req, None, config).await?;
 
     println!("Unpacking {}...", rock.path.display());
 

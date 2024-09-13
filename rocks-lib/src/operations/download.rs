@@ -2,17 +2,19 @@ use std::path::PathBuf;
 
 use eyre::{eyre, Result};
 
-use crate::{config::Config, lua_package::PackageName};
+use crate::{
+    config::Config,
+    lua_package::{LuaPackageReq, PackageName, PackageVersion},
+};
 
 pub struct DownloadedRock {
     pub name: PackageName,
-    pub version: String,
+    pub version: PackageVersion,
     pub path: PathBuf,
 }
 
 pub async fn download(
-    rock_name: &PackageName,
-    rock_version: Option<&String>,
+    package_req: &LuaPackageReq,
     destination_dir: Option<PathBuf>,
     config: &Config,
 ) -> Result<DownloadedRock> {
@@ -20,16 +22,17 @@ pub async fn download(
 
     let manifest = crate::manifest::ManifestMetadata::from_config(config).await?;
 
-    if !manifest.has_rock(rock_name) {
+    if !manifest.has_rock(package_req.name()) {
         return Err(eyre!(format!(
             "Rock '{}' does not exist on {}'s manifest.",
-            rock_name, config.server
+            package_req.name(),
+            config.server
         )));
     }
 
-    let rock_version = rock_version.unwrap_or_else(|| manifest.latest_version(rock_name).unwrap());
+    let package = manifest.latest_match(package_req).unwrap();
 
-    let full_rock_name = format!("{}-{}.src.rock", rock_name, rock_version);
+    let full_rock_name = format!("{}-{}.src.rock", package.name(), package.version());
 
     let rock = reqwest::get(format!("{}/{}", config.server, full_rock_name))
         .await?
@@ -44,8 +47,8 @@ pub async fn download(
     )?;
 
     Ok(DownloadedRock {
-        name: rock_name.clone(),
-        version: rock_version.clone(),
+        name: package.name().to_owned(),
+        version: package.version().to_owned(),
         path: full_rock_name.into(),
     })
 }
