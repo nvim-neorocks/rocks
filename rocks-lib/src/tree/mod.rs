@@ -126,7 +126,7 @@ mod tests {
         let tree_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-tree");
 
-        let tree = Tree::new(&tree_path, &LuaVersion::Lua51).unwrap();
+        let tree = Tree::new(tree_path, LuaVersion::Lua51).unwrap();
 
         assert_yaml_snapshot!(tree.list(), { "." => sorted_redaction() })
     }
