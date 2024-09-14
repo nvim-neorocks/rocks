@@ -16,7 +16,10 @@ pub use platform::*;
 pub use rock_source::*;
 pub use test_spec::*;
 
-use crate::lua_package::{LuaPackageReq, PackageName, PackageVersion};
+use crate::{
+    config::LuaVersion,
+    lua_package::{LuaPackageReq, PackageName, PackageVersion},
+};
 
 #[derive(Debug)]
 pub struct Rockspec {
@@ -80,6 +83,27 @@ impl Rockspec {
             }
         }
         Ok(rockspec)
+    }
+
+    pub fn lua_version(&self) -> Option<LuaVersion> {
+        self.dependencies
+            .current_platform()
+            .iter()
+            .find(|val| *val.name() == "lua".into())
+            .and_then(|lua| {
+                for (possibility, version) in [
+                    ("5.4.0", LuaVersion::Lua54),
+                    ("5.3.0", LuaVersion::Lua53),
+                    ("5.2.0", LuaVersion::Lua52),
+                    ("5.1.0", LuaVersion::Lua51),
+                ] {
+                    if lua.version_req().matches(&possibility.parse().unwrap()) {
+                        return Some(version);
+                    }
+                }
+
+                None
+            })
     }
 }
 

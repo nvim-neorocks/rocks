@@ -1,8 +1,8 @@
 use directories::ProjectDirs;
-use eyre::{eyre, OptionExt as _, Result};
+use eyre::{eyre, Result};
 use std::{fmt::Display, path::PathBuf, str::FromStr, time::Duration};
 
-use crate::{project::Project, rockspec::Rockspec};
+use crate::project::Project;
 
 #[derive(Debug, Clone)]
 pub enum LuaVersion {
@@ -32,32 +32,6 @@ impl FromStr for LuaVersion {
                     .into(),
             ),
         }
-    }
-}
-
-impl TryFrom<&Rockspec> for LuaVersion {
-    type Error = eyre::Report;
-
-    fn try_from(rockspec: &Rockspec) -> std::result::Result<Self, Self::Error> {
-        let lua = rockspec
-            .dependencies
-            .current_platform()
-            .iter()
-            .find(|val| *val.name() == "lua".into())
-            .ok_or_eyre("no `lua` dependency found!")?;
-
-        for (possibility, version) in [
-            ("5.4.0", LuaVersion::Lua54),
-            ("5.3.0", LuaVersion::Lua53),
-            ("5.2.0", LuaVersion::Lua52),
-            ("5.1.0", LuaVersion::Lua51),
-        ] {
-            if lua.version_req().matches(&possibility.parse().unwrap()) {
-                return Ok(version);
-            }
-        }
-
-        Err(eyre!("no valid matches for `lua` found!"))
     }
 }
 
@@ -187,9 +161,7 @@ impl Default for Config {
             lua_dir: data_path.join("lua"),
             lua_version: current_project
                 .as_ref()
-                .map(|project| LuaVersion::try_from(project.rockspec()))
-                .transpose()
-                .unwrap(),
+                .and_then(|project| project.rockspec().lua_version()),
             tree: current_project
                 .as_ref()
                 .map(|project| project.root().join("tree"))
