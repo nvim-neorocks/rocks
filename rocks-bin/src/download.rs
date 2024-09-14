@@ -8,10 +8,10 @@ pub struct Download {
     package_req: LuaPackageReq,
 }
 
-pub async fn download(dl_data: Download, config: &Config) -> Result<()> {
+pub async fn download(dl_data: Download, config: Config) -> Result<()> {
     println!("Downloading {}...", dl_data.package_req.name());
 
-    let rock = rocks_lib::operations::download(&dl_data.package_req, None, config).await?;
+    let rock = rocks_lib::operations::download(&dl_data.package_req, None, &config).await?;
 
     println!("Succesfully downloaded {}@{}", rock.name, rock.version);
 

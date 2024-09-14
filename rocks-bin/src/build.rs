@@ -11,7 +11,7 @@ pub struct Build {
     rockspec_path: Option<PathBuf>,
 }
 
-pub fn build(data: Build, config: &Config) -> Result<()> {
+pub fn build(data: Build, config: Config) -> Result<()> {
     let rockspec_path = data.rockspec_path.map_or_else(|| {
         // Try to infer the rockspec the user meant.
 
@@ -48,7 +48,7 @@ pub fn build(data: Build, config: &Config) -> Result<()> {
     let rockspec = std::fs::read_to_string(rockspec_path)?;
     let rockspec = Rockspec::new(&rockspec)?;
 
-    rocks_lib::build::build(rockspec, config)?;
+    rocks_lib::build::build(rockspec, &config)?;
 
     Ok(())
 }
