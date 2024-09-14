@@ -12,8 +12,11 @@ pub struct ListCmd {
 
 pub fn list_installed(list_data: ListCmd, config: Config) -> Result<()> {
     let tree = Tree::new(
-        config.tree,
-        config.lua_version.ok_or_eyre("lua version not supplied!")?,
+        config.tree().clone(),
+        config
+            .lua_version()
+            .cloned()
+            .ok_or_eyre("lua version not supplied!")?,
     )?;
     let available_rocks = tree.list();
 

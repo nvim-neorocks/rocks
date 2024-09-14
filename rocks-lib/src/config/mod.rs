@@ -19,7 +19,7 @@ pub enum LuaVersion {
 impl FromStr for LuaVersion {
     type Err = String;
 
-    fn from_str(s: &str) -> std::prelude::v1::Result<Self, Self::Err> {
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "5.1" | "51" => Ok(LuaVersion::Lua51),
             "5.2" | "52" => Ok(LuaVersion::Lua52),
@@ -50,20 +50,24 @@ impl Display for LuaVersion {
 
 // TODO: Make all fields private and add getters that return references to the data - they needn't be modified at runtime.
 pub struct Config {
-    pub enable_development_rockspecs: bool,
-    pub server: String,
-    pub only_server: Option<String>,
-    pub only_sources: Option<String>,
-    pub namespace: String,
-    pub lua_dir: PathBuf,
-    pub lua_version: Option<LuaVersion>,
-    pub tree: PathBuf,
-    pub no_project: bool,
-    pub verbose: bool,
-    pub timeout: Duration,
+    enable_development_rockspecs: bool,
+    server: String,
+    only_server: Option<String>,
+    only_sources: Option<String>,
+    namespace: String,
+    lua_dir: PathBuf,
+    lua_version: Option<LuaVersion>,
+    tree: PathBuf,
+    no_project: bool,
+    verbose: bool,
+    timeout: Duration,
 }
 
 impl Config {
+    pub fn new() -> ConfigBuilder {
+        ConfigBuilder::default()
+    }
+
     pub fn get_project_dirs() -> Result<ProjectDirs> {
         directories::ProjectDirs::from("org", "neorocks", "rocks")
             .ok_or(eyre!("Could not find a valid home directory"))
@@ -81,95 +85,156 @@ impl Config {
 }
 
 impl Config {
-    pub fn new() -> Config {
-        Config::default()
+    pub fn dev(&self) -> bool {
+        self.enable_development_rockspecs
     }
 
-    pub fn dev(self, dev: bool) -> Config {
-        Config {
+    pub fn server(&self) -> &String {
+        &self.server
+    }
+
+    pub fn only_server(&self) -> Option<&String> {
+        self.only_server.as_ref()
+    }
+
+    pub fn only_sources(&self) -> Option<&String> {
+        self.only_sources.as_ref()
+    }
+
+    pub fn namespace(&self) -> &String {
+        &self.namespace
+    }
+
+    pub fn lua_dir(&self) -> &PathBuf {
+        &self.lua_dir
+    }
+
+    pub fn lua_version(&self) -> Option<&LuaVersion> {
+        self.lua_version.as_ref()
+    }
+
+    // TODO(vhyrro): Return `&Tree` instead
+    pub fn tree(&self) -> &PathBuf {
+        &self.tree
+    }
+
+    pub fn no_project(&self) -> bool {
+        self.no_project
+    }
+
+    pub fn verbose(&self) -> bool {
+        self.verbose
+    }
+
+    pub fn timeout(&self) -> &Duration {
+        &self.timeout
+    }
+}
+
+#[derive(Default)]
+pub struct ConfigBuilder {
+    enable_development_rockspecs: Option<bool>,
+    server: Option<String>,
+    only_server: Option<String>,
+    only_sources: Option<String>,
+    namespace: Option<String>,
+    lua_dir: Option<PathBuf>,
+    lua_version: Option<LuaVersion>,
+    tree: Option<PathBuf>,
+    no_project: Option<bool>,
+    verbose: Option<bool>,
+    timeout: Option<Duration>,
+}
+
+impl ConfigBuilder {
+    pub fn dev(self, dev: Option<bool>) -> ConfigBuilder {
+        ConfigBuilder {
             enable_development_rockspecs: dev,
             ..self
         }
     }
 
-    pub fn server(self, server: String) -> Config {
-        Config { server, ..self }
+    pub fn server(self, server: Option<String>) -> ConfigBuilder {
+        ConfigBuilder { server, ..self }
     }
 
-    pub fn only_server(self, server: String) -> Config {
-        Config {
-            only_server: Some(server.clone()),
+    pub fn only_server(self, server: Option<String>) -> ConfigBuilder {
+        ConfigBuilder {
+            only_server: server.clone(),
             server,
             ..self
         }
     }
 
-    pub fn only_sources(self, sources: String) -> Config {
-        Config {
-            only_sources: Some(sources),
+    pub fn only_sources(self, sources: Option<String>) -> ConfigBuilder {
+        ConfigBuilder {
+            only_sources: sources,
             ..self
         }
     }
 
-    pub fn namespace(self, namespace: String) -> Config {
-        Config { namespace, ..self }
+    pub fn namespace(self, namespace: Option<String>) -> ConfigBuilder {
+        ConfigBuilder { namespace, ..self }
     }
 
-    pub fn lua_dir(self, lua_dir: PathBuf) -> Config {
-        Config { lua_dir, ..self }
+    pub fn lua_dir(self, lua_dir: Option<PathBuf>) -> ConfigBuilder {
+        ConfigBuilder { lua_dir, ..self }
     }
 
-    pub fn lua_version(self, lua_version: LuaVersion) -> Config {
-        Config {
-            lua_version: Some(lua_version),
+    pub fn lua_version(self, lua_version: Option<LuaVersion>) -> ConfigBuilder {
+        ConfigBuilder {
+            lua_version,
             ..self
         }
     }
 
-    pub fn tree(self, tree: PathBuf) -> Config {
-        Config { tree, ..self }
+    pub fn tree(self, tree: Option<PathBuf>) -> ConfigBuilder {
+        ConfigBuilder { tree, ..self }
     }
 
-    pub fn no_project(self, no_project: bool) -> Config {
-        Config { no_project, ..self }
+    pub fn no_project(self, no_project: Option<bool>) -> ConfigBuilder {
+        ConfigBuilder { no_project, ..self }
     }
 
-    pub fn verbose(self, verbose: bool) -> Config {
-        Config { verbose, ..self }
+    pub fn verbose(self, verbose: Option<bool>) -> ConfigBuilder {
+        ConfigBuilder { verbose, ..self }
     }
 
-    pub fn timeout(self, timeout: Option<Duration>) -> Config {
-        Config {
-            timeout: timeout.unwrap_or_else(|| Config::default().timeout),
-            ..self
-        }
+    pub fn timeout(self, timeout: Option<Duration>) -> ConfigBuilder {
+        ConfigBuilder { timeout, ..self }
     }
-}
 
-impl Default for Config {
-    fn default() -> Config {
-        // TODO: Remove these unwraps
-        let data_path = Config::get_default_data_path().unwrap();
-        let current_project = Project::current().unwrap();
+    pub fn build(self) -> Result<Config> {
+        let data_path = Config::get_default_data_path()?;
+        let current_project = Project::current()?;
 
-        Config {
-            enable_development_rockspecs: false,
-            server: "https://luarocks.org/".into(),
-            only_server: None,
-            only_sources: None,
-            namespace: "".into(),
-            lua_dir: data_path.join("lua"),
-            lua_version: current_project
+        Ok(Config {
+            enable_development_rockspecs: self.enable_development_rockspecs.unwrap_or(false),
+            server: self
+                .server
+                .unwrap_or_else(|| "https://luarocks.org/".to_string()),
+            only_server: self.only_server,
+            only_sources: self.only_sources,
+            namespace: self.namespace.unwrap_or_else(|| "".to_string()),
+            lua_dir: self.lua_dir.unwrap_or_else(|| data_path.join("lua")),
+            lua_version: self.lua_version.or(current_project
                 .as_ref()
-                .and_then(|project| project.rockspec().lua_version()),
-            tree: current_project
-                .as_ref()
-                .map(|project| project.root().join("tree"))
-                .unwrap_or(data_path)
-                .to_path_buf(),
-            no_project: false,
-            verbose: false,
-            timeout: Duration::from_secs(30),
-        }
+                .and_then(|project| project.rockspec().lua_version())),
+            tree: self
+                .tree
+                .or_else(|| {
+                    if self.no_project.unwrap_or(false) {
+                        None
+                    } else {
+                        current_project
+                            .as_ref()
+                            .map(|project| project.root().join("tree"))
+                    }
+                })
+                .unwrap_or(data_path),
+            no_project: self.no_project.unwrap_or(false),
+            verbose: self.verbose.unwrap_or(false),
+            timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(30)),
+        })
     }
 }

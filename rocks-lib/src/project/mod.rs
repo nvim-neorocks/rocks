@@ -1,8 +1,6 @@
 use eyre::Result;
 use lets_find_up::{find_up_with, FindUpKind, FindUpOptions};
-use std::
-    path::{Path, PathBuf}
-;
+use std::path::{Path, PathBuf};
 
 use crate::{config::LuaVersion, rockspec::Rockspec, tree::Tree};
 
@@ -35,10 +33,7 @@ impl Project {
 
                 std::fs::create_dir_all(&root)?;
 
-                Ok(Some(Project {
-                    root,
-                    rockspec,
-                }))
+                Ok(Some(Project { root, rockspec }))
             }
             None => Ok(None),
         }

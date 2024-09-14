@@ -4,7 +4,7 @@ use crate::{
     rockspec::{utils, Build as _, BuildBackendSpec, RockSourceSpec, Rockspec},
     tree::{RockLayout, Tree},
 };
-use eyre::{OptionExt, Result};
+use eyre::{OptionExt as _, Result};
 use git2::Repository;
 
 mod builtin;
@@ -64,16 +64,19 @@ pub fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
 
     // TODO(vhyrro): Create a unified way of accessing the Lua version with centralized error
     // handling.
-    let lua_version = config.lua_version.clone().or(rockspec.lua_version()).ok_or_eyre("lua version not set! Please provide a version through `--lua-version <ver>`")?;
+    let rockspec_version = rockspec.lua_version();
+    let lua_version = config
+        .lua_version()
+        .or(rockspec_version.as_ref())
+        .ok_or_eyre(
+            "lua version not set! Please provide a version through `--lua-version <ver>`",
+        )?;
 
-    let tree = Tree::new(
-        config.tree.clone(),
-        lua_version.clone(),
-    )?;
+    let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
 
     let output_paths = tree.rock(&rockspec.package, &rockspec.version)?;
 
-    let lua = LuaInstallation::new(config.lua_version.as_ref().unwrap_or(&lua_version), config)?;
+    let lua = LuaInstallation::new(lua_version, config)?;
 
     install(&rockspec, &tree, &output_paths, &lua)?;
 

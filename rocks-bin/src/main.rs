@@ -142,23 +142,23 @@ enum Commands {
 async fn main() {
     let cli = Cli::parse();
 
-    let default_config = Config::default();
-    let config = Config {
-        enable_development_rockspecs: cli.dev,
-        lua_dir: cli.lua_dir.unwrap_or(default_config.lua_dir),
-        lua_version: cli.lua_version.or(default_config.lua_version),
-        namespace: cli.namespace.unwrap_or(default_config.namespace),
-        only_server: cli.only_server.or(default_config.only_server),
-        only_sources: cli.only_sources.or(default_config.only_sources),
-        server: cli.server.unwrap_or(default_config.server),
-        tree: cli.tree.unwrap_or(default_config.tree),
-        timeout: cli
-            .timeout
-            .map(|duration| Duration::from_secs(duration as u64))
-            .unwrap_or(default_config.timeout),
-        no_project: cli.no_project,
-        verbose: cli.verbose,
-    };
+    let config = Config::new()
+        .dev(Some(cli.dev))
+        .lua_dir(cli.lua_dir)
+        .lua_version(cli.lua_version)
+        .namespace(cli.namespace)
+        .only_server(cli.only_server)
+        .only_sources(cli.only_sources)
+        .server(cli.server)
+        .tree(cli.tree)
+        .timeout(
+            cli.timeout
+                .map(|duration| Duration::from_secs(duration as u64)),
+        )
+        .no_project(Some(cli.no_project))
+        .verbose(Some(cli.verbose))
+        .build()
+        .unwrap();
 
     match cli.command {
         Some(command) => match command {
