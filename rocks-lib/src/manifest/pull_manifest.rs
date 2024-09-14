@@ -61,6 +61,8 @@ mod tests {
     use httptest::{matchers::*, responders::*, Expectation, Server};
     use serial_test::serial;
 
+    use crate::config::ConfigBuilder;
+
     use super::*;
 
     fn reset_cache() {
@@ -91,7 +93,7 @@ mod tests {
         let server = start_test_server("manifest".into());
         let mut url_str = server.url_str(""); // Remove trailing "/"
         url_str.pop();
-        let config = Config::new().build().unwrap();
+        let config = ConfigBuilder::new().build().unwrap();
         manifest_from_server(url_str, &config).await.unwrap();
     }
 
@@ -103,7 +105,7 @@ mod tests {
         let mut url_str = server.url_str(""); // Remove trailing "/"
         url_str.pop();
 
-        let config = Config::new()
+        let config = ConfigBuilder::new()
             .lua_version(Some(crate::config::LuaVersion::Lua51))
             .build()
             .unwrap();
@@ -119,7 +121,7 @@ mod tests {
         let mut url_str = server.url_str(""); // Remove trailing "/"
         url_str.pop();
         let manifest_content = "dummy data";
-        let config = Config::new().build().unwrap();
+        let config = ConfigBuilder::new().build().unwrap();
         let cache_dir = Config::get_default_cache_path().unwrap();
         let cache = cache_dir.join("manifest");
         fs::write(&cache, manifest_content).unwrap();
