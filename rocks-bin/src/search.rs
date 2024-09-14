@@ -21,10 +21,10 @@ pub struct Search {
     porcelain: bool,
 }
 
-pub async fn search(data: Search, config: &Config) -> Result<()> {
+pub async fn search(data: Search, config: Config) -> Result<()> {
     let formatting = TreeFormatting::dir_tree(FormatCharacters::box_chars());
 
-    let manifest = manifest_from_server(config.server.to_owned(), config).await?;
+    let manifest = manifest_from_server(config.server.to_owned(), &config).await?;
 
     let metadata = ManifestMetadata::new(&manifest)?;
 

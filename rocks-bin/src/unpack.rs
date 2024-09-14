@@ -34,11 +34,11 @@ pub async fn unpack(data: Unpack) -> Result<()> {
     Ok(())
 }
 
-pub async fn unpack_remote(data: UnpackRemote, config: &Config) -> Result<()> {
+pub async fn unpack_remote(data: UnpackRemote, config: Config) -> Result<()> {
     let package_req = data.package_req;
     println!("Downloading {}...", package_req.name());
 
-    let rock = rocks_lib::operations::download(&package_req, None, config).await?;
+    let rock = rocks_lib::operations::download(&package_req, None, &config).await?;
 
     println!("Unpacking {}...", rock.path.display());
 

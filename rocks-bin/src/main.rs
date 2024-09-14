@@ -162,26 +162,26 @@ async fn main() {
 
     match cli.command {
         Some(command) => match command {
-            Commands::Search(search_data) => search::search(search_data, &config).await.unwrap(),
+            Commands::Search(search_data) => search::search(search_data, config).await.unwrap(),
             Commands::Download(download_data) => {
-                download::download(download_data, &config).await.unwrap()
+                download::download(download_data, config).await.unwrap()
             }
             Commands::Debug(debug) => match debug {
                 Debug::Unpack(unpack_data) => unpack::unpack(unpack_data).await.unwrap(),
                 Debug::UnpackRemote(unpack_data) => {
-                    unpack::unpack_remote(unpack_data, &config).await.unwrap()
+                    unpack::unpack_remote(unpack_data, config).await.unwrap()
                 }
             },
             Commands::New(project_data) => project::write_new::write_project_rockspec(project_data)
                 .await
                 .unwrap(),
-            Commands::Build(build_data) => build::build(build_data, &config).unwrap(),
+            Commands::Build(build_data) => build::build(build_data, config).unwrap(),
             Commands::List(list_data) => list::list_installed(list_data, config).unwrap(),
             Commands::Install(install_data) => {
-                install::install(install_data, &config).await.unwrap()
+                install::install(install_data, config).await.unwrap()
             }
             Commands::Outdated(outdated) => outdated::outdated(outdated, config).await.unwrap(),
-            Commands::InstallLua => install_lua::install_lua(&config).unwrap(),
+            Commands::InstallLua => install_lua::install_lua(config).unwrap(),
             _ => unimplemented!(),
         },
         None => {

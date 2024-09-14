@@ -7,7 +7,7 @@ pub struct Install {
     package_req: LuaPackageReq,
 }
 
-pub async fn install(install_data: Install, config: &Config) -> Result<()> {
+pub async fn install(install_data: Install, config: Config) -> Result<()> {
     // TODO(vhyrro): If the tree doesn't exist then error out.
-    rocks_lib::operations::install(install_data.package_req, config).await
+    rocks_lib::operations::install(install_data.package_req, &config).await
 }
