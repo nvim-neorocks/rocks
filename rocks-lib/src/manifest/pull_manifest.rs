@@ -8,8 +8,7 @@ use crate::config::Config;
 pub async fn manifest_from_server(url: String, config: &Config) -> Result<String> {
     let manifest_filename = "manifest".to_string()
         + &config
-            .lua_version
-            .as_ref()
+            .lua_version()
             .map(|s| format!("-{}", s))
             .unwrap_or_default();
     let url = url.trim_end_matches('/').to_string() + "/" + &manifest_filename;
@@ -92,7 +91,7 @@ mod tests {
         let server = start_test_server("manifest".into());
         let mut url_str = server.url_str(""); // Remove trailing "/"
         url_str.pop();
-        let config = Config::default();
+        let config = Config::new().build().unwrap();
         manifest_from_server(url_str, &config).await.unwrap();
     }
 
@@ -104,10 +103,10 @@ mod tests {
         let mut url_str = server.url_str(""); // Remove trailing "/"
         url_str.pop();
 
-        let config = Config {
-            lua_version: Some(crate::config::LuaVersion::Lua51),
-            ..Config::default()
-        };
+        let config = Config::new()
+            .lua_version(Some(crate::config::LuaVersion::Lua51))
+            .build()
+            .unwrap();
 
         manifest_from_server(url_str, &config).await.unwrap();
     }
@@ -120,7 +119,7 @@ mod tests {
         let mut url_str = server.url_str(""); // Remove trailing "/"
         url_str.pop();
         let manifest_content = "dummy data";
-        let config = Config::default();
+        let config = Config::new().build().unwrap();
         let cache_dir = Config::get_default_cache_path().unwrap();
         let cache = cache_dir.join("manifest");
         fs::write(&cache, manifest_content).unwrap();

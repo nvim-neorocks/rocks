@@ -26,7 +26,7 @@ pub async fn download(
         return Err(eyre!(format!(
             "Rock '{}' does not exist on {}'s manifest.",
             package_req.name(),
-            config.server
+            config.server()
         )));
     }
 
@@ -34,7 +34,7 @@ pub async fn download(
 
     let full_rock_name = format!("{}-{}.src.rock", package.name(), package.version());
 
-    let rock = reqwest::get(format!("{}/{}", config.server, full_rock_name))
+    let rock = reqwest::get(format!("{}/{}", config.server(), full_rock_name))
         .await?
         .bytes()
         .await?;

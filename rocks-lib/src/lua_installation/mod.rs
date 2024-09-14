@@ -65,6 +65,6 @@ impl LuaInstallation {
     }
 
     pub fn path(version: &LuaVersion, config: &Config) -> Result<PathBuf> {
-        Ok(config.lua_dir.join(version.to_string()))
+        Ok(config.lua_dir().join(version.to_string()))
     }
 }
