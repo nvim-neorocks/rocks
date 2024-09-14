@@ -2,6 +2,7 @@ use std::{cmp::Ordering, fmt::Display, str::FromStr};
 
 use eyre::Result;
 use html_escape::decode_html_entities;
+use mlua::FromLua;
 use semver::{Error, Version, VersionReq};
 use serde::{de, Deserialize, Deserializer, Serialize};
 
@@ -38,6 +39,16 @@ impl<'de> Deserialize<'de> for PackageVersion {
     {
         let s = String::deserialize(deserializer)?;
         Self::from_str(&s).map_err(de::Error::custom)
+    }
+}
+
+impl<'lua> FromLua<'lua> for PackageVersion {
+    fn from_lua(
+        value: mlua::prelude::LuaValue<'lua>,
+        lua: &'lua mlua::prelude::Lua,
+    ) -> mlua::prelude::LuaResult<Self> {
+        let s = String::from_lua(value, lua)?;
+        Self::from_str(&s).map_err(|err| mlua::Error::DeserializeError(err.to_string()))
     }
 }
 

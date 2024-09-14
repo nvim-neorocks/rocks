@@ -34,7 +34,7 @@ fn install(
 
 pub fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
     // TODO(vhyrro): Use a more serious isolation strategy here.
-    let temp_dir = tempdir::TempDir::new(&rockspec.package)?;
+    let temp_dir = tempdir::TempDir::new(&rockspec.package.to_string())?;
 
     let previous_dir = std::env::current_dir()?;
 
