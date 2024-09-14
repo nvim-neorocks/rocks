@@ -1,9 +1,8 @@
 use eyre::Result;
 use lets_find_up::{find_up_with, FindUpKind, FindUpOptions};
-use std::{
-    borrow::Borrow,
-    path::{Path, PathBuf},
-};
+use std::
+    path::{Path, PathBuf}
+;
 
 use crate::{config::LuaVersion, rockspec::Rockspec, tree::Tree};
 
@@ -13,8 +12,6 @@ pub struct Project {
     root: PathBuf,
     /// The parsed rockspec.
     rockspec: Rockspec,
-    /// The tree of the project.
-    tree: Tree,
 }
 
 impl Project {
@@ -33,16 +30,12 @@ impl Project {
             Some(path) => {
                 let rockspec_content = std::fs::read_to_string(&path)?;
                 let rockspec = Rockspec::new(&rockspec_content)?;
-                // NOTE: This will error if the project doesn't specify a Lua dependency.
-                // Should we enforce `lua >= xyz` in our `project.rockspec`s?
-                let lua_version: LuaVersion = rockspec.borrow().try_into()?;
 
                 let root = path.parent().unwrap().to_path_buf().join(".rocks");
 
                 std::fs::create_dir_all(&root)?;
 
                 Ok(Some(Project {
-                    tree: Tree::new(root.join("tree"), lua_version)?,
                     root,
                     rockspec,
                 }))
@@ -61,8 +54,8 @@ impl Project {
         &self.rockspec
     }
 
-    pub fn tree(&self) -> &Tree {
-        &self.tree
+    pub fn tree(&self, lua_version: LuaVersion) -> Result<Tree> {
+        Tree::new(self.root.clone(), lua_version)
     }
 }
 
