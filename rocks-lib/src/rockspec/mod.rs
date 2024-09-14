@@ -4,11 +4,11 @@ mod platform;
 mod rock_source;
 mod test_spec;
 
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use eyre::{eyre, Result};
-use mlua::{Lua, LuaSerdeExt, Value};
-use serde::{de::DeserializeOwned, Deserialize};
+use mlua::{FromLua, Lua, LuaSerdeExt, Value};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 pub use build::*;
 pub use dependency::*;
@@ -16,16 +16,16 @@ pub use platform::*;
 pub use rock_source::*;
 pub use test_spec::*;
 
-use crate::lua_package::LuaPackageReq;
+use crate::lua_package::{LuaPackageReq, PackageName, PackageVersion};
 
 #[derive(Debug)]
 pub struct Rockspec {
     /// The file format version. Example: "1.0"
-    pub rockspec_format: Option<String>,
-    /// The name of the package. Example: "LuaSocket"
-    pub package: String,
+    pub rockspec_format: Option<RockspecFormat>,
+    /// The name of the package. Example: "luasocket"
+    pub package: PackageName,
     /// The version of the package, plus a suffix indicating the revision of the rockspec. Example: "2.0.1-1"
-    pub version: String,
+    pub version: PackageVersion,
     pub description: RockDescription,
     pub supported_platforms: PlatformSupport,
     pub dependencies: PerPlatform<Vec<LuaPackageReq>>,
@@ -102,6 +102,45 @@ pub struct RockDescription {
     pub labels: Vec<String>,
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RockspecFormat {
+    #[serde(rename = "1.0")]
+    _1_0,
+    #[serde(rename = "2.0")]
+    _2_0,
+    #[serde(rename = "3.0")]
+    _3_0,
+}
+
+impl FromStr for RockspecFormat {
+    type Err = eyre::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "1.0" => Ok(Self::_1_0),
+            "2.0" => Ok(Self::_2_0),
+            "3.0" => Ok(Self::_3_0),
+            txt => Err(eyre!("Invalid rockspec format: {}", txt)),
+        }
+    }
+}
+
+impl From<&str> for RockspecFormat {
+    fn from(s: &str) -> Self {
+        Self::from_str(s).unwrap()
+    }
+}
+
+impl<'lua> FromLua<'lua> for RockspecFormat {
+    fn from_lua(
+        value: mlua::prelude::LuaValue<'lua>,
+        lua: &'lua mlua::prelude::Lua,
+    ) -> mlua::prelude::LuaResult<Self> {
+        let s = String::from_lua(value, lua)?;
+        Self::from_str(&s).map_err(|err| mlua::Error::DeserializeError(err.to_string()))
+    }
+}
+
 fn parse_lua_tbl_or_default<T>(lua: &Lua, lua_var_name: &str) -> Result<T>
 where
     T: Default,
@@ -142,8 +181,8 @@ mod tests {
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert_eq!(rockspec.rockspec_format, Some("1.0".into()));
-        assert_eq!(rockspec.package, "foo");
-        assert_eq!(rockspec.version, "1.0.0-1");
+        assert_eq!(rockspec.package, "foo".into());
+        assert_eq!(rockspec.version, "1.0.0-1".parse().unwrap());
         assert_eq!(rockspec.description, RockDescription::default());
 
         let rockspec_content = "
@@ -157,8 +196,8 @@ mod tests {
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert_eq!(rockspec.rockspec_format, None);
-        assert_eq!(rockspec.package, "bar");
-        assert_eq!(rockspec.version, "2.0.0-1");
+        assert_eq!(rockspec.package, "bar".into());
+        assert_eq!(rockspec.version, "2.0.0-1".parse().unwrap());
         assert_eq!(rockspec.description, RockDescription::default());
 
         let rockspec_content = "
@@ -179,8 +218,8 @@ mod tests {
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert_eq!(rockspec.rockspec_format, None);
-        assert_eq!(rockspec.package, "rocks");
-        assert_eq!(rockspec.version, "3.0.0-1");
+        assert_eq!(rockspec.package, "rocks".into());
+        assert_eq!(rockspec.version, "3.0.0-1".parse().unwrap());
         let expected_description = RockDescription {
             summary: Some("some summary".into()),
             detailed: Some("some detailed description".into()),
@@ -212,8 +251,8 @@ mod tests {
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert_eq!(rockspec.rockspec_format, None);
-        assert_eq!(rockspec.package, "rocks");
-        assert_eq!(rockspec.version, "3.0.0-1");
+        assert_eq!(rockspec.package, "rocks".into());
+        assert_eq!(rockspec.version, "3.0.0-1".parse().unwrap());
         let expected_description = RockDescription {
             summary: Some("some summary".into()),
             detailed: Some("some detailed description".into()),
@@ -254,8 +293,8 @@ mod tests {
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert_eq!(rockspec.rockspec_format, None);
-        assert_eq!(rockspec.package, "rocks");
-        assert_eq!(rockspec.version, "3.0.0-1");
+        assert_eq!(rockspec.package, "rocks".into());
+        assert_eq!(rockspec.version, "3.0.0-1".parse().unwrap());
         let expected_description = RockDescription {
             summary: Some("some summary".into()),
             detailed: Some("some detailed description".into()),

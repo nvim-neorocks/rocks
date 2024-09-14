@@ -98,10 +98,9 @@ mod tests {
     fn builtin_build() {
         let dir = TempDir::new("rocks-test").unwrap();
 
-        let content = String::from_utf8(
-            std::fs::read("resources/test/lua-cjson-2.1.0.9-1.rockspec").unwrap(),
-        )
-        .unwrap();
+        let content =
+            String::from_utf8(std::fs::read("resources/test/lua-cjson-2.1.0-1.rockspec").unwrap())
+                .unwrap();
         let rockspec = Rockspec::new(&content).unwrap();
 
         let config = Config::new()

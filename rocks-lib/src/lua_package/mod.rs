@@ -1,5 +1,6 @@
 use eyre::{eyre, Result};
 use itertools::Itertools;
+use mlua::FromLua;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{fmt::Display, str::FromStr};
 pub use version::{PackageVersion, PackageVersionReq};
@@ -127,6 +128,15 @@ impl<'de> Deserialize<'de> for PackageName {
         D: serde::Deserializer<'de>,
     {
         Ok(PackageName::new(String::deserialize(deserializer)?))
+    }
+}
+
+impl<'lua> FromLua<'lua> for PackageName {
+    fn from_lua(
+        value: mlua::prelude::LuaValue<'lua>,
+        lua: &'lua mlua::prelude::Lua,
+    ) -> mlua::prelude::LuaResult<Self> {
+        Ok(Self::new(String::from_lua(value, lua)?))
     }
 }
 

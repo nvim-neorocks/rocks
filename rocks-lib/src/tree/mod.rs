@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-use crate::config::LuaVersion;
+use crate::{
+    config::LuaVersion,
+    lua_package::{PackageName, PackageVersion},
+};
 use eyre::Result;
 
 mod list;
@@ -50,7 +53,11 @@ impl<'a> Tree<'a> {
         self.root.join("bin")
     }
 
-    pub fn rock(&self, rock_name: &String, rock_version: &String) -> Result<RockLayout> {
+    pub fn rock(
+        &self,
+        rock_name: &PackageName,
+        rock_version: &PackageVersion,
+    ) -> Result<RockLayout> {
         // TODO(vhyrro): Don't store rocks with the revision number, that should be stripped almost
         // everywhere by default.
         let rock_path = self.root().join(format!("{}@{}", rock_name, rock_version));
@@ -86,7 +93,7 @@ mod tests {
         let tree = Tree::new(&tree_path, &LuaVersion::Lua51).unwrap();
 
         let neorg = tree
-            .rock(&"neorg".to_string(), &"8.0.0-1".to_string())
+            .rock(&"neorg".into(), &"8.0.0-1".parse().unwrap())
             .unwrap();
 
         assert_eq!(
@@ -99,15 +106,15 @@ mod tests {
         );
 
         let lua_cjson = tree
-            .rock(&"lua-cjson".to_string(), &"2.1.0.9-1".to_string())
+            .rock(&"lua-cjson".into(), &"2.1.0-1".parse().unwrap())
             .unwrap();
 
         assert_eq!(
             lua_cjson,
             RockLayout {
-                etc: tree_path.join("5.1/lua-cjson@2.1.0.9-1/etc"),
-                lib: tree_path.join("5.1/lua-cjson@2.1.0.9-1/lib"),
-                src: tree_path.join("5.1/lua-cjson@2.1.0.9-1/src"),
+                etc: tree_path.join("5.1/lua-cjson@2.1.0-1/etc"),
+                lib: tree_path.join("5.1/lua-cjson@2.1.0-1/lib"),
+                src: tree_path.join("5.1/lua-cjson@2.1.0-1/src"),
             }
         );
     }
