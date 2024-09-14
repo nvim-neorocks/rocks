@@ -64,10 +64,6 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new() -> ConfigBuilder {
-        ConfigBuilder::default()
-    }
-
     pub fn get_project_dirs() -> Result<ProjectDirs> {
         directories::ProjectDirs::from("org", "neorocks", "rocks")
             .ok_or(eyre!("Could not find a valid home directory"))
@@ -147,61 +143,65 @@ pub struct ConfigBuilder {
 }
 
 impl ConfigBuilder {
-    pub fn dev(self, dev: Option<bool>) -> ConfigBuilder {
-        ConfigBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn dev(self, dev: Option<bool>) -> Self {
+        Self {
             enable_development_rockspecs: dev,
             ..self
         }
     }
 
-    pub fn server(self, server: Option<String>) -> ConfigBuilder {
-        ConfigBuilder { server, ..self }
+    pub fn server(self, server: Option<String>) -> Self {
+        Self { server, ..self }
     }
 
-    pub fn only_server(self, server: Option<String>) -> ConfigBuilder {
-        ConfigBuilder {
+    pub fn only_server(self, server: Option<String>) -> Self {
+        Self {
             only_server: server.clone(),
             server,
             ..self
         }
     }
 
-    pub fn only_sources(self, sources: Option<String>) -> ConfigBuilder {
-        ConfigBuilder {
+    pub fn only_sources(self, sources: Option<String>) -> Self {
+        Self {
             only_sources: sources,
             ..self
         }
     }
 
-    pub fn namespace(self, namespace: Option<String>) -> ConfigBuilder {
-        ConfigBuilder { namespace, ..self }
+    pub fn namespace(self, namespace: Option<String>) -> Self {
+        Self { namespace, ..self }
     }
 
-    pub fn lua_dir(self, lua_dir: Option<PathBuf>) -> ConfigBuilder {
-        ConfigBuilder { lua_dir, ..self }
+    pub fn lua_dir(self, lua_dir: Option<PathBuf>) -> Self {
+        Self { lua_dir, ..self }
     }
 
-    pub fn lua_version(self, lua_version: Option<LuaVersion>) -> ConfigBuilder {
-        ConfigBuilder {
+    pub fn lua_version(self, lua_version: Option<LuaVersion>) -> Self {
+        Self {
             lua_version,
             ..self
         }
     }
 
-    pub fn tree(self, tree: Option<PathBuf>) -> ConfigBuilder {
-        ConfigBuilder { tree, ..self }
+    pub fn tree(self, tree: Option<PathBuf>) -> Self {
+        Self { tree, ..self }
     }
 
-    pub fn no_project(self, no_project: Option<bool>) -> ConfigBuilder {
-        ConfigBuilder { no_project, ..self }
+    pub fn no_project(self, no_project: Option<bool>) -> Self {
+        Self { no_project, ..self }
     }
 
-    pub fn verbose(self, verbose: Option<bool>) -> ConfigBuilder {
-        ConfigBuilder { verbose, ..self }
+    pub fn verbose(self, verbose: Option<bool>) -> Self {
+        Self { verbose, ..self }
     }
 
-    pub fn timeout(self, timeout: Option<Duration>) -> ConfigBuilder {
-        ConfigBuilder { timeout, ..self }
+    pub fn timeout(self, timeout: Option<Duration>) -> Self {
+        Self { timeout, ..self }
     }
 
     pub fn build(self) -> Result<Config> {
@@ -215,7 +215,7 @@ impl ConfigBuilder {
                 .unwrap_or_else(|| "https://luarocks.org/".to_string()),
             only_server: self.only_server,
             only_sources: self.only_sources,
-            namespace: self.namespace.unwrap_or_else(|| "".to_string()),
+            namespace: self.namespace.unwrap_or_default(),
             lua_dir: self.lua_dir.unwrap_or_else(|| data_path.join("lua")),
             lua_version: self.lua_version.or(current_project
                 .as_ref()

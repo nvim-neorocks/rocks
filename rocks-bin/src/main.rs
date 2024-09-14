@@ -8,7 +8,7 @@ use download::Download;
 use install::Install;
 use list::ListCmd;
 use outdated::Outdated;
-use rocks_lib::config::{Config, LuaVersion};
+use rocks_lib::config::{ConfigBuilder, LuaVersion};
 use search::Search;
 use update::Update;
 
@@ -142,7 +142,7 @@ enum Commands {
 async fn main() {
     let cli = Cli::parse();
 
-    let config = Config::new()
+    let config = ConfigBuilder::new()
         .dev(Some(cli.dev))
         .lua_dir(cli.lua_dir)
         .lua_version(cli.lua_version)

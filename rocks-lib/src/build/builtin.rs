@@ -92,7 +92,7 @@ fn autodetect_modules() -> Result<HashMap<String, ModuleSpec>> {
 mod tests {
     use tempdir::TempDir;
 
-    use crate::{config::Config, rockspec::Rockspec};
+    use crate::{config::ConfigBuilder, rockspec::Rockspec};
 
     #[test]
     fn builtin_build() {
@@ -103,7 +103,7 @@ mod tests {
                 .unwrap();
         let rockspec = Rockspec::new(&content).unwrap();
 
-        let config = Config::new()
+        let config = ConfigBuilder::new()
             .tree(Some(dir.into_path()))
             .lua_version(Some(crate::config::LuaVersion::Lua51))
             .build()
