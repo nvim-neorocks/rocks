@@ -19,3 +19,25 @@ impl LuaPackage {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::path::PathBuf;
+
+    use crate::{lua_package::LuaPackage, manifest::ManifestMetadata};
+
+    #[test]
+    fn rock_has_update() {
+        let test_manifest_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/manifest");
+        let manifest = String::from_utf8(std::fs::read(&test_manifest_path).unwrap()).unwrap();
+        let manifest = ManifestMetadata::new(&manifest).unwrap();
+
+        let test_package = LuaPackage::parse("lua-cjson".to_string(), "2.0.0".to_string()).unwrap();
+
+        assert_eq!(
+            test_package.has_update(&manifest).unwrap(),
+            Some("2.1.0-1".parse().unwrap())
+        );
+    }
+}
