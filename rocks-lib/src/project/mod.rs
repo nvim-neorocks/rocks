@@ -29,11 +29,14 @@ impl Project {
                 let rockspec_content = std::fs::read_to_string(&path)?;
                 let rockspec = Rockspec::new(&rockspec_content)?;
 
-                let root = path.parent().unwrap().to_path_buf().join(".rocks");
+                let root = path.parent().unwrap();
 
-                std::fs::create_dir_all(&root)?;
+                std::fs::create_dir_all(root)?;
 
-                Ok(Some(Project { root, rockspec }))
+                Ok(Some(Project {
+                    root: root.to_path_buf(),
+                    rockspec,
+                }))
             }
             None => Ok(None),
         }

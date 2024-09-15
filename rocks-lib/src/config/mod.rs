@@ -228,7 +228,7 @@ impl ConfigBuilder {
                     } else {
                         current_project
                             .as_ref()
-                            .map(|project| project.root().join("tree"))
+                            .map(|project| project.root().join("rocks/tree"))
                     }
                 })
                 .unwrap_or(data_path),

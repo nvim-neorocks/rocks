@@ -15,9 +15,11 @@ octocrab = "0.39.0"
 serde_json = "1.0.118"
 spdx = "0.10.4"
 spinners = "4.1.1"
+stylua = { version = "0.20.0", features = ["fromstr", "lua52"] }
 termcolor = "1.4.1"
 text_trees = "0.1.2"
 tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread"] }
+toml = "0.8.19"
 uzers = "0.12.1"
 walkdir = "2.5.0"
 
