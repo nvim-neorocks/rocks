@@ -21,9 +21,9 @@ To achieve this, we seek to refactor various aspects of `luarocks`, including:
 
 The current build system is functional, but lacks support for compiling Lua C modules.
 
-- [ ] Despite the build system working, `rocks install` (a combination of `rocks unpack-remote` and `rocks build`) is not implemented yet.
-- [ ] Support for compiling Lua C modules.
-  - [ ] `rocks install-lua` - a command to install headers for a specific Lua version. This command should be invoked automatically when invoking
+- [x] Despite the build system working, `rocks install` (a combination of `rocks unpack-remote` and `rocks build`) is not implemented yet.
+- [x] Support for compiling Lua C modules.
+  - [x] `rocks install-lua` - a command to install headers for a specific Lua version. This command should be invoked automatically when invoking
         `rocks install` on a rock which requires C headers. The command can be used to forcefully use downloaded headers instead of system ones.
         If `rocks` detects system headers for a given Lua version, it won't auto-download its own on an invocation of `rocks install`.
 - [ ] `rocks add` - a command different to `rocks install`, whose purpose is to add a dependency to a project. `rocks install`, on the other hand, installs
@@ -62,3 +62,8 @@ Lua-based configuration is sensible if the underlying project is written in Lua,
 a TOML file, just like all other modern package managers and CLI projects are (examples: jujutsu, cargo).
 
 The available options in the configuration file will be determined on a per-need basis.
+
+## Utilities
+
+- [ ] `rocks fmt` - for auto-formatting of code (will require stylua to be present on the system, unless we can pull it in as a dependency somehow)
+- [ ] `rocks check` - will install `luacheck` as a build dependency and run checks
