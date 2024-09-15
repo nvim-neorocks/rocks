@@ -103,8 +103,6 @@ enum Commands {
     Download(Download),
     /// Formats the codebase according to a `stylua.toml`.
     Fmt,
-    /// Initialize a directory for a Lua project using Rocks.
-    Init,
     /// Install a rock for use on the system.
     Install(Install),
     /// Manually install and manage Lua headers for various Lua versions.
