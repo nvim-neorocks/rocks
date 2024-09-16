@@ -101,7 +101,7 @@ enum Commands {
     Doc,
     /// Download a specific rock file from a rocks server.
     Download(Download),
-    /// Formats the codebase according to a `stylua.toml`.
+    /// Formats the codebase with stylua.
     Fmt,
     /// Install a rock for use on the system.
     Install(Install),
