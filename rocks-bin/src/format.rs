@@ -5,6 +5,7 @@ use rocks_lib::project::Project;
 use stylua_lib::Config;
 use walkdir::WalkDir;
 
+// TODO: Add `PathBuf` parameter that describes what directory or file to format here.
 pub fn format() -> Result<()> {
     let project = Project::current()?.ok_or_eyre(
         "`rocks fmt` can only be executed in a rocks project! Run `rocks new` to create one.",
