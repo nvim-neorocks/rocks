@@ -176,7 +176,7 @@ async fn main() {
             Commands::New(project_data) => project::write_new::write_project_rockspec(project_data)
                 .await
                 .unwrap(),
-            Commands::Build(build_data) => build::build(build_data, config).unwrap(),
+            Commands::Build(build_data) => build::build(build_data, config).await.unwrap(),
             Commands::List(list_data) => list::list_installed(list_data, config).unwrap(),
             Commands::Install(install_data) => {
                 install::install(install_data, config).await.unwrap()
