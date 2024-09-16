@@ -94,8 +94,8 @@ mod tests {
 
     use crate::{config::ConfigBuilder, rockspec::Rockspec};
 
-    #[test]
-    fn builtin_build() {
+    #[tokio::test]
+    async fn builtin_build() {
         let dir = TempDir::new("rocks-test").unwrap();
 
         let content =
@@ -109,6 +109,6 @@ mod tests {
             .build()
             .unwrap();
 
-        crate::build::build(rockspec, &config).unwrap();
+        crate::build::build(rockspec, &config).await.unwrap();
     }
 }

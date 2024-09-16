@@ -25,7 +25,8 @@ pub async fn install(package_req: LuaPackageReq, config: &Config) -> Result<()> 
     crate::build::build(
         Rockspec::new(&std::fs::read_to_string(rockspec_path)?)?,
         config,
-    )?;
+    )
+    .await?;
 
     Ok(())
 }

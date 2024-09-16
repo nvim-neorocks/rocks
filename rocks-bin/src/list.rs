@@ -25,10 +25,10 @@ pub fn list_installed(list_data: ListCmd, config: Config) -> Result<()> {
     } else {
         let formatting = TreeFormatting::dir_tree(FormatCharacters::box_chars());
         for (name, versions) in available_rocks.into_iter().sorted() {
-            let mut tree = StringTreeNode::new(name.to_owned());
+            let mut tree = StringTreeNode::new(name.to_string());
 
             for version in versions {
-                tree.push(version);
+                tree.push(version.to_string());
             }
 
             println!("{}", tree.to_string_with_format(&formatting)?);

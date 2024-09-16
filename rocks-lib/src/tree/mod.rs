@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::{
     config::LuaVersion,
-    lua_package::{PackageName, PackageVersion},
+    lua_package::{LuaPackage, LuaPackageReq, PackageName, PackageVersion},
 };
 use eyre::Result;
 
@@ -52,6 +52,18 @@ impl Tree {
 
     pub fn bin(&self) -> PathBuf {
         self.root.join("bin")
+    }
+
+    pub fn has_rock(&self, req: &LuaPackageReq) -> Option<LuaPackage> {
+        self.list().get(req.name()).map(|versions| {
+            versions.iter().rev().find_map(|version| {
+                if req.version_req().matches(version) {
+                    Some(LuaPackage::new(req.name().clone(), version.clone()))
+                } else {
+                    None
+                }
+            })
+        })?
     }
 
     pub fn rock(

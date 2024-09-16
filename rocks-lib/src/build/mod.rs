@@ -4,6 +4,7 @@ use crate::{
     rockspec::{utils, Build as _, BuildBackendSpec, RockSourceSpec, Rockspec},
     tree::{RockLayout, Tree},
 };
+use async_recursion::async_recursion;
 use eyre::{OptionExt as _, Result};
 use git2::Repository;
 
@@ -32,7 +33,32 @@ fn install(
     Ok(())
 }
 
-pub fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
+#[async_recursion]
+pub async fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
+    // TODO(vhyrro): Create a unified way of accessing the Lua version with centralized error
+    // handling.
+    let lua_version = rockspec.lua_version();
+    let lua_version = config.lua_version().or(lua_version.as_ref()).ok_or_eyre(
+        "lua version not set! Please provide a version through `--lua-version <ver>`",
+    )?;
+
+    let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
+
+    // Recursively build all dependencies.
+    // TODO: Handle build dependencies as well.
+    for dependency_req in rockspec
+        .build_dependencies
+        .current_platform()
+        .iter()
+        .filter(|req| tree.has_rock(req).is_none())
+    {
+        // NOTE: This recursive operation will create another `tree` object
+        // which will in turn acquire another lock to the filesystem.
+        // Once we implement fs locks, this could become a problem, so a more sophisticated
+        // filesystem acquiring mechanism will have to be devised.
+        crate::operations::install(dependency_req.clone(), config).await?;
+    }
+
     // TODO(vhyrro): Use a more serious isolation strategy here.
     let temp_dir = tempdir::TempDir::new(&rockspec.package.to_string())?;
 
@@ -62,18 +88,6 @@ pub fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
     // operations in the temporary directory itself and then copy all results over once they've
     // succeeded.
 
-    // TODO(vhyrro): Create a unified way of accessing the Lua version with centralized error
-    // handling.
-    let rockspec_version = rockspec.lua_version();
-    let lua_version = config
-        .lua_version()
-        .or(rockspec_version.as_ref())
-        .ok_or_eyre(
-            "lua version not set! Please provide a version through `--lua-version <ver>`",
-        )?;
-
-    let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
-
     let output_paths = tree.rock(&rockspec.package, &rockspec.version)?;
 
     let lua = LuaInstallation::new(lua_version, config)?;
@@ -92,7 +106,6 @@ pub fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
         }
     }
 
-    // TODO: Ensure dependencies and build dependencies.
     match rockspec.build.default.build_backend.as_ref().cloned() {
         Some(BuildBackendSpec::Builtin(build_spec)) => {
             build_spec.run(rockspec, output_paths, false, &lua)?

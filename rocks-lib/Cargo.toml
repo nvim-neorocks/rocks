@@ -39,6 +39,7 @@ lua-src = "547.0.0"
 luajit-src = "210.5.10"
 target-lexicon = "0.12.16"
 clap = { version = "4.5.3", features = ["derive"], optional = true}
+async-recursion = "1.1.1"
 
 [dev-dependencies]
 httptest = { version = "0.16.1" }
