@@ -1,4 +1,9 @@
-# A Library & Client implementation of [`luarocks`](https://github.com/luarocks/luarocks)
+# A [WIP] Library & Client implementation of [`luarocks`](https://github.com/luarocks/luarocks)
+
+> [!WARNING]
+>
+> **rocks is a work in progress
+> and does not have a stable release yet.**
 
 Rocks serves as an application for:
 - Installing and managing rocks
