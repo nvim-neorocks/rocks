@@ -17,9 +17,9 @@ use std::{collections::HashMap, path::PathBuf};
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
-use crate::tree::RockLayout;
+use crate::{config::Config, lua_installation::LuaInstallation, tree::RockLayout};
 
-use super::{PartialOverride, PerPlatform, PlatformIdentifier, Rockspec};
+use super::{PartialOverride, PerPlatform, PlatformIdentifier};
 
 /// The build specification for a given rock, serialized from `rockspec.build = { ... }`.
 ///
@@ -431,10 +431,10 @@ impl Default for BuildType {
 pub trait Build {
     fn run(
         self,
-        rockspec: Rockspec,
-        output_paths: RockLayout,
+        output_paths: &RockLayout,
         no_install: bool,
-        lua: &crate::lua_installation::LuaInstallation,
+        lua: &LuaInstallation,
+        config: &Config,
     ) -> Result<()>;
 }
 

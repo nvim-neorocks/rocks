@@ -10,39 +10,62 @@ use eyre::{OptionExt as _, Result};
 use indicatif::MultiProgress;
 mod builtin;
 mod fetch;
+mod make;
+pub mod variables;
 
-fn install(
+async fn run_build(
+    progress: &MultiProgress,
+    rockspec: &Rockspec,
+    output_paths: &RockLayout,
+    lua: &LuaInstallation,
+    config: &Config,
+) -> Result<()> {
+    with_spinner(progress, "🛠️ Building...".into(), || async {
+        match rockspec.build.default.build_backend.to_owned() {
+            Some(BuildBackendSpec::Builtin(build_spec)) => {
+                build_spec.run(output_paths, false, lua, config)?
+            }
+            Some(BuildBackendSpec::Make(make_spec)) => {
+                make_spec.run(output_paths, false, lua, config)?
+            }
+            _ => unimplemented!(),
+        }
+        Ok(())
+    })
+    .await?;
+    Ok(())
+}
+
+async fn install(
+    progress: &MultiProgress,
     rockspec: &Rockspec,
     tree: &Tree,
     output_paths: &RockLayout,
     lua: &LuaInstallation,
 ) -> Result<()> {
-    let install_spec = &rockspec.build.current_platform().install;
-
-    for (target, source) in &install_spec.lua {
-        utils::copy_lua_to_module_path(source, target, &output_paths.src)?;
-    }
-
-    for (target, source) in &install_spec.lib {
-        utils::compile_c_files(&vec![source.into()], target, &output_paths.lib, lua)?;
-    }
-
-    for (target, source) in &install_spec.bin {
-        std::fs::copy(source, tree.bin().join(target))?;
-    }
-
+    with_spinner(
+        progress,
+        format!("💻 Installing {} {}", rockspec.package, rockspec.version),
+        || async {
+            let install_spec = &rockspec.build.current_platform().install;
+            for (target, source) in &install_spec.lua {
+                utils::copy_lua_to_module_path(source, target, &output_paths.src)?;
+            }
+            for (target, source) in &install_spec.lib {
+                utils::compile_c_files(&vec![source.into()], target, &output_paths.lib, lua)?;
+            }
+            for (target, source) in &install_spec.bin {
+                std::fs::copy(source, tree.bin().join(target))?;
+            }
+            Ok(())
+        },
+    )
+    .await?;
     Ok(())
 }
 
-pub async fn build(progress: &MultiProgress, rockspec: Rockspec, config: &Config) -> Result<()> {
-    with_spinner(progress, "🛠️ Building...".into(), || async {
-        build_impl(progress, rockspec, config).await
-    })
-    .await
-}
-
 #[async_recursion]
-async fn build_impl(progress: &MultiProgress, rockspec: Rockspec, config: &Config) -> Result<()> {
+pub async fn build(progress: &MultiProgress, rockspec: Rockspec, config: &Config) -> Result<()> {
     // TODO(vhyrro): Create a unified way of accessing the Lua version with centralized error
     // handling.
     let lua_version = rockspec.lua_version();
@@ -90,7 +113,9 @@ async fn build_impl(progress: &MultiProgress, rockspec: Rockspec, config: &Confi
 
     let lua = LuaInstallation::new(lua_version, config)?;
 
-    install(&rockspec, &tree, &output_paths, &lua)?;
+    run_build(progress, &rockspec, &output_paths, &lua, config).await?;
+
+    install(progress, &rockspec, &tree, &output_paths, &lua).await?;
 
     // Copy over all `copy_directories` to their respective paths
     for directory in &rockspec.build.current_platform().copy_directories {
@@ -103,13 +128,6 @@ async fn build_impl(progress: &MultiProgress, rockspec: Rockspec, config: &Confi
             }
         }
     }
-
-    match rockspec.build.default.build_backend.as_ref().cloned() {
-        Some(BuildBackendSpec::Builtin(build_spec)) => {
-            build_spec.run(rockspec, output_paths, false, &lua)?
-        }
-        _ => unimplemented!(),
-    };
 
     std::env::set_current_dir(previous_dir)?;
 

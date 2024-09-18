@@ -1,8 +1,11 @@
 use directories::ProjectDirs;
 use eyre::{eyre, Result};
-use std::{fmt::Display, path::PathBuf, str::FromStr, time::Duration};
+use std::{collections::HashMap, fmt::Display, path::PathBuf, str::FromStr, time::Duration};
 
-use crate::project::Project;
+use crate::{
+    build::variables::{self, HasVariables},
+    project::Project,
+};
 
 #[derive(Debug, Clone)]
 pub enum LuaVersion {
@@ -61,6 +64,8 @@ pub struct Config {
     no_project: bool,
     verbose: bool,
     timeout: Duration,
+    make: String,
+    variables: HashMap<String, String>,
 }
 
 impl Config {
@@ -125,6 +130,20 @@ impl Config {
     pub fn timeout(&self) -> &Duration {
         &self.timeout
     }
+
+    pub fn make_cmd(&self) -> &String {
+        &self.make
+    }
+
+    pub fn variables(&self) -> &HashMap<String, String> {
+        &self.variables
+    }
+}
+
+impl HasVariables for Config {
+    fn substitute_variables(&self, input: String) -> String {
+        variables::substitute(|var_name| self.variables().get(var_name).cloned(), input)
+    }
 }
 
 #[derive(Default)]
@@ -140,6 +159,8 @@ pub struct ConfigBuilder {
     no_project: Option<bool>,
     verbose: Option<bool>,
     timeout: Option<Duration>,
+    make: Option<String>,
+    variables: Option<HashMap<String, String>>,
 }
 
 impl ConfigBuilder {
@@ -204,6 +225,14 @@ impl ConfigBuilder {
         Self { timeout, ..self }
     }
 
+    pub fn make_cmd(self, make: Option<String>) -> Self {
+        Self { make, ..self }
+    }
+
+    pub fn variables(self, variables: Option<HashMap<String, String>>) -> Self {
+        Self { variables, ..self }
+    }
+
     pub fn build(self) -> Result<Config> {
         let data_path = Config::get_default_data_path()?;
         let current_project = Project::current()?;
@@ -235,6 +264,8 @@ impl ConfigBuilder {
             no_project: self.no_project.unwrap_or(false),
             verbose: self.verbose.unwrap_or(false),
             timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(30)),
+            make: self.make.unwrap_or("make".into()),
+            variables: self.variables.unwrap_or_default(),
         })
     }
 }

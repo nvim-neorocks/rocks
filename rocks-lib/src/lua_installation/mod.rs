@@ -2,7 +2,10 @@ use eyre::Result;
 use std::path::PathBuf;
 use target_lexicon::Triple;
 
-use crate::config::{Config, LuaVersion};
+use crate::{
+    build::variables::{self, HasVariables},
+    config::{Config, LuaVersion},
+};
 
 pub struct LuaInstallation {
     pub include_dir: PathBuf,
@@ -66,5 +69,22 @@ impl LuaInstallation {
 
     pub fn path(version: &LuaVersion, config: &Config) -> Result<PathBuf> {
         Ok(config.lua_dir().join(version.to_string()))
+    }
+}
+
+impl HasVariables for LuaInstallation {
+    fn substitute_variables(&self, input: String) -> String {
+        variables::substitute(
+            |var_name| {
+                let dir = match var_name {
+                    "LUA_INCDIR" => Some(self.include_dir.to_owned()),
+                    "LUA_LIBDIR" => Some(self.lib_dir.to_owned()),
+                    // TODO: "LUA" ?
+                    _ => None,
+                }?;
+                Some(dir.to_string_lossy().to_string())
+            },
+            input,
+        )
     }
 }
