@@ -1,8 +1,9 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
+    config::Config,
     lua_installation::LuaInstallation,
-    rockspec::{utils, Build, BuiltinBuildSpec, ModuleSpec, Rockspec},
+    rockspec::{utils, Build, BuiltinBuildSpec, ModuleSpec},
     tree::RockLayout,
 };
 use eyre::{OptionExt as _, Result};
@@ -12,10 +13,10 @@ use walkdir::WalkDir;
 impl Build for BuiltinBuildSpec {
     fn run(
         self,
-        _rockspec: Rockspec,
-        output_paths: RockLayout,
+        output_paths: &RockLayout,
         _no_install: bool,
         lua: &LuaInstallation,
+        _config: &Config,
     ) -> Result<()> {
         // Detect all Lua modules
         let modules = autodetect_modules()?

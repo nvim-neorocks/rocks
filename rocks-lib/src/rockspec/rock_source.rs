@@ -4,7 +4,7 @@ use mlua::{FromLua, Lua, Value};
 use reqwest::Url;
 use serde::{de, Deserialize, Deserializer};
 use ssri::Integrity;
-use std::{borrow::Cow, path::PathBuf, str::FromStr};
+use std::{borrow::Cow, fs, path::PathBuf, str::FromStr};
 
 use super::{
     FromPlatformOverridable, PartialOverride, PerPlatform, PerPlatformWrapper, PlatformOverridable,
@@ -223,7 +223,11 @@ impl FromStr for SourceUrl {
     fn from_str(str: &str) -> Result<Self> {
         match str {
             s if s.starts_with("cvs://") => Ok(Self::Cvs(s.to_string())),
-            s if s.starts_with("file://") => Ok(Self::File(s.trim_start_matches("file://").into())),
+            s if s.starts_with("file://") => {
+                let path_buf: PathBuf = s.trim_start_matches("file://").into();
+                let path = fs::canonicalize(&path_buf)?;
+                Ok(Self::File(path))
+            }
             s if s.starts_with("git://") => Ok(Self::Git(s.parse()?)),
             s if starts_with_any(
                 s,
@@ -290,7 +294,7 @@ fn starts_with_any(str: &str, prefixes: Vec<&str>) -> bool {
 #[cfg(test)]
 mod tests {
 
-    use std::path::Path;
+    use tempdir::TempDir;
 
     use super::*;
 
@@ -300,9 +304,9 @@ mod tests {
         assert_eq!(url, SourceUrl::Cvs("cvs://foo".into()));
         let url: SourceUrl = "cvs://bar".parse().unwrap();
         assert_eq!(url, SourceUrl::Cvs("cvs://bar".into()));
-        let url: SourceUrl = "file:///tmp/foo".parse().unwrap();
-        let file = Path::new("/tmp/foo");
-        assert_eq!(url, SourceUrl::File(file.to_path_buf()));
+        let dir = TempDir::new("rocks-test").unwrap().into_path();
+        let url: SourceUrl = format!("file://{}", dir.to_string_lossy()).parse().unwrap();
+        assert_eq!(url, SourceUrl::File(dir));
         let url: SourceUrl = "ftp://example.com/foo".parse().unwrap();
         assert!(matches!(url, SourceUrl::Url { .. }));
         let url: SourceUrl = "git://example.com/foo".parse().unwrap();
