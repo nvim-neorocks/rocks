@@ -65,5 +65,5 @@ The available options in the configuration file will be determined on a per-need
 
 ## Utilities
 
-- [ ] `rocks fmt` - for auto-formatting of code (will require stylua to be present on the system, unless we can pull it in as a dependency somehow)
+- [x] `rocks fmt` - for auto-formatting of code (will require stylua to be present on the system, unless we can pull it in as a dependency somehow)
 - [ ] `rocks check` - will install `luacheck` as a build dependency and run checks
