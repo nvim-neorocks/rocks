@@ -29,6 +29,12 @@ impl LuaPackage {
     pub fn version(&self) -> &PackageVersion {
         &self.version
     }
+    pub fn as_package_req(&self) -> LuaPackageReq {
+        LuaPackageReq {
+            name: self.name.clone(),
+            version_req: self.version.clone().into(),
+        }
+    }
 }
 
 /// A lua package requirement with a name and an optional version requirement.

@@ -3,7 +3,7 @@ use std::{cmp::Ordering, fmt::Display, str::FromStr};
 use eyre::Result;
 use html_escape::decode_html_entities;
 use mlua::FromLua;
-use semver::{Error, Version, VersionReq};
+use semver::{Comparator, Error, Op, Version, VersionReq};
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 /// **SemVer version** as defined by <https://semver.org>.
@@ -132,6 +132,25 @@ impl Default for PackageVersionReq {
     fn default() -> Self {
         PackageVersionReq::SemVer {
             version_req: VersionReq::default(),
+        }
+    }
+}
+
+impl From<PackageVersion> for PackageVersionReq {
+    fn from(version: PackageVersion) -> Self {
+        match version {
+            PackageVersion::Dev { name } => PackageVersionReq::Dev { name_req: name },
+            PackageVersion::SemVer { version } => PackageVersionReq::SemVer {
+                version_req: VersionReq {
+                    comparators: vec![Comparator {
+                        op: Op::Exact,
+                        major: version.major,
+                        minor: Some(version.minor),
+                        patch: Some(version.patch),
+                        pre: version.pre,
+                    }],
+                },
+            },
         }
     }
 }

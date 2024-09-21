@@ -8,6 +8,7 @@ use download::Download;
 use install::Install;
 use list::ListCmd;
 use outdated::Outdated;
+use remove::Remove;
 use rocks_lib::config::{ConfigBuilder, LuaVersion};
 use search::Search;
 use update::Update;
@@ -21,6 +22,8 @@ mod install_lua;
 mod list;
 mod outdated;
 mod project;
+mod purge;
+mod remove;
 mod search;
 mod unpack;
 mod update;
@@ -124,7 +127,7 @@ enum Commands {
     /// Remove all installed rocks from a tree.
     Purge,
     /// Uninstall a rock.
-    Remove,
+    Remove(Remove),
     /// Query the Luarocks servers.
     #[command(arg_required_else_help = true)]
     Search(Search),
@@ -184,6 +187,8 @@ async fn main() {
         Commands::Outdated(outdated) => outdated::outdated(outdated, config).await.unwrap(),
         Commands::InstallLua => install_lua::install_lua(config).unwrap(),
         Commands::Fmt => format::format().unwrap(),
+        Commands::Purge => purge::purge(config).unwrap(),
+        Commands::Remove(remove_args) => remove::remove(remove_args, config).await.unwrap(),
         _ => unimplemented!(),
     }
 }
