@@ -72,9 +72,9 @@ impl ManifestMetadata {
 
         let version = self.repository[lua_package_req.name()]
             .keys()
-            .filter(|version| lua_package_req.version_req().matches(version))
             .sorted()
-            .last()?;
+            .rev()
+            .find_or_first(|version| lua_package_req.version_req().matches(version))?;
 
         Some(LuaPackage::new(
             lua_package_req.name().to_owned(),

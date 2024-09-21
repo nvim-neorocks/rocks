@@ -8,7 +8,6 @@ pub use version::{PackageVersion, PackageVersionReq};
 mod outdated;
 mod version;
 
-// TODO: We probably need a better name for this
 pub struct LuaPackage {
     name: PackageName,
     version: PackageVersion,
@@ -75,7 +74,7 @@ impl FromStr for LuaPackageReq {
     fn from_str(str: &str) -> Result<Self> {
         let rock_name_str = str
             .chars()
-            .peeking_take_while(|t| t.is_alphanumeric() || matches!(t, '-' | '_'))
+            .peeking_take_while(|t| t.is_alphanumeric() || matches!(t, '-' | '_' | '.'))
             .collect::<String>();
 
         if rock_name_str.is_empty() {
@@ -199,6 +198,8 @@ mod tests {
         assert_eq!(package_req.name.to_string(), "lua");
         let package_req: LuaPackageReq = "toml-edit >= 0.1.0".parse().unwrap();
         assert_eq!(package_req.name.to_string(), "toml-edit");
+        let package_req: LuaPackageReq = "plugin.nvim >= 0.1.0".parse().unwrap();
+        assert_eq!(package_req.name.to_string(), "plugin.nvim");
         let package_req: LuaPackageReq = "lfs".parse().unwrap();
         assert_eq!(package_req.name.to_string(), "lfs");
         let package_req: LuaPackageReq = "neorg 1.0.0".parse().unwrap();
