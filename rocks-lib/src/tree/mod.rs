@@ -19,7 +19,7 @@ mod list;
 /// - /rocks/<lua-version>/<rock>/src - library code for the rock
 /// - /bin - binary files produced by various rocks
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Tree {
     /// The Lua version of the tree.
     version: LuaVersion,
@@ -50,6 +50,10 @@ impl Tree {
         self.root.join(self.version.to_string())
     }
 
+    pub fn root_for(&self, rock_name: &PackageName, rock_version: &PackageVersion) -> PathBuf {
+        self.root().join(format!("{}@{}", rock_name, rock_version))
+    }
+
     pub fn bin(&self) -> PathBuf {
         self.root.join("bin")
     }
@@ -73,7 +77,7 @@ impl Tree {
     ) -> Result<RockLayout> {
         // TODO(vhyrro): Don't store rocks with the revision number, that should be stripped almost
         // everywhere by default.
-        let rock_path = self.root().join(format!("{}@{}", rock_name, rock_version));
+        let rock_path = self.root_for(rock_name, rock_version);
 
         let etc = rock_path.join("etc");
         let lib = rock_path.join("lib");
