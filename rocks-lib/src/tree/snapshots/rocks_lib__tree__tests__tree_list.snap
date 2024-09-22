@@ -1,5 +1,6 @@
 ---
 source: rocks-lib/src/tree/mod.rs
+assertion_line: 141
 expression: tree.list()
 ---
 lua-cjson:

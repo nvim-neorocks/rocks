@@ -49,5 +49,4 @@ dir-diff = "0.3.3"
 insta = "1.39.0"
 
 [features]
-test_nosandbox = [] # Run tests without sandboxing
 clap = ["dep:clap"]

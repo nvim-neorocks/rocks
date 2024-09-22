@@ -83,13 +83,9 @@ nix build .#checks.<your-system>.git-hooks-check -Lv
 
 ## Running tests without nix
 
-For reproducibility, we only run tests that can be sandboxed in CI
-(or with nix).
-To run tests locally with non-sandboxed tests enabled:
-
-```bash
-cargo test --features=test_nosandbox
-```
+For reproducibility, we only run tests that can be sandboxed with nix,
+skipping integration tests.
+Running `cargo test` locally will run all tests, including integration tests.
 
 Or, if you are using [cargo-nextest](https://nexte.st/), we provide an alias:
 
