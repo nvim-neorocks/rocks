@@ -1,0 +1,19 @@
+---
+name: update-flake-lock
+on:
+  schedule:
+    - cron: '0 1 * * 0' # Sunday at 01:00
+  workflow_dispatch:
+
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - name: Update flake.lock
+        uses: DeterminateSystems/update-flake-lock@main
+        with:
+          token: ${{ secrets.GH_TOKEN_FOR_UPDATES }}
+          pr-title: "chore: update flake.lock"
+          commit-msg: "chore: update flake.lock" 
