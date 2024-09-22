@@ -8,6 +8,9 @@ jobs:
   build:
     name: ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
+    permissions:
+      id-token: "write"
+      contents: "read"
     strategy:
       fail-fast: false
       matrix:
