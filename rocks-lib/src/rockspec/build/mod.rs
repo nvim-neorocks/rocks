@@ -3,9 +3,11 @@ mod cmake;
 mod make;
 
 pub mod utils; // Make build utilities available as a submodule
-pub use builtin::*;
+pub use builtin::{BuiltinBuildSpec, ModulePaths, ModuleSpec};
 pub use cmake::*;
 pub use make::*;
+
+use builtin::ModuleSpecInternal;
 
 use itertools::Itertools as _;
 
@@ -17,7 +19,7 @@ use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
 use crate::tree::RockLayout;
 
-use super::{PerPlatform, PlatformIdentifier, Rockspec};
+use super::{PartialOverride, PerPlatform, PlatformIdentifier, Rockspec};
 
 /// The build specification for a given rock, serialized from `rockspec.build = { ... }`.
 ///
@@ -41,7 +43,17 @@ impl BuildSpec {
     fn from_internal_spec(internal: BuildSpecInternal) -> Result<Self> {
         let build_backend = match internal.build_type.unwrap_or_default() {
             BuildType::Builtin => Some(BuildBackendSpec::Builtin(BuiltinBuildSpec {
-                modules: internal.builtin_spec.unwrap_or_default(),
+                modules: internal
+                    .builtin_spec
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|(key, module_spec_internal)| {
+                        match ModuleSpec::from_internal(module_spec_internal) {
+                            Ok(module_spec) => Ok((key, module_spec)),
+                            Err(err) => Err(err),
+                        }
+                    })
+                    .collect::<Result<HashMap<String, ModuleSpec>>>()?,
             })),
             BuildType::Make => {
                 let default = MakeBuildSpec::default();
@@ -185,7 +197,7 @@ struct BuildSpecInternal {
     #[serde(rename = "type", default)]
     build_type: Option<BuildType>,
     #[serde(rename = "modules", default)]
-    builtin_spec: Option<HashMap<String, ModuleSpec>>,
+    builtin_spec: Option<HashMap<String, ModuleSpecInternal>>,
     #[serde(default)]
     makefile: Option<PathBuf>,
     #[serde(rename = "build_target", default)]
@@ -230,7 +242,8 @@ impl<'lua> FromLua<'lua> for PerPlatform<BuildSpecInternal> {
                 }?;
                 let _ = tbl.raw_remove("platforms");
                 let default = lua.from_value(list.clone())?;
-                override_platform_specs(&mut per_platform, &default);
+                override_platform_specs(&mut per_platform, &default)
+                    .map_err(|err| mlua::Error::DeserializeError(err.to_string()))?;
                 Ok(PerPlatform {
                     default,
                     per_platform,
@@ -250,38 +263,52 @@ impl<'lua> FromLua<'lua> for PerPlatform<BuildSpecInternal> {
 fn override_platform_specs(
     per_platform: &mut HashMap<PlatformIdentifier, BuildSpecInternal>,
     base: &BuildSpecInternal,
-) {
+) -> Result<()> {
     let per_platform_raw = per_platform.clone();
     for (platform, build_spec) in per_platform.clone() {
         // Add base dependencies for each platform
-        per_platform.insert(platform, override_build_spec_internal(base, &build_spec));
+        per_platform.insert(platform, override_build_spec_internal(base, &build_spec)?);
     }
     for (platform, build_spec) in per_platform_raw {
         for extended_platform in &platform.get_extended_platforms() {
             let extended_spec = per_platform
                 .get(extended_platform)
-                .cloned()
-                .unwrap_or_default();
+                .unwrap_or(&base.to_owned())
+                .to_owned();
             per_platform.insert(
                 *extended_platform,
-                override_build_spec_internal(&extended_spec, &build_spec),
+                override_build_spec_internal(&extended_spec, &build_spec)?,
             );
         }
     }
+    Ok(())
 }
 
 fn override_build_spec_internal(
     base: &BuildSpecInternal,
     override_spec: &BuildSpecInternal,
-) -> BuildSpecInternal {
-    BuildSpecInternal {
+) -> Result<BuildSpecInternal> {
+    Ok(BuildSpecInternal {
         build_type: override_opt(&override_spec.build_type, &base.build_type),
         builtin_spec: match (
             override_spec.builtin_spec.clone(),
             base.builtin_spec.clone(),
         ) {
-            (Some(override_val), Some(base_val)) => {
-                Some(base_val.into_iter().chain(override_val).collect())
+            (Some(override_val), Some(base_spec_map)) => {
+                Some(base_spec_map.into_iter().chain(override_val).try_fold(
+                    HashMap::default(),
+                    |mut acc: HashMap<String, ModuleSpecInternal>, (k, module_spec_override)|
+                        -> Result<HashMap<String, ModuleSpecInternal>, eyre::Error> {
+                        let overridden = match acc.get(&k) {
+                            None => module_spec_override,
+                            Some(base_module_spec) => {
+                                base_module_spec.apply_overrides(&module_spec_override)?
+                            }
+                        };
+                        acc.insert(k, overridden);
+                        Ok(acc)
+                    },
+                )?)
             }
             (override_val @ Some(_), _) => override_val,
             (_, base_val @ Some(_)) => base_val,
@@ -325,7 +352,7 @@ fn override_build_spec_internal(
             _ => None,
         },
         patches: override_opt(&override_spec.patches, &base.patches),
-    }
+    })
 }
 
 fn override_opt<T: Clone>(override_opt: &Option<T>, base: &Option<T>) -> Option<T> {

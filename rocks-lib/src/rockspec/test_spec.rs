@@ -98,8 +98,8 @@ struct TestSpecInternal {
 }
 
 impl PartialOverride for TestSpecInternal {
-    fn apply_overrides(&self, override_spec: &Self) -> Self {
-        TestSpecInternal {
+    fn apply_overrides(&self, override_spec: &Self) -> Result<Self> {
+        Ok(TestSpecInternal {
             test_type: override_opt(&override_spec.test_type, &self.test_type),
             flags: match (override_spec.flags.clone(), self.flags.clone()) {
                 (Some(override_vec), Some(base_vec)) => {
@@ -119,7 +119,7 @@ impl PartialOverride for TestSpecInternal {
                 Some(_) => None,
                 None => override_opt(&override_spec.script, &self.script),
             },
-        }
+        })
     }
 }
 

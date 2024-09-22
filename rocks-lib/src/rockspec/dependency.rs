@@ -16,7 +16,7 @@ pub enum ExternalDependency {
 }
 
 impl PartialOverride for HashMap<String, ExternalDependency> {
-    fn apply_overrides(&self, override_map: &Self) -> Self {
+    fn apply_overrides(&self, override_map: &Self) -> Result<Self> {
         let mut result = Self::new();
         for (key, value) in self {
             result.insert(key.clone(), value.clone());
@@ -24,7 +24,7 @@ impl PartialOverride for HashMap<String, ExternalDependency> {
         for (key, value) in override_map {
             result.insert(key.clone(), value.clone());
         }
-        result
+        Ok(result)
     }
 }
 

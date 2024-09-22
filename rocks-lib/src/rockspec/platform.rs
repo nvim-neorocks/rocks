@@ -203,15 +203,15 @@ impl PlatformSupport {
     }
 }
 
-pub trait PartialOverride {
-    fn apply_overrides(&self, override_val: &Self) -> Self;
+pub trait PartialOverride: Sized {
+    fn apply_overrides(&self, override_val: &Self) -> Result<Self>;
 }
 
 /// Override `base_deps` with `override_deps`
 /// - Adds missing dependencies
 /// - Replaces dependencies with the same name
 impl PartialOverride for Vec<LuaPackageReq> {
-    fn apply_overrides(&self, override_vec: &Self) -> Self {
+    fn apply_overrides(&self, override_vec: &Self) -> Result<Self> {
         let mut result_map: HashMap<String, LuaPackageReq> = self
             .iter()
             .map(|dep| (dep.name().clone().to_string(), dep.clone()))
@@ -222,7 +222,7 @@ impl PartialOverride for Vec<LuaPackageReq> {
                 override_dep.clone(),
             );
         }
-        result_map.into_values().collect()
+        Ok(result_map.into_values().collect())
     }
 }
 
@@ -306,7 +306,8 @@ where
                 }?;
                 let _ = tbl.raw_remove("platforms");
                 let default = lua.from_value(list.to_owned())?;
-                apply_per_platform_overrides(&mut per_platform, &default);
+                apply_per_platform_overrides(&mut per_platform, &default)
+                    .map_err(|err| mlua::Error::DeserializeError(err.to_string()))?;
                 Ok(PerPlatform {
                     default,
                     per_platform,
@@ -360,7 +361,10 @@ where
     }
 }
 
-fn apply_per_platform_overrides<T>(per_platform: &mut HashMap<PlatformIdentifier, T>, base: &T)
+fn apply_per_platform_overrides<T>(
+    per_platform: &mut HashMap<PlatformIdentifier, T>,
+    base: &T,
+) -> Result<()>
 where
     T: PartialOverride,
     T: Default,
@@ -369,7 +373,7 @@ where
     let per_platform_raw = per_platform.clone();
     for (platform, overrides) in per_platform.clone() {
         // Add base values for each platform
-        let overridden = base.apply_overrides(&overrides);
+        let overridden = base.apply_overrides(&overrides)?;
         per_platform.insert(platform, overridden);
     }
     for (platform, overrides) in per_platform_raw {
@@ -381,10 +385,11 @@ where
                 .unwrap_or_default();
             per_platform.insert(
                 *extended_platform,
-                extended_overrides.apply_overrides(&overrides),
+                extended_overrides.apply_overrides(&overrides)?,
             );
         }
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -471,7 +476,7 @@ mod tests {
         let bar: LuaPackageReq = "bar 1.0.0".parse().unwrap();
         let base_vec = vec![neorg_a, foo.clone()];
         let override_vec = vec![neorg_b.clone(), bar.clone()];
-        let result = base_vec.apply_overrides(&override_vec);
+        let result = base_vec.apply_overrides(&override_vec).unwrap();
         assert_eq!(result.clone().len(), 3);
         assert_eq!(
             result

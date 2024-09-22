@@ -172,8 +172,8 @@ struct RockSourceInternal {
 }
 
 impl PartialOverride for RockSourceInternal {
-    fn apply_overrides(&self, override_spec: &Self) -> Self {
-        Self {
+    fn apply_overrides(&self, override_spec: &Self) -> Result<Self> {
+        Ok(Self {
             url: override_opt(override_spec.url.as_ref(), self.url.as_ref()),
             hash: override_opt(override_spec.hash.as_ref(), self.hash.as_ref()),
             file: override_opt(override_spec.file.as_ref(), self.file.as_ref()),
@@ -190,7 +190,7 @@ impl PartialOverride for RockSourceInternal {
                 (None, None) => override_opt(override_spec.module.as_ref(), self.module.as_ref()),
                 _ => None,
             },
-        }
+        })
     }
 }
 
