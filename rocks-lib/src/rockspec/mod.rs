@@ -839,5 +839,47 @@ mod tests {
                 PathBuf::from("ftplugin")
             ]
         );
+        let rockspec_content = "
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        source = { url = 'git://hub.com/example-project/foo.zip' }\n
+        build = {\n
+            type = 'builtin',\n
+            modules = {\n
+                cjson = {\n
+                    sources = { 'lua_cjson.c', 'strbuf.c', 'fpconv.c' },\n
+                }\n
+            },\n
+            platforms = {\n
+                win32 = { modules = { cjson = { defines = {\n
+                    'DISABLE_INVALID_NUMBERS', 'USE_INTERNAL_ISINF'\n
+                } } } }\n
+            },\n
+        }\n
+        "
+        .to_string();
+        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+        let per_platform = rockspec.build.per_platform;
+        let win32 = per_platform.get(&PlatformIdentifier::Windows).unwrap();
+        assert_eq!(
+            win32.build_backend,
+            Some(BuildBackendSpec::Builtin(BuiltinBuildSpec {
+                modules: vec![(
+                    "cjson".into(),
+                    ModuleSpec::ModulePaths(ModulePaths {
+                        sources: vec!["lua_cjson.c".into(), "strbuf.c".into(), "fpconv.c".into()],
+                        libraries: Vec::default(),
+                        defines: vec![
+                            ("DISABLE_INVALID_NUMBERS".into(), None),
+                            ("USE_INTERNAL_ISINF".into(), None)
+                        ],
+                        incdirs: Vec::default(),
+                        libdirs: Vec::default(),
+                    })
+                )]
+                .into_iter()
+                .collect()
+            }))
+        );
     }
 }

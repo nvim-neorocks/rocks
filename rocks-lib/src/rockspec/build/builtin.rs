@@ -1,7 +1,9 @@
-use std::{collections::HashMap, path::PathBuf};
-
+use eyre::{eyre, Result};
 use itertools::Itertools;
 use serde::{de, Deserialize, Deserializer};
+use std::{collections::HashMap, path::PathBuf};
+
+use crate::rockspec::{FromPlatformOverridable, PartialOverride, PerPlatform, PlatformOverridable};
 
 #[derive(Debug, PartialEq, Deserialize, Default, Clone)]
 pub struct BuiltinBuildSpec {
@@ -18,7 +20,42 @@ pub enum ModuleSpec {
     ModulePaths(ModulePaths),
 }
 
+impl ModuleSpec {
+    pub fn from_internal(internal: ModuleSpecInternal) -> Result<ModuleSpec> {
+        match internal {
+            ModuleSpecInternal::SourcePath(path) => Ok(ModuleSpec::SourcePath(path)),
+            ModuleSpecInternal::SourcePaths(paths) => Ok(ModuleSpec::SourcePaths(paths)),
+            ModuleSpecInternal::ModulePaths(module_paths) => Ok(ModuleSpec::ModulePaths(
+                ModulePaths::from_internal(module_paths)?,
+            )),
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for ModuleSpec {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Self::from_internal(ModuleSpecInternal::deserialize(deserializer)?)
+            .map_err(de::Error::custom)
+    }
+}
+
+impl FromPlatformOverridable<ModuleSpecInternal, Self> for ModuleSpec {
+    fn from_platform_overridable(internal: ModuleSpecInternal) -> Result<Self> {
+        Self::from_internal(internal)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum ModuleSpecInternal {
+    SourcePath(PathBuf),
+    SourcePaths(Vec<PathBuf>),
+    ModulePaths(ModulePathsInternal),
+}
+
+impl<'de> Deserialize<'de> for ModuleSpecInternal {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -71,22 +108,116 @@ where
         .try_collect()
 }
 
-#[derive(Debug, PartialEq, Deserialize, Clone)]
+impl PartialOverride for ModuleSpecInternal {
+    fn apply_overrides(&self, override_spec: &Self) -> Result<Self> {
+        match (override_spec, self) {
+            (ModuleSpecInternal::SourcePath(_), b @ ModuleSpecInternal::SourcePath(_)) => {
+                Ok(b.to_owned())
+            }
+            (ModuleSpecInternal::SourcePaths(_), b @ ModuleSpecInternal::SourcePaths(_)) => {
+                Ok(b.to_owned())
+            }
+            (ModuleSpecInternal::ModulePaths(a), ModuleSpecInternal::ModulePaths(b)) => {
+                Ok(ModuleSpecInternal::ModulePaths(a.apply_overrides(b)?))
+            }
+            _ => Err(eyre!(
+                "cannot resolve ambiguous platform override for `build.modules`."
+            )),
+        }
+    }
+}
+
+impl PlatformOverridable for ModuleSpecInternal {
+    fn on_nil<T>() -> Result<PerPlatform<T>>
+    where
+        T: PlatformOverridable,
+    {
+        Err(eyre!(
+            "could not resolve platform override for `build.modules`. This is a bug!"
+        ))
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct ModulePaths {
     /// Path names of C sources, mandatory field
     pub sources: Vec<PathBuf>,
     /// External libraries to be linked
-    #[serde(default)]
     pub libraries: Vec<PathBuf>,
     /// C defines, e.g. { "FOO=bar", "USE_BLA" }
-    #[serde(default, deserialize_with = "deserialize_definitions")]
     pub defines: Vec<(String, Option<String>)>,
     /// Directories to be added to the compiler's headers lookup directory list.
-    #[serde(default)]
     pub incdirs: Vec<PathBuf>,
     /// Directories to be added to the linker's library lookup directory list.
+    pub libdirs: Vec<PathBuf>,
+}
+
+impl ModulePaths {
+    fn from_internal(internal: ModulePathsInternal) -> Result<ModulePaths> {
+        if internal.sources.is_empty() {
+            return Err(eyre!("missing or empty field `sources`"));
+        }
+        Ok(ModulePaths {
+            sources: internal.sources,
+            libraries: internal.libraries,
+            defines: internal.defines,
+            incdirs: internal.incdirs,
+            libdirs: internal.libdirs,
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for ModulePaths {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let internal = ModulePathsInternal::deserialize(deserializer)?;
+        Self::from_internal(internal).map_err(de::Error::custom)
+    }
+}
+
+#[derive(Debug, PartialEq, Deserialize, Clone, Default)]
+pub struct ModulePathsInternal {
+    #[serde(default)]
+    pub sources: Vec<PathBuf>,
+    #[serde(default)]
+    pub libraries: Vec<PathBuf>,
+    #[serde(default, deserialize_with = "deserialize_definitions")]
+    pub defines: Vec<(String, Option<String>)>,
+    #[serde(default)]
+    pub incdirs: Vec<PathBuf>,
     #[serde(default)]
     pub libdirs: Vec<PathBuf>,
+}
+
+impl PartialOverride for ModulePathsInternal {
+    fn apply_overrides(&self, override_spec: &Self) -> Result<Self> {
+        Ok(Self {
+            sources: override_vec(override_spec.sources.as_ref(), self.sources.as_ref()),
+            libraries: override_vec(override_spec.libraries.as_ref(), self.libraries.as_ref()),
+            defines: override_vec(override_spec.defines.as_ref(), self.defines.as_ref()),
+            incdirs: override_vec(override_spec.incdirs.as_ref(), self.incdirs.as_ref()),
+            libdirs: override_vec(override_spec.libdirs.as_ref(), self.libdirs.as_ref()),
+        })
+    }
+}
+
+impl PlatformOverridable for ModulePathsInternal {
+    fn on_nil<T>() -> Result<PerPlatform<T>>
+    where
+        T: PlatformOverridable,
+        T: Default,
+    {
+        Ok(PerPlatform::default())
+    }
+}
+
+fn override_vec<T: Clone>(override_vec: &[T], base: &[T]) -> Vec<T> {
+    if override_vec.is_empty() {
+        return base.to_owned();
+    }
+    override_vec.to_owned()
 }
 
 #[cfg(test)]
