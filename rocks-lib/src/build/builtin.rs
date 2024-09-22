@@ -86,29 +86,3 @@ fn autodetect_modules() -> Result<HashMap<String, ModuleSpec>> {
         })
         .try_collect()
 }
-
-#[cfg(test)]
-#[cfg(feature = "test_nosandbox")]
-mod tests {
-    use tempdir::TempDir;
-
-    use crate::{config::ConfigBuilder, rockspec::Rockspec};
-
-    #[tokio::test]
-    async fn builtin_build() {
-        let dir = TempDir::new("rocks-test").unwrap();
-
-        let content =
-            String::from_utf8(std::fs::read("resources/test/lua-cjson-2.1.0-1.rockspec").unwrap())
-                .unwrap();
-        let rockspec = Rockspec::new(&content).unwrap();
-
-        let config = ConfigBuilder::new()
-            .tree(Some(dir.into_path()))
-            .lua_version(Some(crate::config::LuaVersion::Lua51))
-            .build()
-            .unwrap();
-
-        crate::build::build(rockspec, &config).await.unwrap();
-    }
-}

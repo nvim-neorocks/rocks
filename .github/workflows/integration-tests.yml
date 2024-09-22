@@ -1,0 +1,16 @@
+on: [push, pull_request]
+
+name: Integration tests
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: Swatinem/rust-cache@v2
+      - name: Integration tests
+        run: | 
+          nix develop --command cargo nextest run --test "*"
+        shell: bash

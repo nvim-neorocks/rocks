@@ -29,10 +29,18 @@
 
         nativeCheckInputs = [
           cacert
+          cargo-nextest
         ];
 
         preCheck = ''
           export HOME=$(realpath .)
+        '';
+
+        checkPhase = ''
+          runHook preCheck
+          # Disable integration tests
+          cargo nextest run --no-fail-fast --lib
+          runHook postCheck
         '';
 
         env = {

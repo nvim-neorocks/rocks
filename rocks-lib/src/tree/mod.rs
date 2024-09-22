@@ -91,7 +91,6 @@ impl Tree {
 mod tests {
     use std::path::PathBuf;
 
-    #[cfg(feature = "test_nosandbox")]
     use insta::{assert_yaml_snapshot, sorted_redaction};
 
     use crate::{config::LuaVersion, tree::RockLayout};
@@ -133,7 +132,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "test_nosandbox")]
     fn tree_list() {
         let tree_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-tree");
