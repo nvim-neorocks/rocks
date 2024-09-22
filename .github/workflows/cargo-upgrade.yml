@@ -1,0 +1,27 @@
+---
+name: Cargo upgrade
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Sunday at 00:00
+  workflow_dispatch:
+
+jobs:
+  cargo-upgrade:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run cargo-upgrade
+        uses: meysam81/cargo-upgrade-action@v1
+        with:
+          token: ${{ secrets.GH_TOKEN_FOR_UPDATES }}
