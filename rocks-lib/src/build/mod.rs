@@ -2,7 +2,9 @@ use std::path::Path;
 
 use crate::{
     config::Config,
+    lockfile::LockedPackage,
     lua_installation::LuaInstallation,
+    lua_package::LuaPackage,
     progress::with_spinner,
     rockspec::{utils, Build as _, BuildBackendSpec, Rockspec},
     tree::{RockLayout, Tree},
@@ -75,7 +77,11 @@ async fn install(
 }
 
 #[async_recursion]
-pub async fn build(progress: &MultiProgress, rockspec: Rockspec, config: &Config) -> Result<()> {
+pub async fn build(
+    progress: &MultiProgress,
+    rockspec: Rockspec,
+    config: &Config,
+) -> Result<LockedPackage> {
     // TODO(vhyrro): Create a unified way of accessing the Lua version with centralized error
     // handling.
     let lua_version = rockspec.lua_version();
@@ -84,6 +90,12 @@ pub async fn build(progress: &MultiProgress, rockspec: Rockspec, config: &Config
     )?;
 
     let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
+    let mut lockfile = tree.lockfile()?;
+
+    let package = lockfile.add(
+        &LuaPackage::new(rockspec.package.clone(), rockspec.version.clone()),
+        false,
+    );
 
     // Recursively build all dependencies.
     // TODO: Handle build dependencies as well.
@@ -97,7 +109,10 @@ pub async fn build(progress: &MultiProgress, rockspec: Rockspec, config: &Config
         // which will in turn acquire another lock to the filesystem.
         // Once we implement fs locks, this could become a problem, so a more sophisticated
         // filesystem acquiring mechanism will have to be devised.
-        crate::operations::install(progress, dependency_req.clone(), config).await?;
+        let dependency =
+            crate::operations::install(progress, dependency_req.clone(), config).await?;
+
+        lockfile.add_dependency(&package, &dependency);
     }
 
     let temp_dir = tempdir::TempDir::new(&rockspec.package.to_string())?;
@@ -138,5 +153,5 @@ pub async fn build(progress: &MultiProgress, rockspec: Rockspec, config: &Config
         }
     }
 
-    Ok(())
+    Ok(package)
 }

@@ -18,7 +18,7 @@ pub fn list_installed(list_data: ListCmd, config: Config) -> Result<()> {
             .cloned()
             .ok_or_eyre("lua version not supplied!")?,
     )?;
-    let available_rocks = tree.list();
+    let available_rocks = tree.list()?;
 
     if list_data.porcelain {
         println!("{}", serde_json::to_string(&available_rocks)?);

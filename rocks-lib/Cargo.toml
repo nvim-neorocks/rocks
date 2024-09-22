@@ -20,7 +20,7 @@ pathdiff = "0.2.1"
 reqwest = "0.12.0"
 semver = "1.0.22"
 serde = { version = "1.0.197", features = ["derive"] }
-serde_json = "1.0.114"
+serde_json = { version = "1.0.114", features = ["preserve_order"] }
 ssri = "9.2.0"
 strum = { version = "0.26" }
 strum_macros = "0.26"
@@ -31,7 +31,6 @@ walkdir = "2.4.0"
 zip = "2.2.0"
 tar = "0.4.42"
 flate2 = "1.0.34"
-insta = { version = "1.39.0", features = ["redactions", "yaml"] }
 which = "6.0.3"
 lets_find_up = "0.0.3"
 remove_dir_all = "0.8.3"
@@ -43,13 +42,16 @@ clap = { version = "4.5.3", features = ["derive"], optional = true}
 async-recursion = "1.1.1"
 infer = "0.16.0"
 indicatif = "0.17.8"
+sha2 = "0.10.8"
+hex = { version = "0.4.3" }
 
 [dev-dependencies]
 httptest = { version = "0.16.1" }
 serial_test = { version = "3.0.0" }
 proptest = "1.4.0"
 dir-diff = "0.3.3"
-insta = "1.39.0"
+insta = { version = "1.39.0", features = ["redactions", "yaml", "json"] }
+assert_fs = "1.1.2"
 
 [features]
 clap = ["dep:clap"]

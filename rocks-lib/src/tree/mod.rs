@@ -1,11 +1,11 @@
-use std::path::PathBuf;
-
 use crate::{
     build::variables::{self, HasVariables},
     config::LuaVersion,
+    lockfile::Lockfile,
     lua_package::{LuaPackage, LuaPackageReq, PackageName, PackageVersion},
 };
 use eyre::Result;
+use std::path::PathBuf;
 
 mod list;
 
@@ -83,8 +83,10 @@ impl HasVariables for RockLayout {
 
 impl Tree {
     pub fn new(root: PathBuf, version: LuaVersion) -> Result<Self> {
+        let path_with_version = root.join(version.to_string());
+
         // Ensure that the root and the version directory exist.
-        std::fs::create_dir_all(root.join(version.to_string()))?;
+        std::fs::create_dir_all(&path_with_version)?;
 
         // Ensure that the bin directory exists.
         std::fs::create_dir_all(root.join("bin"))?;
@@ -105,7 +107,7 @@ impl Tree {
     }
 
     pub fn has_rock(&self, req: &LuaPackageReq) -> Option<LuaPackage> {
-        self.list().get(req.name()).map(|versions| {
+        self.list().ok()?.get(req.name()).map(|versions| {
             versions.iter().rev().find_map(|version| {
                 if req.version_req().matches(version) {
                     Some(LuaPackage::new(req.name().clone(), version.clone()))
@@ -149,15 +151,25 @@ impl Tree {
             doc,
         })
     }
+
+    pub fn lockfile(&self) -> Result<Lockfile> {
+        Lockfile::new(self.root().join("lock.json"))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
-    use insta::{assert_yaml_snapshot, sorted_redaction};
+    use insta::assert_yaml_snapshot;
+    use itertools::Itertools;
 
-    use crate::{build::variables::HasVariables as _, config::LuaVersion, tree::RockLayout};
+    use crate::{
+        build::variables::HasVariables as _,
+        config::LuaVersion,
+        lua_package::{PackageName, PackageVersion},
+        tree::RockLayout,
+    };
 
     use super::Tree;
 
@@ -209,8 +221,15 @@ mod tests {
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-tree");
 
         let tree = Tree::new(tree_path, LuaVersion::Lua51).unwrap();
+        let result = tree.list().unwrap();
+        // note: sorted_redaction doesn't work because we have a nested Vec
+        let sorted_result: Vec<(PackageName, Vec<PackageVersion>)> = result
+            .into_iter()
+            .sorted()
+            .map(|(name, version)| (name, version.into_iter().sorted().collect_vec()))
+            .collect_vec();
 
-        assert_yaml_snapshot!(tree.list(), { "." => sorted_redaction() })
+        assert_yaml_snapshot!(sorted_result)
     }
 
     #[test]
@@ -247,6 +266,6 @@ mod tests {
                 neorg.doc.to_string_lossy().to_string(),
                 "$(UNRECOGNISED)".into(),
             ]
-        )
+        );
     }
 }
