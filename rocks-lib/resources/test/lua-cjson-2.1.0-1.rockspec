@@ -3,7 +3,7 @@ version = "2.1.0-1"
 
 source = {
     url = "git+https://github.com/openresty/lua-cjson",
-    tag = "2.1.0",
+    tag = "2.1.0.9", -- 2.1.0 fails to build
 }
 
 description = {
