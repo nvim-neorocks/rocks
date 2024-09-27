@@ -14,13 +14,10 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache rust
+        uses: Swatinem/rust-cache@v2
       - name: Run cargo-upgrade
         uses: meysam81/cargo-upgrade-action@v1
         with:
