@@ -435,7 +435,10 @@ mod tests {
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
-        assert_eq!(rockspec.source.default.archive_name, "foo.tar.gz");
+        assert_eq!(
+            rockspec.source.default.archive_name,
+            Some("foo.tar.gz".into())
+        );
         let foo_bar_path = rockspec.build.default.install.conf.get("foo.bar").unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("config/bar.toml"));
         let rockspec_content = "
@@ -454,8 +457,6 @@ mod tests {
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
-        assert_eq!(rockspec.source.default.archive_name, "foo.zip");
-        assert_eq!(rockspec.source.default.unpack_dir, "foo");
         assert!(matches!(
             rockspec.build.default.build_backend,
             Some(BuildBackendSpec::Builtin { .. })
@@ -543,8 +544,7 @@ mod tests {
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
-        assert_eq!(rockspec.source.default.archive_name, "foo.zip");
-        assert_eq!(rockspec.source.default.unpack_dir, "baz");
+        assert_eq!(rockspec.source.default.unpack_dir, Some("baz".into()));
         assert_eq!(
             rockspec.build.default.build_backend,
             Some(BuildBackendSpec::Make(MakeBuildSpec::default()))

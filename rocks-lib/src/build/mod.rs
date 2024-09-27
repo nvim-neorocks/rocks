@@ -1,14 +1,14 @@
 use crate::{
     config::Config,
     lua_installation::LuaInstallation,
-    rockspec::{utils, Build as _, BuildBackendSpec, RockSourceSpec, Rockspec},
+    rockspec::{utils, Build as _, BuildBackendSpec, Rockspec},
     tree::{RockLayout, Tree},
 };
 use async_recursion::async_recursion;
 use eyre::{OptionExt as _, Result};
-use git2::Repository;
 
 mod builtin;
+mod fetch;
 
 fn install(
     rockspec: &Rockspec,
@@ -67,22 +67,12 @@ pub async fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
     std::env::set_current_dir(&temp_dir)?;
 
     // Install the source in order to build.
-    match &rockspec.source.current_platform().source_spec {
-        RockSourceSpec::Git(git) => {
-            let repo = Repository::clone(&git.url.to_string(), &temp_dir)?;
+    let rock_source = rockspec.source.current_platform();
+    fetch::fetch_src(temp_dir.path(), rock_source).await?;
 
-            if let Some(commit_hash) = &git.checkout_ref {
-                let (object, _) = repo.revparse_ext(commit_hash)?;
-                repo.checkout_tree(&object, None)?;
-            }
-        }
-        RockSourceSpec::Url(_) => todo!(),
-        RockSourceSpec::File(_) => todo!(),
-        RockSourceSpec::Cvs(_) => unimplemented!(),
-        RockSourceSpec::Mercurial(_) => unimplemented!(),
-        RockSourceSpec::Sscm(_) => unimplemented!(),
-        RockSourceSpec::Svn(_) => unimplemented!(),
-    };
+    if let Some(unpack_dir) = &rock_source.unpack_dir {
+        std::env::set_current_dir(temp_dir.path().join(unpack_dir))?;
+    }
 
     // TODO(vhyrro): Instead of copying bit-by-bit we should instead perform all of these
     // operations in the temporary directory itself and then copy all results over once they've
