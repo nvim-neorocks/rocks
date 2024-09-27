@@ -1,7 +1,7 @@
 use crate::{
     config::Config,
     lua_installation::LuaInstallation,
-    rockspec::{utils, Build as _, BuildBackendSpec, RockSourceSpec, Rockspec},
+    rockspec::{utils, Build as _, BuildBackendSpec, Rockspec},
     tree::{RockLayout, Tree},
 };
 use async_recursion::async_recursion;
@@ -67,7 +67,12 @@ pub async fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
     std::env::set_current_dir(&temp_dir)?;
 
     // Install the source in order to build.
-    fetch::fetch_src(temp_dir, &rockspec.source.current_platform().source_spec).await?;
+    let rock_source = rockspec.source.current_platform();
+    fetch::fetch_src(temp_dir.path(), rock_source).await?;
+
+    if let Some(unpack_dir) = &rock_source.unpack_dir {
+        std::env::set_current_dir(temp_dir.path().join(unpack_dir))?;
+    }
 
     // TODO(vhyrro): Instead of copying bit-by-bit we should instead perform all of these
     // operations in the temporary directory itself and then copy all results over once they've

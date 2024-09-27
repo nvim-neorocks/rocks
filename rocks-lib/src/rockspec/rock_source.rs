@@ -15,8 +15,8 @@ use super::{
 pub struct RockSource {
     pub source_spec: RockSourceSpec,
     pub integrity: Option<Integrity>,
-    pub archive_name: String,
-    pub unpack_dir: String,
+    pub archive_name: Option<String>,
+    pub unpack_dir: Option<PathBuf>,
 }
 
 impl FromPlatformOverridable<RockSourceInternal, Self> for RockSource {
@@ -24,7 +24,6 @@ impl FromPlatformOverridable<RockSourceInternal, Self> for RockSource {
         // The rockspec.source table allows invalid combinations
         // This ensures that invalid combinations are caught while parsing.
         let url = internal.url.ok_or(eyre!("source URL missing"))?;
-        let archive_name = internal.file.unwrap_or(url.derive_file_name()?);
 
         let source_spec = match (url, internal.tag, internal.branch, internal.module) {
             (source, None, None, None) => Ok(RockSourceSpec::default_from_source_url(source)),
@@ -60,18 +59,11 @@ impl FromPlatformOverridable<RockSourceInternal, Self> for RockSource {
             _ => Err(eyre!("invalid rockspec source field combination.")),
         }?;
 
-        let dir = internal.dir.unwrap_or(
-            PathBuf::from(&archive_name)
-                .file_stem()
-                .and_then(|name| name.to_str())
-                .map(str::to_string)
-                .ok_or(eyre!("could not derive rockspec source.dir"))?,
-        );
         Ok(RockSource {
             source_spec,
             integrity: internal.hash,
-            archive_name,
-            unpack_dir: dir,
+            archive_name: internal.file,
+            unpack_dir: internal.dir,
         })
     }
 }
@@ -165,7 +157,7 @@ struct RockSourceInternal {
     #[serde(default)]
     hash: Option<Integrity>,
     file: Option<String>,
-    dir: Option<String>,
+    dir: Option<PathBuf>,
     tag: Option<String>,
     branch: Option<String>,
     module: Option<String>,
@@ -224,25 +216,6 @@ enum SourceUrl {
     Sscm(String),
     /// or the Subversion source control manager
     Svn(String),
-}
-
-impl SourceUrl {
-    fn derive_file_name(&self) -> Result<String> {
-        let ret = match self {
-            SourceUrl::Cvs(str) => base_name(str.as_str()).to_string(),
-            SourceUrl::File(file) => file
-                .file_name()
-                .and_then(|name| name.to_str())
-                .map(|name| name.to_string())
-                .ok_or(eyre!("could not derive rockspec source.file"))?,
-            SourceUrl::Url(url) => base_name(url.to_string().as_str()).to_string(),
-            SourceUrl::Git(url) => base_name(url.to_string().as_str()).to_string(),
-            SourceUrl::Mercurial(url) => base_name(url.to_string().as_str()).to_string(),
-            SourceUrl::Sscm(url) => base_name(url.to_string().as_str()).to_string(),
-            SourceUrl::Svn(url) => base_name(url.to_string().as_str()).to_string(),
-        };
-        Ok(ret)
-    }
 }
 
 impl FromStr for SourceUrl {
