@@ -28,7 +28,7 @@ mod utils;
 
 /// A fast and efficient Lua package manager.
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about, long_about = None, arg_required_else_help = true)]
 struct Cli {
     /// Enable the sub-repositories in rocks servers for
     /// rockspecs of in-development versions.
@@ -83,7 +83,7 @@ struct Cli {
     timeout: Option<usize>,
 
     #[command(subcommand)]
-    command: Option<Commands>,
+    command: Commands,
 }
 
 #[derive(Subcommand)]
@@ -95,15 +95,17 @@ enum Commands {
     /// Query information about Rocks's configuration.
     Config,
     /// Various debugging utilities.
-    #[command(subcommand)]
+    #[command(subcommand, arg_required_else_help = true)]
     Debug(Debug),
     /// Show documentation for an installed rock.
     Doc,
     /// Download a specific rock file from a rocks server.
+    #[command(arg_required_else_help = true)]
     Download(Download),
     /// Formats the codebase with stylua.
     Fmt,
     /// Install a rock for use on the system.
+    #[command(arg_required_else_help = true)]
     Install(Install),
     /// Manually install and manage Lua headers for various Lua versions.
     InstallLua,
@@ -124,6 +126,7 @@ enum Commands {
     /// Uninstall a rock.
     Remove,
     /// Query the Luarocks servers.
+    #[command(arg_required_else_help = true)]
     Search(Search),
     /// Show information about an installed rock.
     Show,
@@ -162,32 +165,25 @@ async fn main() {
         .unwrap();
 
     match cli.command {
-        Some(command) => match command {
-            Commands::Search(search_data) => search::search(search_data, config).await.unwrap(),
-            Commands::Download(download_data) => {
-                download::download(download_data, config).await.unwrap()
-            }
-            Commands::Debug(debug) => match debug {
-                Debug::Unpack(unpack_data) => unpack::unpack(unpack_data).await.unwrap(),
-                Debug::UnpackRemote(unpack_data) => {
-                    unpack::unpack_remote(unpack_data, config).await.unwrap()
-                }
-            },
-            Commands::New(project_data) => project::write_new::write_project_rockspec(project_data)
-                .await
-                .unwrap(),
-            Commands::Build(build_data) => build::build(build_data, config).await.unwrap(),
-            Commands::List(list_data) => list::list_installed(list_data, config).unwrap(),
-            Commands::Install(install_data) => {
-                install::install(install_data, config).await.unwrap()
-            }
-            Commands::Outdated(outdated) => outdated::outdated(outdated, config).await.unwrap(),
-            Commands::InstallLua => install_lua::install_lua(config).unwrap(),
-            Commands::Fmt => format::format().unwrap(),
-            _ => unimplemented!(),
-        },
-        None => {
-            println!("TODO: Display configuration information here. Consider supplying a command instead.");
+        Commands::Search(search_data) => search::search(search_data, config).await.unwrap(),
+        Commands::Download(download_data) => {
+            download::download(download_data, config).await.unwrap()
         }
+        Commands::Debug(debug) => match debug {
+            Debug::Unpack(unpack_data) => unpack::unpack(unpack_data).await.unwrap(),
+            Debug::UnpackRemote(unpack_data) => {
+                unpack::unpack_remote(unpack_data, config).await.unwrap()
+            }
+        },
+        Commands::New(project_data) => project::write_new::write_project_rockspec(project_data)
+            .await
+            .unwrap(),
+        Commands::Build(build_data) => build::build(build_data, config).await.unwrap(),
+        Commands::List(list_data) => list::list_installed(list_data, config).unwrap(),
+        Commands::Install(install_data) => install::install(install_data, config).await.unwrap(),
+        Commands::Outdated(outdated) => outdated::outdated(outdated, config).await.unwrap(),
+        Commands::InstallLua => install_lua::install_lua(config).unwrap(),
+        Commands::Fmt => format::format().unwrap(),
+        _ => unimplemented!(),
     }
 }
