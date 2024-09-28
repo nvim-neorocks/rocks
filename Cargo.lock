@@ -2520,7 +2520,6 @@ dependencies = [
  "openssl",
  "pathdiff",
  "proptest",
- "regex",
  "remove_dir_all 0.8.3",
  "reqwest",
  "semver",
