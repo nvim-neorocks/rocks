@@ -1,3 +1,4 @@
+use indicatif::MultiProgress;
 use rocks_lib::{
     build,
     config::{ConfigBuilder, LuaVersion},
@@ -20,5 +21,7 @@ async fn builtin_build() {
         .build()
         .unwrap();
 
-    build::build(rockspec, &config).await.unwrap();
+    build::build(&MultiProgress::new(), rockspec, &config)
+        .await
+        .unwrap();
 }

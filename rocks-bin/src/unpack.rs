@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use clap::Args;
 use eyre::Result;
+use indicatif::MultiProgress;
 use rocks_lib::{config::Config, lua_package::LuaPackageReq};
 
 #[derive(Args)]
@@ -25,9 +26,11 @@ pub struct UnpackRemote {
 }
 
 pub async fn unpack(data: Unpack) -> Result<()> {
-    let unpack_path = rocks_lib::operations::unpack_src_rock(data.path, data.destination)?;
+    let unpack_path =
+        rocks_lib::operations::unpack_src_rock(&MultiProgress::new(), data.path, data.destination)
+            .await?;
 
-    println!("Done. You may now enter the following directory:");
+    println!("You may now enter the following directory:");
     println!("{}", unpack_path.display());
     println!("and type `rocks make` to build.");
 
@@ -36,15 +39,13 @@ pub async fn unpack(data: Unpack) -> Result<()> {
 
 pub async fn unpack_remote(data: UnpackRemote, config: Config) -> Result<()> {
     let package_req = data.package_req;
-    println!("Downloading {}...", package_req.name());
+    let progress = MultiProgress::new();
+    let rock = rocks_lib::operations::download(&progress, &package_req, None, &config).await?;
 
-    let rock = rocks_lib::operations::download(&package_req, None, &config).await?;
+    let unpack_path =
+        rocks_lib::operations::unpack_src_rock(&progress, rock.path.clone(), data.path).await?;
 
-    println!("Unpacking {}...", rock.path.display());
-
-    let unpack_path = rocks_lib::operations::unpack_src_rock(rock.path.clone(), data.path)?;
-
-    println!("Done. You may now enter the following directory:");
+    println!("You may now enter the following directory:");
     println!("{}", unpack_path.display());
     println!("and type `rocks build` to build.");
 

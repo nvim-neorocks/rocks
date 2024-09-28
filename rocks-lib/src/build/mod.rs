@@ -1,12 +1,13 @@
 use crate::{
     config::Config,
     lua_installation::LuaInstallation,
+    progress::with_spinner,
     rockspec::{utils, Build as _, BuildBackendSpec, Rockspec},
     tree::{RockLayout, Tree},
 };
 use async_recursion::async_recursion;
 use eyre::{OptionExt as _, Result};
-
+use indicatif::MultiProgress;
 mod builtin;
 mod fetch;
 
@@ -33,8 +34,15 @@ fn install(
     Ok(())
 }
 
+pub async fn build(progress: &MultiProgress, rockspec: Rockspec, config: &Config) -> Result<()> {
+    with_spinner(progress, "🛠️ Building...".into(), || async {
+        build_impl(progress, rockspec, config).await
+    })
+    .await
+}
+
 #[async_recursion]
-pub async fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
+async fn build_impl(progress: &MultiProgress, rockspec: Rockspec, config: &Config) -> Result<()> {
     // TODO(vhyrro): Create a unified way of accessing the Lua version with centralized error
     // handling.
     let lua_version = rockspec.lua_version();
@@ -56,7 +64,7 @@ pub async fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
         // which will in turn acquire another lock to the filesystem.
         // Once we implement fs locks, this could become a problem, so a more sophisticated
         // filesystem acquiring mechanism will have to be devised.
-        crate::operations::install(dependency_req.clone(), config).await?;
+        crate::operations::install(progress, dependency_req.clone(), config).await?;
     }
 
     // TODO(vhyrro): Use a more serious isolation strategy here.
@@ -68,7 +76,7 @@ pub async fn build(rockspec: Rockspec, config: &Config) -> Result<()> {
 
     // Install the source in order to build.
     let rock_source = rockspec.source.current_platform();
-    fetch::fetch_src(temp_dir.path(), rock_source).await?;
+    fetch::fetch_src(progress, temp_dir.path(), rock_source).await?;
 
     if let Some(unpack_dir) = &rock_source.unpack_dir {
         std::env::set_current_dir(temp_dir.path().join(unpack_dir))?;

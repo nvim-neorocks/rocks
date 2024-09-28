@@ -1,5 +1,6 @@
 use clap::Args;
 use eyre::Result;
+use indicatif::MultiProgress;
 use rocks_lib::{
     config::Config,
     lua_package::{LuaPackage, PackageName, PackageVersion},
@@ -27,5 +28,5 @@ pub async fn remove(remove_args: Remove, config: Config) -> Result<()> {
             .unwrap(),
     );
 
-    rocks_lib::operations::remove(package, &config)
+    rocks_lib::operations::remove(&MultiProgress::new(), package, &config).await
 }

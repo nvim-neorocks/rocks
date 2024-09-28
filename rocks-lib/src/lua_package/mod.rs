@@ -74,6 +74,16 @@ impl LuaPackageReq {
     }
 }
 
+impl Display for LuaPackageReq {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.version_req.eq(&PackageVersionReq::default()) {
+            self.name.fmt(f)
+        } else {
+            f.write_str(format!("{} {}", self.name, self.version_req).as_str())
+        }
+    }
+}
+
 impl FromStr for LuaPackageReq {
     type Err = eyre::Error;
 

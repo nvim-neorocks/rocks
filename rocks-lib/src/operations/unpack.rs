@@ -1,8 +1,24 @@
+use crate::progress::with_spinner;
+
 use eyre::eyre;
 use eyre::Result;
+use indicatif::MultiProgress;
 use std::{fs::File, path::PathBuf};
 
-pub fn unpack_src_rock(rock_path: PathBuf, destination: Option<PathBuf>) -> Result<PathBuf> {
+pub async fn unpack_src_rock(
+    progress: &MultiProgress,
+    rock_path: PathBuf,
+    destination: Option<PathBuf>,
+) -> Result<PathBuf> {
+    with_spinner(
+        progress,
+        format!("📦 Unpacking {}", rock_path.display()),
+        || async { unpack_src_rock_impl(rock_path, destination).await },
+    )
+    .await
+}
+
+async fn unpack_src_rock_impl(rock_path: PathBuf, destination: Option<PathBuf>) -> Result<PathBuf> {
     let stringified_rock_path = rock_path.to_str().ok_or_else(|| {
         eyre!(
             "Invalid UTF-8 found within rock path: {}",
@@ -33,12 +49,18 @@ pub fn unpack_src_rock(rock_path: PathBuf, destination: Option<PathBuf>) -> Resu
 mod tests {
     use super::*;
 
-    #[test]
-    pub fn unpack_rock() {
+    #[tokio::test]
+    pub async fn unpack_rock() {
         let test_rock_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("resources")
             .join("test");
 
-        unpack_src_rock(test_rock_path.join("luatest-0.2-1.src.rock"), None).unwrap();
+        unpack_src_rock(
+            &MultiProgress::new(),
+            test_rock_path.join("luatest-0.2-1.src.rock"),
+            None,
+        )
+        .await
+        .unwrap();
     }
 }

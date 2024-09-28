@@ -1,14 +1,45 @@
+use crate::{
+    config::Config, lua_package::LuaPackageReq, progress::with_spinner, rockspec::Rockspec,
+};
+
 use eyre::Result;
+use indicatif::MultiProgress;
 use tempdir::TempDir;
 
-use crate::{config::Config, lua_package::LuaPackageReq, rockspec::Rockspec};
+pub async fn install(
+    progress: &MultiProgress,
+    package_req: LuaPackageReq,
+    config: &Config,
+) -> Result<()> {
+    with_spinner(
+        progress,
+        format!("💻 Installing {}", package_req),
+        || async { install_impl(progress, package_req, config).await },
+    )
+    .await
+}
 
-pub async fn install(package_req: LuaPackageReq, config: &Config) -> Result<()> {
+async fn install_impl(
+    progress: &MultiProgress,
+    package_req: LuaPackageReq,
+    config: &Config,
+) -> Result<()> {
     let temp = TempDir::new(&package_req.name().to_string())?;
 
-    let rock = super::download(&package_req, Some(temp.path().to_path_buf()), config).await?;
+    let rock = super::download(
+        progress,
+        &package_req,
+        Some(temp.path().to_path_buf()),
+        config,
+    )
+    .await?;
 
-    super::unpack_src_rock(temp.path().join(rock.path), Some(temp.path().to_path_buf()))?;
+    super::unpack_src_rock(
+        progress,
+        temp.path().join(rock.path),
+        Some(temp.path().to_path_buf()),
+    )
+    .await?;
 
     let rockspec_path = walkdir::WalkDir::new(&temp)
         .max_depth(1)
@@ -23,6 +54,7 @@ pub async fn install(package_req: LuaPackageReq, config: &Config) -> Result<()> 
         .into_path();
 
     crate::build::build(
+        progress,
         Rockspec::new(&std::fs::read_to_string(rockspec_path)?)?,
         config,
     )

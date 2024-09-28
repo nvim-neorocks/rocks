@@ -1,7 +1,15 @@
-use crate::{config::Config, lua_package::LuaPackage, tree::Tree};
+use crate::{config::Config, lua_package::LuaPackage, progress::with_spinner, tree::Tree};
 use eyre::Result;
+use indicatif::MultiProgress;
 
-pub fn remove(package: LuaPackage, config: &Config) -> Result<()> {
+pub async fn remove(progress: &MultiProgress, package: LuaPackage, config: &Config) -> Result<()> {
+    with_spinner(progress, format!("🗑️ Removing {}", package), || async {
+        remove_impl(package, config).await
+    })
+    .await
+}
+
+async fn remove_impl(package: LuaPackage, config: &Config) -> Result<()> {
     let tree = Tree::new(
         config.tree().clone(),
         config.lua_version().cloned().unwrap(),
