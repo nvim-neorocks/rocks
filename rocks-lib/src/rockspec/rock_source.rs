@@ -1,7 +1,6 @@
 use eyre::{eyre, Result};
 use git_url_parse::GitUrl;
 use mlua::{FromLua, Lua, Value};
-use regex::RegexSet;
 use reqwest::Url;
 use serde::{de, Deserialize, Deserializer};
 use ssri::Integrity;
@@ -222,29 +221,25 @@ impl FromStr for SourceUrl {
     type Err = eyre::Error;
 
     fn from_str(str: &str) -> Result<Self> {
-        let url_regex_set: RegexSet =
-            RegexSet::new([r"^https://", r"^http://", r"^ftp://"]).unwrap();
-
-        let mercurial_source_regex_set: RegexSet =
-            RegexSet::new([r"^hg://", r"^hg\+http://", r"^hg\+https://", r"^hg\+ssh://"]).unwrap();
-
-        let git_source_regex_set: RegexSet = RegexSet::new([
-            r"^git\+file://",
-            r"^git\+http://",
-            r"^git\+https://",
-            r"^git\+ssh://",
-        ])
-        .unwrap();
-
         match str {
             s if s.starts_with("cvs://") => Ok(Self::Cvs(s.to_string())),
             s if s.starts_with("file://") => Ok(Self::File(s.trim_start_matches("file://").into())),
             s if s.starts_with("git://") => Ok(Self::Git(s.parse()?)),
-            s if git_source_regex_set.matches(s).matched_any() => {
+            s if starts_with_any(
+                s,
+                ["git+file://", "git+http://", "git+https://", "git+ssh://"].into(),
+            ) =>
+            {
                 Ok(Self::Git(s.trim_start_matches("git+").parse()?))
             }
-            s if url_regex_set.matches(s).matched_any() => Ok(Self::Url(s.parse()?)),
-            s if mercurial_source_regex_set.matches(s).matched_any() => {
+            s if starts_with_any(s, ["https://", "http://", "ftp://"].into()) => {
+                Ok(Self::Url(s.parse()?))
+            }
+            s if starts_with_any(
+                s,
+                ["hg://", "hg+http://", "hg+https://", "hg+ssh://"].into(),
+            ) =>
+            {
                 Ok(Self::Mercurial(s.to_string()))
             }
             s if s.starts_with("sscm://") => Ok(Self::Sscm(s.to_string())),
@@ -286,6 +281,10 @@ fn base_name(path: &str) -> Cow<'_, str> {
         Some(p) => p.into(),
         None => path.into(),
     }
+}
+
+fn starts_with_any(str: &str, prefixes: Vec<&str>) -> bool {
+    return prefixes.iter().any(|&prefix| str.starts_with(prefix));
 }
 
 #[cfg(test)]

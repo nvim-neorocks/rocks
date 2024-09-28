@@ -17,7 +17,6 @@ httpdate = "1.0.3"
 itertools = "0.13.0"
 mlua = { version = "0.9.6", features = ["luajit52", "serialize"] }
 pathdiff = "0.2.1"
-regex = "1.10.3"
 reqwest = "0.12.0"
 semver = "1.0.22"
 serde = { version = "1.0.197", features = ["derive"] }
