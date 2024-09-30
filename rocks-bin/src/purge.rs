@@ -1,8 +1,9 @@
 use eyre::Result;
+use indicatif::MultiProgress;
 use inquire::Confirm;
-use rocks_lib::{config::Config, tree::Tree};
+use rocks_lib::{config::Config, progress::with_spinner, tree::Tree};
 
-pub fn purge(config: Config) -> Result<()> {
+pub async fn purge(config: Config) -> Result<()> {
     let tree = Tree::new(
         config.tree().clone(),
         config.lua_version().cloned().unwrap(),
@@ -14,7 +15,16 @@ pub fn purge(config: Config) -> Result<()> {
         .with_default(false)
         .prompt()?
     {
-        std::fs::remove_dir_all(tree.root())?;
+        let root_dir = tree.root();
+        with_spinner(
+            &MultiProgress::new(),
+            format!("🗑️ Purging {}", root_dir.display()),
+            || async {
+                std::fs::remove_dir_all(tree.root())?;
+                Ok(())
+            },
+        )
+        .await?
     }
 
     Ok(())

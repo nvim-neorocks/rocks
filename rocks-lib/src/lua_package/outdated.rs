@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use eyre::{eyre, Result};
 
 use crate::manifest::ManifestMetadata;
@@ -17,6 +19,12 @@ impl LuaPackage {
         } else {
             Ok(None)
         }
+    }
+}
+
+impl Display for LuaPackage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(format!("{} {}", self.name, self.version).as_str())
     }
 }
 

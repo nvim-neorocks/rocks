@@ -185,9 +185,9 @@ async fn main() {
         Commands::List(list_data) => list::list_installed(list_data, config).unwrap(),
         Commands::Install(install_data) => install::install(install_data, config).await.unwrap(),
         Commands::Outdated(outdated) => outdated::outdated(outdated, config).await.unwrap(),
-        Commands::InstallLua => install_lua::install_lua(config).unwrap(),
+        Commands::InstallLua => install_lua::install_lua(config).await.unwrap(),
         Commands::Fmt => format::format().unwrap(),
-        Commands::Purge => purge::purge(config).unwrap(),
+        Commands::Purge => purge::purge(config).await.unwrap(),
         Commands::Remove(remove_args) => remove::remove(remove_args, config).await.unwrap(),
         _ => unimplemented!(),
     }

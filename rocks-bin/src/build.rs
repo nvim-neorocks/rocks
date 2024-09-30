@@ -1,4 +1,5 @@
 use eyre::eyre;
+use indicatif::MultiProgress;
 use itertools::Itertools;
 use std::path::PathBuf;
 
@@ -48,7 +49,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     let rockspec = std::fs::read_to_string(rockspec_path)?;
     let rockspec = Rockspec::new(&rockspec)?;
 
-    rocks_lib::build::build(rockspec, &config).await?;
+    rocks_lib::build::build(&MultiProgress::new(), rockspec, &config).await?;
 
     Ok(())
 }
