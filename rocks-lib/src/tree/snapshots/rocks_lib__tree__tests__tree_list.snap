@@ -4,6 +4,6 @@ assertion_line: 141
 expression: tree.list()
 ---
 lua-cjson:
-  - 2.1.0-1
+  - 2.1.0
 neorg:
-  - 8.0.0-1
+  - 8.0.0
