@@ -109,28 +109,28 @@ mod tests {
         let tree = Tree::new(tree_path.clone(), LuaVersion::Lua51).unwrap();
 
         let neorg = tree
-            .rock(&"neorg".into(), &"8.0.0-1".parse().unwrap())
+            .rock(&"neorg".into(), &"8.0.0".parse().unwrap())
             .unwrap();
 
         assert_eq!(
             neorg,
             RockLayout {
-                etc: tree_path.join("5.1/neorg@8.0.0-1/etc"),
-                lib: tree_path.join("5.1/neorg@8.0.0-1/lib"),
-                src: tree_path.join("5.1/neorg@8.0.0-1/src"),
+                etc: tree_path.join("5.1/neorg@8.0.0/etc"),
+                lib: tree_path.join("5.1/neorg@8.0.0/lib"),
+                src: tree_path.join("5.1/neorg@8.0.0/src"),
             }
         );
 
         let lua_cjson = tree
-            .rock(&"lua-cjson".into(), &"2.1.0-1".parse().unwrap())
+            .rock(&"lua-cjson".into(), &"2.1.0".parse().unwrap())
             .unwrap();
 
         assert_eq!(
             lua_cjson,
             RockLayout {
-                etc: tree_path.join("5.1/lua-cjson@2.1.0-1/etc"),
-                lib: tree_path.join("5.1/lua-cjson@2.1.0-1/lib"),
-                src: tree_path.join("5.1/lua-cjson@2.1.0-1/src"),
+                etc: tree_path.join("5.1/lua-cjson@2.1.0/etc"),
+                lib: tree_path.join("5.1/lua-cjson@2.1.0/lib"),
+                src: tree_path.join("5.1/lua-cjson@2.1.0/src"),
             }
         );
     }

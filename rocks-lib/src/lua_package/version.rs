@@ -84,11 +84,14 @@ impl FromStr for PackageVersion {
     type Err = eyre::Error;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        if is_dev_version_str(text) {
-            return Ok(PackageVersion::Dev { name: text.into() });
+        let trimmed = trim_specrev(text);
+        if is_dev_version_str(trimmed) {
+            return Ok(PackageVersion::Dev {
+                name: trimmed.into(),
+            });
         }
         Ok(PackageVersion::SemVer {
-            version: parse_version(text)?,
+            version: parse_version(trimmed)?,
         })
     }
 }
@@ -170,6 +173,18 @@ impl FromStr for PackageVersionReq {
     }
 }
 
+/// TODO?: For now, let's not support specrev. It's a dumb idea.
+fn trim_specrev(version_str: &str) -> &str {
+    if let Some(pos) = version_str.rfind('-') {
+        if let Some(specrev) = version_str.get(pos + 1..) {
+            if specrev.chars().all(|c| c.is_ascii_digit()) {
+                return &version_str[..pos];
+            }
+        }
+    }
+    version_str
+}
+
 fn is_dev_version_str(text: &str) -> bool {
     matches!(text, "dev" | "scm" | "git")
 }
@@ -234,6 +249,34 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    async fn parse_semver_version() {
+        assert_eq!(
+            PackageVersion::parse("1").unwrap(),
+            PackageVersion::SemVer {
+                version: "1.0.0".parse().unwrap()
+            }
+        );
+        assert_eq!(
+            PackageVersion::parse("1.0").unwrap(),
+            PackageVersion::SemVer {
+                version: "1.0.0".parse().unwrap()
+            }
+        );
+        assert_eq!(
+            PackageVersion::parse("1.0.0").unwrap(),
+            PackageVersion::SemVer {
+                version: "1.0.0".parse().unwrap()
+            }
+        );
+        assert_eq!(
+            PackageVersion::parse("1.0.0-1").unwrap(),
+            PackageVersion::SemVer {
+                version: "1.0.0".parse().unwrap()
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn parse_dev_version() {
         assert_eq!(
             PackageVersion::parse("dev").unwrap(),
@@ -246,6 +289,10 @@ mod tests {
         assert_eq!(
             PackageVersion::parse("git").unwrap(),
             PackageVersion::Dev { name: "git".into() }
+        );
+        assert_eq!(
+            PackageVersion::parse("scm-1").unwrap(),
+            PackageVersion::Dev { name: "scm".into() }
         );
     }
 

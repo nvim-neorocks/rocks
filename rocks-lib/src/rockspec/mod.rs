@@ -509,19 +509,6 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
-            url = 'git://hub.com/example-project/',\n
-        }\n
-        build = {\n
-            copy_directories = { 'foo-1.0.0-1.rockspec' },\n
-        }\n
-        "
-        .to_string();
-        let _rockspec = Rockspec::new(&rockspec_content).unwrap_err();
-        let rockspec_content = "
-        rockspec_format = '1.0'\n
-        package = 'foo'\n
-        version = '1.0.0-1'\n
-        source = {\n
             url = 'git://hub.com/example-project/foo.zip',\n
             dir = 'baz',\n
         }\n
@@ -881,5 +868,20 @@ mod tests {
                 .collect()
             }))
         );
+    }
+
+    #[tokio::test]
+    pub async fn parse_scm_rockspec() {
+        let rockspec_content = "
+        package = 'foo'\n
+        version = 'scm-1'\n
+        source = {\n
+            url = 'https://github.com/nvim-neorocks/rocks.nvim/archive/1.0.0/rocks.nvim.zip',\n
+        }\n
+        "
+        .to_string();
+        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+        assert_eq!(rockspec.package, "foo".into());
+        assert_eq!(rockspec.version, "scm-1".parse().unwrap());
     }
 }
