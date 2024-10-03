@@ -1,6 +1,6 @@
 use eyre::eyre;
 use itertools::Itertools;
-use std::process::Command;
+use std::{path::Path, process::Command};
 
 use crate::{
     build::variables::HasVariables,
@@ -17,6 +17,7 @@ impl Build for MakeBuildSpec {
         no_install: bool,
         lua: &LuaInstallation,
         config: &Config,
+        build_dir: &Path,
     ) -> eyre::Result<()> {
         // Build step
         if self.build_pass {
@@ -31,6 +32,7 @@ impl Build for MakeBuildSpec {
                 })
                 .collect_vec();
             match Command::new(config.make_cmd())
+                .current_dir(build_dir)
                 .arg(self.build_target)
                 .args(["-f", self.makefile.to_str().unwrap()])
                 .args(build_args)
@@ -72,7 +74,8 @@ stderr: {}",
                     format!("{key}={substituted_value}")
                 })
                 .collect_vec();
-            match Command::new("make")
+            match Command::new(config.make_cmd())
+                .current_dir(build_dir)
                 .arg(self.install_target)
                 .args(["-f", self.makefile.to_str().unwrap()])
                 .args(install_args)

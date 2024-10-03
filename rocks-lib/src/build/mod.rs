@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use crate::{
     config::Config,
     lua_installation::LuaInstallation,
@@ -19,14 +21,15 @@ async fn run_build(
     output_paths: &RockLayout,
     lua: &LuaInstallation,
     config: &Config,
+    build_dir: &Path,
 ) -> Result<()> {
     with_spinner(progress, "🛠️ Building...".into(), || async {
         match rockspec.build.default.build_backend.to_owned() {
             Some(BuildBackendSpec::Builtin(build_spec)) => {
-                build_spec.run(output_paths, false, lua, config)?
+                build_spec.run(output_paths, false, lua, config, build_dir)?
             }
             Some(BuildBackendSpec::Make(make_spec)) => {
-                make_spec.run(output_paths, false, lua, config)?
+                make_spec.run(output_paths, false, lua, config, build_dir)?
             }
             _ => unimplemented!(),
         }
@@ -42,6 +45,7 @@ async fn install(
     tree: &Tree,
     output_paths: &RockLayout,
     lua: &LuaInstallation,
+    build_dir: &Path,
 ) -> Result<()> {
     with_spinner(
         progress,
@@ -49,13 +53,19 @@ async fn install(
         || async {
             let install_spec = &rockspec.build.current_platform().install;
             for (target, source) in &install_spec.lua {
-                utils::copy_lua_to_module_path(source, target, &output_paths.src)?;
+                let absolute_source = build_dir.join(source);
+                utils::copy_lua_to_module_path(&absolute_source, target, &output_paths.src)?;
             }
             for (target, source) in &install_spec.lib {
-                utils::compile_c_files(&vec![source.into()], target, &output_paths.lib, lua)?;
+                utils::compile_c_files(
+                    &vec![build_dir.join(source)],
+                    target,
+                    &output_paths.lib,
+                    lua,
+                )?;
             }
             for (target, source) in &install_spec.bin {
-                std::fs::copy(source, tree.bin().join(target))?;
+                std::fs::copy(build_dir.join(source), tree.bin().join(target))?;
             }
             Ok(())
         },
@@ -90,20 +100,11 @@ pub async fn build(progress: &MultiProgress, rockspec: Rockspec, config: &Config
         crate::operations::install(progress, dependency_req.clone(), config).await?;
     }
 
-    // TODO(vhyrro): Use a more serious isolation strategy here.
     let temp_dir = tempdir::TempDir::new(&rockspec.package.to_string())?;
-
-    let previous_dir = std::env::current_dir()?;
-
-    std::env::set_current_dir(&temp_dir)?;
 
     // Install the source in order to build.
     let rock_source = rockspec.source.current_platform();
     fetch::fetch_src(progress, temp_dir.path(), rock_source).await?;
-
-    if let Some(unpack_dir) = &rock_source.unpack_dir {
-        std::env::set_current_dir(temp_dir.path().join(unpack_dir))?;
-    }
 
     // TODO(vhyrro): Instead of copying bit-by-bit we should instead perform all of these
     // operations in the temporary directory itself and then copy all results over once they've
@@ -113,13 +114,21 @@ pub async fn build(progress: &MultiProgress, rockspec: Rockspec, config: &Config
 
     let lua = LuaInstallation::new(lua_version, config)?;
 
-    run_build(progress, &rockspec, &output_paths, &lua, config).await?;
+    let build_dir = match &rock_source.unpack_dir {
+        Some(unpack_dir) => temp_dir.path().join(unpack_dir),
+        None => temp_dir.path().into(),
+    };
 
-    install(progress, &rockspec, &tree, &output_paths, &lua).await?;
+    run_build(progress, &rockspec, &output_paths, &lua, config, &build_dir).await?;
+
+    install(progress, &rockspec, &tree, &output_paths, &lua, &build_dir).await?;
 
     // Copy over all `copy_directories` to their respective paths
     for directory in &rockspec.build.current_platform().copy_directories {
-        for file in walkdir::WalkDir::new(directory).into_iter().flatten() {
+        for file in walkdir::WalkDir::new(build_dir.join(directory))
+            .into_iter()
+            .flatten()
+        {
             if file.file_type().is_file() {
                 let filepath = file.path();
                 let target = output_paths.etc.join(filepath);
@@ -128,8 +137,6 @@ pub async fn build(progress: &MultiProgress, rockspec: Rockspec, config: &Config
             }
         }
     }
-
-    std::env::set_current_dir(previous_dir)?;
 
     Ok(())
 }
