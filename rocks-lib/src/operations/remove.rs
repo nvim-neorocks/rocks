@@ -1,3 +1,4 @@
+use crate::lockfile::LockedPackage;
 use crate::{config::Config, lua_package::LuaPackage, progress::with_spinner, tree::Tree};
 use eyre::Result;
 use indicatif::MultiProgress;
@@ -16,6 +17,8 @@ async fn remove_impl(package: LuaPackage, config: &Config) -> Result<()> {
     )?;
 
     let package = tree.has_rock(&package.as_package_req()).unwrap();
+
+    tree.lockfile()?.remove(&LockedPackage::from(&package));
 
     std::fs::remove_dir_all(tree.root_for(package.name(), package.version()))?;
 

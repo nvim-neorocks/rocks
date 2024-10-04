@@ -9,7 +9,7 @@ pub async fn purge(config: Config) -> Result<()> {
         config.lua_version().cloned().unwrap(),
     )?;
 
-    let len = tree.list().len();
+    let len = tree.list()?.len();
 
     if Confirm::new(&format!("Are you sure you want to purge all {len} rocks?"))
         .with_default(false)

@@ -1,44 +1,28 @@
 use std::collections::HashMap;
 
+use eyre::Result;
 use itertools::Itertools;
-use walkdir::WalkDir;
 
 use crate::lua_package::{LuaPackage, PackageName, PackageVersion};
 
 use super::Tree;
 
 impl Tree {
-    pub fn list(&self) -> HashMap<PackageName, Vec<PackageVersion>> {
-        // TODO: Replace this with a single lockfile read and cache it.
-        WalkDir::new(self.root())
-            .min_depth(1)
-            .max_depth(1)
-            .into_iter()
-            .map(|rock_directory| {
-                let rock_dir = rock_directory.unwrap();
-                let (name, version) = rock_dir
-                    .file_name()
-                    .to_str()
-                    .unwrap()
-                    .split_once('@')
-                    .unwrap();
-                (
-                    PackageName::new(name.to_string()),
-                    PackageVersion::parse(version).unwrap_or_else(|_| {
-                        panic!(
-                            "invalid version found in rocktree at '{}'. This is a bug!",
-                            rock_dir.path().display()
-                        )
-                    }),
-                )
-            })
-            .into_group_map()
+    pub fn list(&self) -> Result<HashMap<PackageName, Vec<PackageVersion>>> {
+        let lockfile = self.lockfile()?;
+
+        Ok(lockfile
+            .rocks()
+            .values()
+            .cloned()
+            .map(|locked_rock| (locked_rock.name, locked_rock.version))
+            .into_group_map())
     }
 
-    pub fn into_rock_list(self) -> Vec<LuaPackage> {
-        let rock_list = self.list();
+    pub fn into_rock_list(self) -> Result<Vec<LuaPackage>> {
+        let rock_list = self.list()?;
 
-        rock_list
+        Ok(rock_list
             .into_iter()
             .flat_map(|(name, versions)| {
                 versions
@@ -46,12 +30,14 @@ impl Tree {
                     .map(|version| LuaPackage::new(name.clone(), version))
                     .collect_vec()
             })
-            .collect()
+            .collect())
     }
 }
 
-impl From<Tree> for Vec<LuaPackage> {
-    fn from(tree: Tree) -> Self {
+impl TryFrom<Tree> for Vec<LuaPackage> {
+    type Error = eyre::Report;
+
+    fn try_from(tree: Tree) -> std::result::Result<Self, Self::Error> {
         tree.into_rock_list()
     }
 }

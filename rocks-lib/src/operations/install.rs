@@ -1,5 +1,6 @@
 use crate::{
-    config::Config, lua_package::LuaPackageReq, progress::with_spinner, rockspec::Rockspec,
+    config::Config, lockfile::LockedPackage, lua_package::LuaPackageReq, progress::with_spinner,
+    rockspec::Rockspec,
 };
 
 use eyre::Result;
@@ -10,7 +11,7 @@ pub async fn install(
     progress: &MultiProgress,
     package_req: LuaPackageReq,
     config: &Config,
-) -> Result<()> {
+) -> Result<LockedPackage> {
     with_spinner(
         progress,
         format!("💻 Installing {}", package_req),
@@ -23,7 +24,7 @@ async fn install_impl(
     progress: &MultiProgress,
     package_req: LuaPackageReq,
     config: &Config,
-) -> Result<()> {
+) -> Result<LockedPackage> {
     let temp = TempDir::new(&package_req.name().to_string())?;
 
     let rock = super::download(
@@ -58,7 +59,5 @@ async fn install_impl(
         Rockspec::new(&std::fs::read_to_string(rockspec_path)?)?,
         config,
     )
-    .await?;
-
-    Ok(())
+    .await
 }

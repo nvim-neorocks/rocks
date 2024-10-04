@@ -1,9 +1,10 @@
 ---
 source: rocks-lib/src/tree/mod.rs
-assertion_line: 141
-expression: tree.list()
+assertion_line: 229
+expression: sorted_result
 ---
-lua-cjson:
-  - 2.1.0
-neorg:
-  - 8.0.0
+- - lua-cjson
+  - - 2.1.0
+- - neorg
+  - - 8.0.0
+    - 8.8.1

@@ -1,0 +1,49 @@
+---
+source: rocks-lib/src/lockfile/mod.rs
+expression: lockfile
+---
+{
+  "version": "1.0.0",
+  "rocks": {
+    "48ec344951668eca0e0a4ff284d804a11e4e709194df3191a72ed8fac89cf2e0": {
+      "name": "lua-cjson",
+      "version": "2.1.0",
+      "pinned": false,
+      "dependencies": []
+    },
+    "aa0a5bcd396f3b8e59fa9dd8059a06c3bf4952f48473214d96fc46895edb59f0": {
+      "name": "neorg",
+      "version": "8.8.1",
+      "pinned": false,
+      "dependencies": [
+        "48ec344951668eca0e0a4ff284d804a11e4e709194df3191a72ed8fac89cf2e0"
+      ]
+    },
+    "ae010d6b758c43148b300c47dbe56532df65e0b4151759ba8bea7e22e787939c": {
+      "name": "test2",
+      "version": "0.1.0",
+      "pinned": true,
+      "dependencies": []
+    },
+    "d27609febb7bc0a8b6be63fb51b8a2daed3dd27e03badaa2ebfbbc73ac658f8b": {
+      "name": "test1",
+      "version": "0.1.0",
+      "pinned": false,
+      "dependencies": [
+        "ae010d6b758c43148b300c47dbe56532df65e0b4151759ba8bea7e22e787939c"
+      ]
+    },
+    "d7164c4921869877c7f29fce3f14b8ea78e0aec0d0c36123a3a920a894785ea5": {
+      "name": "neorg",
+      "version": "8.0.0",
+      "pinned": false,
+      "dependencies": [
+        "48ec344951668eca0e0a4ff284d804a11e4e709194df3191a72ed8fac89cf2e0"
+      ]
+    }
+  },
+  "entrypoints": [
+    "aa0a5bcd396f3b8e59fa9dd8059a06c3bf4952f48473214d96fc46895edb59f0",
+    "d7164c4921869877c7f29fce3f14b8ea78e0aec0d0c36123a3a920a894785ea5"
+  ]
+}

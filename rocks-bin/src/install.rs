@@ -10,5 +10,8 @@ pub struct Install {
 
 pub async fn install(install_data: Install, config: Config) -> Result<()> {
     // TODO(vhyrro): If the tree doesn't exist then error out.
-    rocks_lib::operations::install(&MultiProgress::new(), install_data.package_req, &config).await
+    rocks_lib::operations::install(&MultiProgress::new(), install_data.package_req, &config)
+        .await?;
+
+    Ok(())
 }
