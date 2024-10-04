@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     config::Config,
@@ -17,9 +20,10 @@ impl Build for BuiltinBuildSpec {
         _no_install: bool,
         lua: &LuaInstallation,
         _config: &Config,
+        build_dir: &Path,
     ) -> Result<()> {
         // Detect all Lua modules
-        let modules = autodetect_modules()?
+        let modules = autodetect_modules(build_dir)?
             .into_iter()
             .chain(self.modules)
             .collect::<HashMap<_, _>>();
@@ -27,14 +31,30 @@ impl Build for BuiltinBuildSpec {
         for (destination_path, module_type) in &modules {
             match module_type {
                 ModuleSpec::SourcePath(source) => {
-                    utils::copy_lua_to_module_path(source, destination_path, &output_paths.src)?
+                    let absolute_source_path = build_dir.join(source);
+                    utils::copy_lua_to_module_path(
+                        &absolute_source_path,
+                        destination_path,
+                        &output_paths.src,
+                    )?
                 }
                 ModuleSpec::SourcePaths(files) => {
-                    utils::compile_c_files(files, destination_path, &output_paths.lib, lua)?
+                    let absolute_source_paths =
+                        files.iter().map(|file| build_dir.join(file)).collect();
+                    utils::compile_c_files(
+                        &absolute_source_paths,
+                        destination_path,
+                        &output_paths.lib,
+                        lua,
+                    )?
                 }
-                ModuleSpec::ModulePaths(data) => {
-                    utils::compile_c_modules(data, destination_path, &output_paths.lib, lua)?
-                }
+                ModuleSpec::ModulePaths(data) => utils::compile_c_modules(
+                    data,
+                    build_dir,
+                    destination_path,
+                    &output_paths.lib,
+                    lua,
+                )?,
             }
         }
 
@@ -42,11 +62,11 @@ impl Build for BuiltinBuildSpec {
     }
 }
 
-fn autodetect_modules() -> Result<HashMap<String, ModuleSpec>> {
-    WalkDir::new("src")
+fn autodetect_modules(build_dir: &Path) -> Result<HashMap<String, ModuleSpec>> {
+    WalkDir::new(build_dir.join("src"))
         .into_iter()
-        .chain(WalkDir::new("lua"))
-        .chain(WalkDir::new("lib"))
+        .chain(WalkDir::new(build_dir.join("lua")))
+        .chain(WalkDir::new(build_dir.join("lib")))
         .filter_map(|file| {
             file.ok().and_then(|file| {
                 if PathBuf::from(file.file_name())
@@ -65,8 +85,7 @@ fn autodetect_modules() -> Result<HashMap<String, ModuleSpec>> {
             })
         })
         .map(|file| {
-            let cwd = std::env::current_dir().unwrap();
-            let diff: PathBuf = pathdiff::diff_paths(cwd.join(file.into_path()), cwd)
+            let diff: PathBuf = pathdiff::diff_paths(build_dir.join(file.into_path()), build_dir)
                 .ok_or_eyre("unable to autodetect modules")?;
 
             // NOTE(vhyrro): You may ask why we convert all paths to Lua module paths

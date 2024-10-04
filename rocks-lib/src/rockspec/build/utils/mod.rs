@@ -1,4 +1,5 @@
 use eyre::Result;
+use itertools::Itertools;
 use std::path::{Path, PathBuf};
 
 use crate::lua_installation::LuaInstallation;
@@ -75,6 +76,7 @@ pub fn compile_c_files(
 /// Panics if no filename for the target path can be determined.
 pub fn compile_c_modules(
     data: &ModulePaths,
+    source_dir: &Path,
     target_file: &str,
     target_dir: &Path,
     lua: &LuaInstallation,
@@ -85,12 +87,22 @@ pub fn compile_c_modules(
     std::fs::create_dir_all(target.parent().unwrap())?;
 
     let mut build = cc::Build::new();
+    let source_files = data
+        .sources
+        .iter()
+        .map(|dir| source_dir.join(dir))
+        .collect_vec();
+    let include_dirs = data
+        .incdirs
+        .iter()
+        .map(|dir| source_dir.join(dir))
+        .collect_vec();
     let build = build
         .cargo_metadata(false)
         .debug(false)
-        .files(&data.sources)
+        .files(source_files)
         .host(std::env::consts::OS)
-        .includes(&data.incdirs)
+        .includes(&include_dirs)
         .includes(&lua.include_dir)
         .opt_level(3)
         .out_dir(target_dir)
@@ -104,11 +116,11 @@ pub fn compile_c_modules(
     }
 
     for libdir in &data.libdirs {
-        build.flag(&("-L".to_string() + libdir.to_str().unwrap()));
+        build.flag(&("-L".to_string() + source_dir.join(libdir).to_str().unwrap()));
     }
 
     for library in &data.libraries {
-        build.flag(&("-l".to_string() + library.to_str().unwrap()));
+        build.flag(&("-l".to_string() + source_dir.join(library).to_str().unwrap()));
     }
 
     let file = target.file_name().unwrap_or_else(|| {

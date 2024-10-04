@@ -13,7 +13,10 @@ use itertools::Itertools as _;
 
 use eyre::{eyre, OptionExt as _, Result};
 use mlua::{FromLua, Lua, LuaSerdeExt, Value};
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
@@ -435,6 +438,7 @@ pub trait Build {
         no_install: bool,
         lua: &LuaInstallation,
         config: &Config,
+        build_dir: &Path,
     ) -> Result<()>;
 }
 

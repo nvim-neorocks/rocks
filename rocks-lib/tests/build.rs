@@ -4,11 +4,9 @@ use rocks_lib::{
     config::{ConfigBuilder, LuaVersion},
     rockspec::Rockspec,
 };
-use serial_test::serial;
 use tempdir::TempDir;
 
 #[tokio::test]
-#[serial]
 async fn builtin_build() {
     let dir = TempDir::new("rocks-test").unwrap();
 
@@ -18,7 +16,7 @@ async fn builtin_build() {
     let rockspec = Rockspec::new(&content).unwrap();
 
     let config = ConfigBuilder::new()
-        .tree(Some(dbg!(dir.into_path())))
+        .tree(Some(dir.into_path()))
         .lua_version(Some(LuaVersion::Lua51))
         .build()
         .unwrap();
@@ -29,7 +27,6 @@ async fn builtin_build() {
 }
 
 #[tokio::test]
-#[serial]
 async fn make_build() {
     let dir = TempDir::new("rocks-test").unwrap();
 
