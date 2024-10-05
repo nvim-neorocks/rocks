@@ -1,12 +1,14 @@
 use crate::{
-    config::Config, lockfile::LockedPackage, lua_package::LuaPackageReq, progress::with_spinner,
-    rockspec::Rockspec,
+    config::Config, lockfile::{LockConstraint, LockedPackage}, lua_package::{LuaPackage, LuaPackageReq}, progress::with_spinner,
+    rockspec::Rockspec, tree::Tree,
 };
 
-use eyre::Result;
+use async_recursion::async_recursion;
+use eyre::{OptionExt as _, Result};
 use indicatif::MultiProgress;
 use tempdir::TempDir;
 
+#[async_recursion]
 pub async fn install(
     progress: &MultiProgress,
     package_req: LuaPackageReq,
@@ -25,6 +27,7 @@ async fn install_impl(
     package_req: LuaPackageReq,
     config: &Config,
 ) -> Result<LockedPackage> {
+
     let temp = TempDir::new(&package_req.name().to_string())?;
 
     let rock = super::download(
@@ -54,10 +57,41 @@ async fn install_impl(
         .expect("could not find rockspec in source directory. this is a bug, please report it.")
         .into_path();
 
+    let rockspec = Rockspec::new(&std::fs::read_to_string(rockspec_path)?)?;
+
+    // TODO(vhyrro): Create a unified way of accessing the Lua version with centralized error
+    // handling.
+    let lua_version = rockspec.lua_version();
+    let lua_version = config.lua_version().or(lua_version.as_ref()).ok_or_eyre(
+        "lua version not set! Please provide a version through `--lua-version <ver>`",
+    )?;
+
+    let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
+    let mut lockfile = tree.lockfile()?;
+
+    let package = lockfile.add(&LuaPackage::new(rockspec.package.clone(), rockspec.version.clone()), LockConstraint::Constrained(package_req.version_req().clone()), false);
+
+    // Recursively build all dependencies.
+    // TODO: Handle regular dependencies as well.
+    for dependency_req in rockspec
+        .build_dependencies
+        .current_platform()
+        .iter()
+        .filter(|req| tree.has_rock(req).is_none())
+    {
+        let dependency = crate::operations::install(progress, dependency_req.clone(), config).await?;
+
+        lockfile.add_dependency(&package, &dependency);
+    }
+
     crate::build::build(
         progress,
-        Rockspec::new(&std::fs::read_to_string(rockspec_path)?)?,
+        rockspec,
         config,
     )
-    .await
+    .await?;
+
+    lockfile.flush()?;
+
+    Ok(package)
 }

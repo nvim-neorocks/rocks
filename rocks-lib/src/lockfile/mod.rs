@@ -6,7 +6,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::lua_package::{LuaPackage, PackageName, PackageVersion};
+use crate::lua_package::{LuaPackage, LuaPackageReq, PackageName, PackageVersion, PackageVersionReq};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LockedPackage {
@@ -14,15 +14,21 @@ pub struct LockedPackage {
     pub version: PackageVersion,
     pub pinned: bool,
     pub dependencies: Vec<String>,
+    // TODO: Serialize this directly into a `LuaPackageReq`
+    constraint: Option<String>,
 }
 
 impl LockedPackage {
-    pub fn from(package: &LuaPackage) -> Self {
+    pub fn from(package: &LuaPackage, constraint: LockConstraint) -> Self {
         Self {
             name: package.name().clone(),
             version: package.version().clone(),
             pinned: false,
             dependencies: Vec::default(),
+            constraint: match constraint {
+                LockConstraint::Unconstrained => None,
+                LockConstraint::Constrained(version_req) => Some(version_req.to_string()),
+            },
         }
     }
 
@@ -38,6 +44,11 @@ impl LockedPackage {
 
         hex::encode(hasher.finalize())
     }
+}
+
+pub enum LockConstraint {
+    Unconstrained,
+    Constrained(PackageVersionReq),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -78,8 +89,8 @@ impl Lockfile {
         Ok(new)
     }
 
-    pub fn add(&mut self, rock: &LuaPackage, pinned: bool) -> LockedPackage {
-        let rock = LockedPackage::from(rock).pinned(pinned);
+    pub fn add(&mut self, rock: &LuaPackage, constraint: LockConstraint, pinned: bool) -> LockedPackage {
+        let rock = LockedPackage::from(rock, constraint).pinned(pinned);
 
         self.rocks.entry(rock.id()).or_insert(rock).clone()
     }
@@ -103,6 +114,14 @@ impl Lockfile {
 
     pub fn rocks(&self) -> &HashMap<String, LockedPackage> {
         &self.rocks
+    }
+
+    pub fn get(&self, id: &str) -> Option<&LockedPackage> {
+        self.rocks.get(id)
+    }
+
+    pub fn get_mut(&mut self, id: &str) -> Option<&mut LockedPackage> {
+        self.rocks.get_mut(id)
     }
 
     // TODO: `fn entrypoints() -> Vec<LockedRock>`
@@ -172,10 +191,10 @@ mod tests {
         let mut lockfile = tree.lockfile().unwrap();
 
         let test_package = LuaPackage::parse("test1".to_string(), "0.1.0".to_string()).unwrap();
-        let package = lockfile.add(&test_package, false);
+        let package = lockfile.add(&test_package, crate::lockfile::LockConstraint::Unconstrained, false);
 
         let test_package = LuaPackage::parse("test2".to_string(), "0.1.0".to_string()).unwrap();
-        let dependency = lockfile.add(&test_package, true);
+        let dependency = lockfile.add(&test_package, crate::lockfile::LockConstraint::Unconstrained, true);
 
         lockfile.add_dependency(&package, &dependency);
 
