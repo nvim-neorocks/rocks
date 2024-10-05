@@ -19,7 +19,7 @@ impl Tree {
             .into_group_map())
     }
 
-    pub fn into_rock_list(self) -> Result<Vec<LuaPackage>> {
+    pub fn as_rock_list(&self) -> Result<Vec<LuaPackage>> {
         let rock_list = self.list()?;
 
         Ok(rock_list
@@ -38,6 +38,6 @@ impl TryFrom<Tree> for Vec<LuaPackage> {
     type Error = eyre::Report;
 
     fn try_from(tree: Tree) -> std::result::Result<Self, Self::Error> {
-        tree.into_rock_list()
+        tree.as_rock_list()
     }
 }

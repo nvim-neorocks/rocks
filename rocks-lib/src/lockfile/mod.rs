@@ -6,7 +6,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::lua_package::{LuaPackage, LuaPackageReq, PackageName, PackageVersion, PackageVersionReq};
+use crate::lua_package::{LuaPackage, PackageName, PackageVersion, PackageVersionReq};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LockedPackage {
@@ -15,7 +15,7 @@ pub struct LockedPackage {
     pub pinned: bool,
     pub dependencies: Vec<String>,
     // TODO: Serialize this directly into a `LuaPackageReq`
-    constraint: Option<String>,
+    pub constraint: Option<String>,
 }
 
 impl LockedPackage {
@@ -89,7 +89,12 @@ impl Lockfile {
         Ok(new)
     }
 
-    pub fn add(&mut self, rock: &LuaPackage, constraint: LockConstraint, pinned: bool) -> LockedPackage {
+    pub fn add(
+        &mut self,
+        rock: &LuaPackage,
+        constraint: LockConstraint,
+        pinned: bool,
+    ) -> LockedPackage {
         let rock = LockedPackage::from(rock, constraint).pinned(pinned);
 
         self.rocks.entry(rock.id()).or_insert(rock).clone()
@@ -191,10 +196,18 @@ mod tests {
         let mut lockfile = tree.lockfile().unwrap();
 
         let test_package = LuaPackage::parse("test1".to_string(), "0.1.0".to_string()).unwrap();
-        let package = lockfile.add(&test_package, crate::lockfile::LockConstraint::Unconstrained, false);
+        let package = lockfile.add(
+            &test_package,
+            crate::lockfile::LockConstraint::Unconstrained,
+            false,
+        );
 
         let test_package = LuaPackage::parse("test2".to_string(), "0.1.0".to_string()).unwrap();
-        let dependency = lockfile.add(&test_package, crate::lockfile::LockConstraint::Unconstrained, true);
+        let dependency = lockfile.add(
+            &test_package,
+            crate::lockfile::LockConstraint::Unconstrained,
+            true,
+        );
 
         lockfile.add_dependency(&package, &dependency);
 

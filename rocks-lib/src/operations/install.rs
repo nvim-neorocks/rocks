@@ -1,6 +1,10 @@
 use crate::{
-    config::Config, lockfile::{LockConstraint, LockedPackage}, lua_package::{LuaPackage, LuaPackageReq}, progress::with_spinner,
-    rockspec::Rockspec, tree::Tree,
+    config::Config,
+    lockfile::{LockConstraint, LockedPackage},
+    lua_package::{LuaPackage, LuaPackageReq},
+    progress::with_spinner,
+    rockspec::Rockspec,
+    tree::Tree,
 };
 
 use async_recursion::async_recursion;
@@ -27,7 +31,6 @@ async fn install_impl(
     package_req: LuaPackageReq,
     config: &Config,
 ) -> Result<LockedPackage> {
-
     let temp = TempDir::new(&package_req.name().to_string())?;
 
     let rock = super::download(
@@ -69,7 +72,11 @@ async fn install_impl(
     let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
     let mut lockfile = tree.lockfile()?;
 
-    let package = lockfile.add(&LuaPackage::new(rockspec.package.clone(), rockspec.version.clone()), LockConstraint::Constrained(package_req.version_req().clone()), false);
+    let package = lockfile.add(
+        &LuaPackage::new(rockspec.package.clone(), rockspec.version.clone()),
+        LockConstraint::Constrained(package_req.version_req().clone()),
+        false,
+    );
 
     // Recursively build all dependencies.
     // TODO: Handle regular dependencies as well.
@@ -79,17 +86,13 @@ async fn install_impl(
         .iter()
         .filter(|req| tree.has_rock(req).is_none())
     {
-        let dependency = crate::operations::install(progress, dependency_req.clone(), config).await?;
+        let dependency =
+            crate::operations::install(progress, dependency_req.clone(), config).await?;
 
         lockfile.add_dependency(&package, &dependency);
     }
 
-    crate::build::build(
-        progress,
-        rockspec,
-        config,
-    )
-    .await?;
+    crate::build::build(progress, rockspec, config).await?;
 
     lockfile.flush()?;
 

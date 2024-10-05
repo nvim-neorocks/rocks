@@ -2,7 +2,7 @@ use crate::{
     build::variables::{self, HasVariables},
     config::LuaVersion,
     lockfile::Lockfile,
-    lua_package::{LuaPackage, LuaPackageReq, PackageName, PackageVersion},
+    lua_package::{LuaPackage, LuaPackageReq},
 };
 use eyre::Result;
 use std::path::PathBuf;
@@ -98,8 +98,9 @@ impl Tree {
         self.root.join(self.version.to_string())
     }
 
-    pub fn root_for(&self, rock_name: &PackageName, rock_version: &PackageVersion) -> PathBuf {
-        self.root().join(format!("{}@{}", rock_name, rock_version))
+    pub fn root_for(&self, package: &LuaPackage) -> PathBuf {
+        self.root()
+            .join(format!("{}@{}", package.name(), package.version()))
     }
 
     pub fn bin(&self) -> PathBuf {
@@ -118,14 +119,10 @@ impl Tree {
         })?
     }
 
-    pub fn rock(
-        &self,
-        rock_name: &PackageName,
-        rock_version: &PackageVersion,
-    ) -> Result<RockLayout> {
+    pub fn rock(&self, package: &LuaPackage) -> Result<RockLayout> {
         // TODO(vhyrro): Don't store rocks with the revision number, that should be stripped almost
         // everywhere by default.
-        let rock_path = self.root_for(rock_name, rock_version);
+        let rock_path = self.root_for(package);
 
         let etc = rock_path.join("etc");
         let lib = rock_path.join("lib");
@@ -167,7 +164,7 @@ mod tests {
     use crate::{
         build::variables::HasVariables as _,
         config::LuaVersion,
-        lua_package::{PackageName, PackageVersion},
+        lua_package::{LuaPackage, PackageName, PackageVersion},
         tree::RockLayout,
     };
 
@@ -181,7 +178,7 @@ mod tests {
         let tree = Tree::new(tree_path.clone(), LuaVersion::Lua51).unwrap();
 
         let neorg = tree
-            .rock(&"neorg".into(), &"8.0.0".parse().unwrap())
+            .rock(&LuaPackage::parse("neorg".into(), "8.0.0".into()).unwrap())
             .unwrap();
 
         assert_eq!(
@@ -198,7 +195,7 @@ mod tests {
         );
 
         let lua_cjson = tree
-            .rock(&"lua-cjson".into(), &"2.1.0".parse().unwrap())
+            .rock(&LuaPackage::parse("lua-cjson".into(), "2.1.0".into()).unwrap())
             .unwrap();
 
         assert_eq!(
@@ -240,7 +237,7 @@ mod tests {
         let tree = Tree::new(tree_path.clone(), LuaVersion::Lua51).unwrap();
 
         let neorg = tree
-            .rock(&"neorg".into(), &"8.0.0-1".parse().unwrap())
+            .rock(&LuaPackage::parse("neorg".into(), "8.0.0-1".into()).unwrap())
             .unwrap();
         let build_variables = vec![
             "$(PREFIX)",

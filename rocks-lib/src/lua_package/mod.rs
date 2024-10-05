@@ -29,10 +29,10 @@ impl LuaPackage {
     pub fn version(&self) -> &PackageVersion {
         &self.version
     }
-    pub fn as_package_req(&self) -> LuaPackageReq {
+    pub fn into_package_req(self) -> LuaPackageReq {
         LuaPackageReq {
-            name: self.name.clone(),
-            version_req: self.version.clone().into(),
+            name: self.name,
+            version_req: self.version.into(),
         }
     }
 }
@@ -81,6 +81,12 @@ impl Display for LuaPackageReq {
         } else {
             f.write_str(format!("{} {}", self.name, self.version_req).as_str())
         }
+    }
+}
+
+impl From<LuaPackage> for LuaPackageReq {
+    fn from(value: LuaPackage) -> Self {
+        value.into_package_req()
     }
 }
 

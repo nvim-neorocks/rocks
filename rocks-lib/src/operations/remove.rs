@@ -3,6 +3,7 @@ use crate::{config::Config, lua_package::LuaPackage, progress::with_spinner, tre
 use eyre::Result;
 use indicatif::MultiProgress;
 
+// TODO: Remove dependencies recursively too!
 pub async fn remove(progress: &MultiProgress, package: LuaPackage, config: &Config) -> Result<()> {
     with_spinner(progress, format!("🗑️ Removing {}", package), || async {
         remove_impl(package, config).await
@@ -16,11 +17,14 @@ async fn remove_impl(package: LuaPackage, config: &Config) -> Result<()> {
         config.lua_version().cloned().unwrap(),
     )?;
 
-    let package = tree.has_rock(&package.as_package_req()).unwrap();
+    let package = tree.has_rock(&package.into_package_req()).unwrap();
 
-    tree.lockfile()?.remove(&LockedPackage::from(&package, LockConstraint::Unconstrained));
+    tree.lockfile()?.remove(&LockedPackage::from(
+        &package,
+        LockConstraint::Unconstrained,
+    ));
 
-    std::fs::remove_dir_all(tree.root_for(package.name(), package.version()))?;
+    std::fs::remove_dir_all(tree.root_for(&package))?;
 
     Ok(())
 }
