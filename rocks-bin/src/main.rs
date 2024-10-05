@@ -189,6 +189,7 @@ async fn main() {
         Commands::Fmt => format::format().unwrap(),
         Commands::Purge => purge::purge(config).await.unwrap(),
         Commands::Remove(remove_args) => remove::remove(remove_args, config).await.unwrap(),
+        Commands::Update(_update_args) => update::update(config).await.unwrap(),
         _ => unimplemented!(),
     }
 }

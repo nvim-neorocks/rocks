@@ -4,7 +4,7 @@ use eyre::{eyre, Result};
 
 use crate::manifest::ManifestMetadata;
 
-use super::{version::PackageVersion, LuaPackage};
+use super::{version::PackageVersion, LuaPackage, LuaPackageReq};
 
 impl LuaPackage {
     /// Tries to find a newer version of a given rock.
@@ -16,6 +16,26 @@ impl LuaPackage {
 
         if self.version < *latest_version {
             Ok(Some(latest_version.to_owned()))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Tries to find a newer version of a rock given a constraint.
+    /// Returns the latest version if found.
+    pub fn has_update_with(
+        &self,
+        constraint: &LuaPackageReq,
+        manifest: &ManifestMetadata,
+    ) -> Result<Option<PackageVersion>> {
+        let latest_version = manifest.latest_match(constraint).ok_or(eyre!(
+            "rock {} has no version that satisfies constraint {}",
+            self.name,
+            constraint.version_req
+        ))?;
+
+        if self.version < latest_version.version {
+            Ok(Some(latest_version.version))
         } else {
             Ok(None)
         }

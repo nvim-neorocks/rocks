@@ -35,7 +35,7 @@ pub async fn outdated(outdated_data: Outdated, config: Config) -> Result<()> {
     // This will naturally occur with lockfiles and should be accounted for directly in the
     // `has_update` function.
     let rock_list = tree
-        .into_rock_list()?
+        .as_rock_list()?
         .into_iter()
         .filter_map(|rock| {
             rock.has_update(&metadata)
