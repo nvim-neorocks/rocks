@@ -2,9 +2,7 @@ use eyre::Result;
 use indicatif::MultiProgress;
 
 use crate::{
-    config::Config,
-    lua_package::{LuaPackage, LuaPackageReq},
-    manifest::ManifestMetadata,
+    config::Config, lockfile::LocalPackage, remote_package::PackageReq, manifest::ManifestMetadata,
     progress::with_spinner,
 };
 
@@ -12,16 +10,18 @@ use super::{install, remove};
 
 pub async fn update(
     progress: &MultiProgress,
-    package: LuaPackage,
-    constraint: LuaPackageReq,
+    package: LocalPackage,
+    constraint: PackageReq,
     manifest: &ManifestMetadata,
     config: &Config,
 ) -> Result<()> {
     with_spinner(
         progress,
-        format!("Updating {}...", package.name()),
+        format!("Updating {}...", package.name),
         || async move {
-            let latest_version = package.has_update_with(&constraint, manifest)?;
+            let latest_version = package
+                .to_remote_package()
+                .has_update_with(&constraint, manifest)?;
 
             if latest_version.is_some() {
                 // Install the newest package.

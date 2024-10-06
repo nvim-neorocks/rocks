@@ -1,8 +1,8 @@
 use crate::{
     build::variables::{self, HasVariables},
     config::LuaVersion,
-    lockfile::Lockfile,
-    lua_package::{LuaPackage, LuaPackageReq},
+    lockfile::{Lockfile, LocalPackage},
+    remote_package::PackageReq,
 };
 use eyre::Result;
 use std::path::PathBuf;
@@ -98,30 +98,29 @@ impl Tree {
         self.root.join(self.version.to_string())
     }
 
-    pub fn root_for(&self, package: &LuaPackage) -> PathBuf {
+    pub fn root_for(&self, package: &LocalPackage) -> PathBuf {
         self.root()
-            .join(format!("{}@{}", package.name(), package.version()))
+            .join(format!("{}@{}", package.name, package.version))
     }
 
     pub fn bin(&self) -> PathBuf {
         self.root.join("bin")
     }
 
-    pub fn has_rock(&self, req: &LuaPackageReq) -> Option<LuaPackage> {
-        self.list().ok()?.get(req.name()).map(|versions| {
-            versions.iter().rev().find_map(|version| {
-                if req.version_req().matches(version) {
-                    Some(LuaPackage::new(req.name().clone(), version.clone()))
-                } else {
-                    None
-                }
-            })
-        })?
+    pub fn has_rock(&self, req: &PackageReq) -> Option<LocalPackage> {
+        self.list()
+            .ok()?
+            .get(req.name())
+            .map(|packages| {
+                packages
+                    .iter()
+                    .rev()
+                    .find(|package| req.version_req().matches(&package.version))
+            })?
+            .cloned()
     }
 
-    pub fn rock(&self, package: &LuaPackage) -> Result<RockLayout> {
-        // TODO(vhyrro): Don't store rocks with the revision number, that should be stripped almost
-        // everywhere by default.
+    pub fn rock(&self, package: &LocalPackage) -> Result<RockLayout> {
         let rock_path = self.root_for(package);
 
         let etc = rock_path.join("etc");
@@ -164,7 +163,8 @@ mod tests {
     use crate::{
         build::variables::HasVariables as _,
         config::LuaVersion,
-        lua_package::{LuaPackage, PackageName, PackageVersion},
+        lockfile::{LockConstraint, LocalPackage},
+        remote_package::{PackageName, PackageVersion, RemotePackage},
         tree::RockLayout,
     };
 
@@ -178,7 +178,10 @@ mod tests {
         let tree = Tree::new(tree_path.clone(), LuaVersion::Lua51).unwrap();
 
         let neorg = tree
-            .rock(&LuaPackage::parse("neorg".into(), "8.0.0".into()).unwrap())
+            .rock(&LocalPackage::from(
+                &RemotePackage::parse("neorg".into(), "8.0.0".into()).unwrap(),
+                LockConstraint::Unconstrained,
+            ))
             .unwrap();
 
         assert_eq!(
@@ -195,7 +198,10 @@ mod tests {
         );
 
         let lua_cjson = tree
-            .rock(&LuaPackage::parse("lua-cjson".into(), "2.1.0".into()).unwrap())
+            .rock(&LocalPackage::from(
+                &RemotePackage::parse("lua-cjson".into(), "2.1.0".into()).unwrap(),
+                LockConstraint::Unconstrained,
+            ))
             .unwrap();
 
         assert_eq!(
@@ -223,7 +229,16 @@ mod tests {
         let sorted_result: Vec<(PackageName, Vec<PackageVersion>)> = result
             .into_iter()
             .sorted()
-            .map(|(name, version)| (name, version.into_iter().sorted().collect_vec()))
+            .map(|(name, package)| {
+                (
+                    name,
+                    package
+                        .into_iter()
+                        .map(|package| package.version)
+                        .sorted()
+                        .collect_vec(),
+                )
+            })
             .collect_vec();
 
         assert_yaml_snapshot!(sorted_result)
@@ -237,7 +252,10 @@ mod tests {
         let tree = Tree::new(tree_path.clone(), LuaVersion::Lua51).unwrap();
 
         let neorg = tree
-            .rock(&LuaPackage::parse("neorg".into(), "8.0.0-1".into()).unwrap())
+            .rock(&LocalPackage::from(
+                &RemotePackage::parse("neorg".into(), "8.0.0-1".into()).unwrap(),
+                LockConstraint::Unconstrained,
+            ))
             .unwrap();
         let build_variables = vec![
             "$(PREFIX)",

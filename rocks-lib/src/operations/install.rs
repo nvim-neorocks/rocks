@@ -1,7 +1,7 @@
 use crate::{
     config::Config,
-    lockfile::{LockConstraint, LockedPackage},
-    lua_package::{LuaPackage, LuaPackageReq},
+    lockfile::{LockConstraint, LocalPackage},
+    remote_package::{PackageReq, RemotePackage},
     progress::with_spinner,
     rockspec::Rockspec,
     tree::Tree,
@@ -15,9 +15,9 @@ use tempdir::TempDir;
 #[async_recursion]
 pub async fn install(
     progress: &MultiProgress,
-    package_req: LuaPackageReq,
+    package_req: PackageReq,
     config: &Config,
-) -> Result<LockedPackage> {
+) -> Result<LocalPackage> {
     with_spinner(
         progress,
         format!("💻 Installing {}", package_req),
@@ -28,9 +28,9 @@ pub async fn install(
 
 async fn install_impl(
     progress: &MultiProgress,
-    package_req: LuaPackageReq,
+    package_req: PackageReq,
     config: &Config,
-) -> Result<LockedPackage> {
+) -> Result<LocalPackage> {
     let temp = TempDir::new(&package_req.name().to_string())?;
 
     let rock = super::download(
@@ -73,7 +73,7 @@ async fn install_impl(
     let mut lockfile = tree.lockfile()?;
 
     let package = lockfile.add(
-        &LuaPackage::new(rockspec.package.clone(), rockspec.version.clone()),
+        &RemotePackage::new(rockspec.package.clone(), rockspec.version.clone()),
         LockConstraint::Constrained(package_req.version_req().clone()),
         false,
     );

@@ -2,7 +2,7 @@ pub mod build;
 pub mod config;
 pub mod lockfile;
 pub mod lua_installation;
-pub mod lua_package;
+pub mod remote_package;
 pub mod manifest;
 pub mod operations;
 pub mod progress;

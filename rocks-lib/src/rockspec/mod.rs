@@ -18,7 +18,7 @@ pub use test_spec::*;
 
 use crate::{
     config::LuaVersion,
-    lua_package::{LuaPackageReq, PackageName, PackageVersion},
+    remote_package::{PackageName, PackageReq, PackageVersion},
 };
 
 #[derive(Debug)]
@@ -31,10 +31,10 @@ pub struct Rockspec {
     pub version: PackageVersion,
     pub description: RockDescription,
     pub supported_platforms: PlatformSupport,
-    pub dependencies: PerPlatform<Vec<LuaPackageReq>>,
-    pub build_dependencies: PerPlatform<Vec<LuaPackageReq>>,
+    pub dependencies: PerPlatform<Vec<PackageReq>>,
+    pub build_dependencies: PerPlatform<Vec<PackageReq>>,
     pub external_dependencies: PerPlatform<HashMap<String, ExternalDependency>>,
-    pub test_dependencies: PerPlatform<Vec<LuaPackageReq>>,
+    pub test_dependencies: PerPlatform<Vec<PackageReq>>,
     pub source: PerPlatform<RockSource>,
     pub build: PerPlatform<BuildSpec>,
     pub test: PerPlatform<TestSpec>,
@@ -187,7 +187,7 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use crate::lua_package::LuaPackage;
+    use crate::remote_package::RemotePackage;
     use crate::rockspec::PlatformIdentifier;
 
     use super::*;
@@ -335,19 +335,19 @@ mod tests {
         assert!(!rockspec
             .supported_platforms
             .is_supported(&PlatformIdentifier::Windows));
-        let neorg = LuaPackage::parse("neorg".into(), "6.0.0".into()).unwrap();
+        let neorg = RemotePackage::parse("neorg".into(), "6.0.0".into()).unwrap();
         assert!(rockspec
             .dependencies
             .default
             .into_iter()
             .any(|dep| dep.matches(&neorg)));
-        let foo = LuaPackage::parse("foo".into(), "1.0.0".into()).unwrap();
+        let foo = RemotePackage::parse("foo".into(), "1.0.0".into()).unwrap();
         assert!(rockspec
             .build_dependencies
             .default
             .into_iter()
             .any(|dep| dep.matches(&foo)));
-        let busted = LuaPackage::parse("busted".into(), "2.2.0".into()).unwrap();
+        let busted = RemotePackage::parse("busted".into(), "2.2.0".into()).unwrap();
         assert_eq!(
             *rockspec.external_dependencies.default.get("FOO").unwrap(),
             ExternalDependency::Header("foo.h".into())
@@ -636,9 +636,9 @@ mod tests {
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
-        let neorg_override = LuaPackage::parse("neorg".into(), "5.0.0".into()).unwrap();
-        let toml_edit = LuaPackage::parse("toml-edit".into(), "1.0.0".into()).unwrap();
-        let toml = LuaPackage::parse("toml".into(), "1.0.0".into()).unwrap();
+        let neorg_override = RemotePackage::parse("neorg".into(), "5.0.0".into()).unwrap();
+        let toml_edit = RemotePackage::parse("toml-edit".into(), "1.0.0".into()).unwrap();
+        let toml = RemotePackage::parse("toml".into(), "1.0.0".into()).unwrap();
         assert_eq!(rockspec.dependencies.default.len(), 2);
         let per_platform = &rockspec.dependencies.per_platform;
         assert_eq!(

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use crate::{
     config::Config,
-    lua_package::{LuaPackage, LuaPackageReq, PackageName, PackageVersion},
+    remote_package::{PackageName, PackageReq, PackageVersion, RemotePackage},
 };
 
 pub struct ManifestMetadata {
@@ -65,7 +65,7 @@ impl ManifestMetadata {
         self.repository[rock_name].keys().sorted().last()
     }
 
-    pub fn latest_match(&self, lua_package_req: &LuaPackageReq) -> Option<LuaPackage> {
+    pub fn latest_match(&self, lua_package_req: &PackageReq) -> Option<RemotePackage> {
         if !self.has_rock(lua_package_req.name()) {
             return None;
         }
@@ -76,7 +76,7 @@ impl ManifestMetadata {
             .rev()
             .find_or_first(|version| lua_package_req.version_req().matches(version))?;
 
-        Some(LuaPackage::new(
+        Some(RemotePackage::new(
             lua_package_req.name().to_owned(),
             version.to_owned(),
         ))

@@ -6,10 +6,12 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::lua_package::{LuaPackage, PackageName, PackageVersion, PackageVersionReq};
+use crate::remote_package::{
+    PackageName, PackageReq, PackageVersion, PackageVersionReq, RemotePackage,
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct LockedPackage {
+pub struct LocalPackage {
     pub name: PackageName,
     pub version: PackageVersion,
     pub pinned: bool,
@@ -18,8 +20,8 @@ pub struct LockedPackage {
     pub constraint: Option<String>,
 }
 
-impl LockedPackage {
-    pub fn from(package: &LuaPackage, constraint: LockConstraint) -> Self {
+impl LocalPackage {
+    pub fn from(package: &RemotePackage, constraint: LockConstraint) -> Self {
         Self {
             name: package.name().clone(),
             version: package.version().clone(),
@@ -30,11 +32,6 @@ impl LockedPackage {
                 LockConstraint::Constrained(version_req) => Some(version_req.to_string()),
             },
         }
-    }
-
-    pub fn pinned(mut self, pin: bool) -> Self {
-        self.pinned = pin;
-        self
     }
 
     pub fn id(&self) -> String {
@@ -50,6 +47,42 @@ impl LockedPackage {
 
         hex::encode(hasher.finalize())
     }
+
+    pub fn name(&self) -> &PackageName {
+        &self.name
+    }
+
+    pub fn version(&self) -> &PackageVersion {
+        &self.version
+    }
+
+    pub fn pinned(&self) -> bool {
+        self.pinned
+    }
+
+    pub fn dependencies(&self) -> Vec<&String> {
+        self.dependencies.iter().collect()
+    }
+
+    pub fn constraint(&self) -> LockConstraint {
+        match &self.constraint {
+            // Safe to unwrap as the data can only end up in the struct as a valid constraint
+            Some(constraint) => LockConstraint::Constrained(
+                constraint
+                    .parse()
+                    .expect("invalid constraint in LuaPackage"),
+            ),
+            None => LockConstraint::Unconstrained,
+        }
+    }
+
+    pub fn to_remote_package(&self) -> RemotePackage {
+        RemotePackage::new(self.name.clone(), self.version.clone())
+    }
+
+    pub fn into_package_req(self) -> PackageReq {
+        RemotePackage::new(self.name, self.version).into_package_req()
+    }
 }
 
 pub enum LockConstraint {
@@ -57,14 +90,14 @@ pub enum LockConstraint {
     Constrained(PackageVersionReq),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Lockfile {
     #[serde(skip_serializing, skip_deserializing)]
     filepath: PathBuf,
     // TODO: Serialize this directly into a `Version`
     version: String,
     // NOTE: We cannot directly serialize to a `Sha256` object as they don't implement serde traits.
-    rocks: HashMap<String, LockedPackage>,
+    rocks: HashMap<String, LocalPackage>,
     entrypoints: Vec<String>,
 }
 
@@ -97,16 +130,17 @@ impl Lockfile {
 
     pub fn add(
         &mut self,
-        rock: &LuaPackage,
+        rock: &RemotePackage,
         constraint: LockConstraint,
         pinned: bool,
-    ) -> LockedPackage {
-        let rock = LockedPackage::from(rock, constraint).pinned(pinned);
+    ) -> LocalPackage {
+        let mut rock = LocalPackage::from(rock, constraint);
+        rock.pinned = pinned;
 
         self.rocks.entry(rock.id()).or_insert(rock).clone()
     }
 
-    pub fn add_dependency(&mut self, target: &LockedPackage, dependency: &LockedPackage) {
+    pub fn add_dependency(&mut self, target: &LocalPackage, dependency: &LocalPackage) {
         let target_id = target.id();
         let dependency_id = dependency.id();
 
@@ -115,7 +149,7 @@ impl Lockfile {
             .and_modify(|rock| rock.dependencies.push(dependency_id));
     }
 
-    pub fn remove(&mut self, target: &LockedPackage) {
+    pub fn remove(&mut self, target: &LocalPackage) {
         self.rocks.remove(&target.id());
     }
 
@@ -123,15 +157,15 @@ impl Lockfile {
         &self.version
     }
 
-    pub fn rocks(&self) -> &HashMap<String, LockedPackage> {
+    pub fn rocks(&self) -> &HashMap<String, LocalPackage> {
         &self.rocks
     }
 
-    pub fn get(&self, id: &str) -> Option<&LockedPackage> {
+    pub fn get(&self, id: &str) -> Option<&LocalPackage> {
         self.rocks.get(id)
     }
 
-    pub fn get_mut(&mut self, id: &str) -> Option<&mut LockedPackage> {
+    pub fn get_mut(&mut self, id: &str) -> Option<&mut LocalPackage> {
         self.rocks.get_mut(id)
     }
 
@@ -172,7 +206,7 @@ mod tests {
     use assert_fs::fixture::PathCopy;
     use insta::{assert_json_snapshot, sorted_redaction};
 
-    use crate::{config::LuaVersion::Lua51, lua_package::LuaPackage, tree::Tree};
+    use crate::{config::LuaVersion::Lua51, remote_package::RemotePackage, tree::Tree};
 
     #[test]
     fn parse_lockfile() {
@@ -201,14 +235,14 @@ mod tests {
         let tree = Tree::new(temp.to_path_buf(), Lua51).unwrap();
         let mut lockfile = tree.lockfile().unwrap();
 
-        let test_package = LuaPackage::parse("test1".to_string(), "0.1.0".to_string()).unwrap();
+        let test_package = RemotePackage::parse("test1".to_string(), "0.1.0".to_string()).unwrap();
         let package = lockfile.add(
             &test_package,
             crate::lockfile::LockConstraint::Unconstrained,
             false,
         );
 
-        let test_package = LuaPackage::parse("test2".to_string(), "0.1.0".to_string()).unwrap();
+        let test_package = RemotePackage::parse("test2".to_string(), "0.1.0".to_string()).unwrap();
         let dependency = lockfile.add(
             &test_package,
             crate::lockfile::LockConstraint::Constrained(">= 1.0.0".parse().unwrap()),

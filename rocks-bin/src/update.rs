@@ -4,7 +4,7 @@ use eyre::Result;
 use indicatif::MultiProgress;
 use rocks_lib::{
     config::Config,
-    lua_package::{LuaPackage, LuaPackageReq},
+    remote_package::PackageReq,
     manifest::{manifest_from_server, ManifestMetadata},
     operations,
     tree::Tree,
@@ -29,19 +29,14 @@ pub async fn update(config: Config) -> Result<()> {
 
     let progress = MultiProgress::new();
 
-    for locked_package in rocks.values() {
-        if !locked_package.pinned {
-            let package =
-                LuaPackage::new(locked_package.name.clone(), locked_package.version.clone());
+    for package in rocks.values() {
+        if !package.pinned {
             operations::update(
                 &progress,
-                package,
-                LuaPackageReq::new(
-                    locked_package.name.to_string(),
-                    locked_package
-                        .constraint
-                        .as_ref()
-                        .map(|str| str.to_string()),
+                package.clone(),
+                PackageReq::new(
+                    package.name.to_string(),
+                    package.constraint.as_ref().map(|str| str.to_string()),
                 )?,
                 &manifest,
                 &config,

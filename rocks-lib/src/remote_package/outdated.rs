@@ -4,9 +4,9 @@ use eyre::{eyre, Result};
 
 use crate::manifest::ManifestMetadata;
 
-use super::{version::PackageVersion, LuaPackage, LuaPackageReq};
+use super::{version::PackageVersion, PackageReq, RemotePackage};
 
-impl LuaPackage {
+impl RemotePackage {
     /// Tries to find a newer version of a given rock.
     /// Returns the latest version if found.
     pub fn has_update(&self, manifest: &ManifestMetadata) -> Result<Option<PackageVersion>> {
@@ -25,7 +25,7 @@ impl LuaPackage {
     /// Returns the latest version if found.
     pub fn has_update_with(
         &self,
-        constraint: &LuaPackageReq,
+        constraint: &PackageReq,
         manifest: &ManifestMetadata,
     ) -> Result<Option<PackageVersion>> {
         let latest_version = manifest.latest_match(constraint).ok_or(eyre!(
@@ -42,7 +42,7 @@ impl LuaPackage {
     }
 }
 
-impl Display for LuaPackage {
+impl Display for RemotePackage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(format!("{} {}", self.name, self.version).as_str())
     }
@@ -52,7 +52,7 @@ impl Display for LuaPackage {
 mod test {
     use std::path::PathBuf;
 
-    use crate::{lua_package::LuaPackage, manifest::ManifestMetadata};
+    use crate::{remote_package::RemotePackage, manifest::ManifestMetadata};
 
     #[test]
     fn rock_has_update() {
@@ -61,7 +61,8 @@ mod test {
         let manifest = String::from_utf8(std::fs::read(&test_manifest_path).unwrap()).unwrap();
         let manifest = ManifestMetadata::new(&manifest).unwrap();
 
-        let test_package = LuaPackage::parse("lua-cjson".to_string(), "2.0.0".to_string()).unwrap();
+        let test_package =
+            RemotePackage::parse("lua-cjson".to_string(), "2.0.0".to_string()).unwrap();
 
         assert_eq!(
             test_package.has_update(&manifest).unwrap(),
