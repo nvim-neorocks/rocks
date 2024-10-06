@@ -40,7 +40,13 @@ impl LockedPackage {
     pub fn id(&self) -> String {
         let mut hasher = Sha256::new();
 
-        hasher.update(format!("{}{}{}", self.name, self.version, self.pinned));
+        hasher.update(format!(
+            "{}{}{}{}",
+            self.name,
+            self.version,
+            self.pinned,
+            self.constraint.clone().unwrap_or_default()
+        ));
 
         hex::encode(hasher.finalize())
     }
@@ -205,7 +211,7 @@ mod tests {
         let test_package = LuaPackage::parse("test2".to_string(), "0.1.0".to_string()).unwrap();
         let dependency = lockfile.add(
             &test_package,
-            crate::lockfile::LockConstraint::Unconstrained,
+            crate::lockfile::LockConstraint::Constrained(">= 1.0.0".parse().unwrap()),
             true,
         );
 
