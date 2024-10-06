@@ -5,7 +5,7 @@ use indicatif::MultiProgress;
 
 use crate::{
     config::Config,
-    lua_package::{LuaPackage, LuaPackageReq, PackageName, PackageVersion},
+    remote_package::{PackageName, PackageReq, PackageVersion, RemotePackage},
     progress::with_spinner,
 };
 
@@ -17,7 +17,7 @@ pub struct DownloadedRock {
 
 pub async fn download(
     progress: &MultiProgress,
-    package_req: &LuaPackageReq,
+    package_req: &PackageReq,
     destination_dir: Option<PathBuf>,
     config: &Config,
 ) -> Result<DownloadedRock> {
@@ -31,7 +31,7 @@ pub async fn download(
     .await
 }
 
-async fn search_manifest(package_req: &LuaPackageReq, config: &Config) -> Result<LuaPackage> {
+async fn search_manifest(package_req: &PackageReq, config: &Config) -> Result<RemotePackage> {
     let manifest = crate::manifest::ManifestMetadata::from_config(config).await?;
     if !manifest.has_rock(package_req.name()) {
         return Err(eyre!(format!(
@@ -44,7 +44,7 @@ async fn search_manifest(package_req: &LuaPackageReq, config: &Config) -> Result
 }
 
 async fn download_impl(
-    package: LuaPackage,
+    package: RemotePackage,
     destination_dir: Option<PathBuf>,
     config: &Config,
 ) -> Result<DownloadedRock> {

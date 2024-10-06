@@ -24,11 +24,11 @@ pub fn list_installed(list_data: ListCmd, config: Config) -> Result<()> {
         println!("{}", serde_json::to_string(&available_rocks)?);
     } else {
         let formatting = TreeFormatting::dir_tree(FormatCharacters::box_chars());
-        for (name, versions) in available_rocks.into_iter().sorted() {
+        for (name, packages) in available_rocks.into_iter().sorted() {
             let mut tree = StringTreeNode::new(name.to_string());
 
-            for version in versions {
-                tree.push(version.to_string());
+            for package in packages {
+                tree.push(format!("{} {}", package.name(), package.version()));
             }
 
             println!("{}", tree.to_string_with_format(&formatting)?);

@@ -2,8 +2,9 @@ use std::path::Path;
 
 use crate::{
     config::Config,
+    lockfile::{LockConstraint, LocalPackage},
     lua_installation::LuaInstallation,
-    lua_package::LuaPackage,
+    remote_package::RemotePackage,
     progress::with_spinner,
     rockspec::{utils, Build as _, BuildBackendSpec, Rockspec},
     tree::{RockLayout, Tree},
@@ -94,10 +95,14 @@ pub async fn build(progress: &MultiProgress, rockspec: Rockspec, config: &Config
     // operations in the temporary directory itself and then copy all results over once they've
     // succeeded.
 
-    let output_paths = tree.rock(&LuaPackage::new(
-        rockspec.package.clone(),
-        rockspec.version.clone(),
-    ))?;
+    // TODO(vhyrro): The `build` operation needs more metadata, specifically the dependency
+    // and pinning information.
+    let package = LocalPackage::from(
+        &RemotePackage::new(rockspec.package.clone(), rockspec.version.clone()),
+        LockConstraint::Unconstrained,
+    );
+
+    let output_paths = tree.rock(&package)?;
 
     let lua = LuaInstallation::new(lua_version, config)?;
 

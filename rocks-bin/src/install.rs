@@ -1,11 +1,11 @@
 use eyre::Result;
 use indicatif::MultiProgress;
-use rocks_lib::{config::Config, lua_package::LuaPackageReq};
+use rocks_lib::{config::Config, remote_package::PackageReq};
 
 #[derive(clap::Args)]
 pub struct Install {
     #[clap(flatten)]
-    package_req: LuaPackageReq,
+    package_req: PackageReq,
 }
 
 pub async fn install(install_data: Install, config: Config) -> Result<()> {

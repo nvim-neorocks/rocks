@@ -1,10 +1,11 @@
 use clap::Args;
-use eyre::Result;
+use eyre::{OptionExt as _, Result};
 use indicatif::MultiProgress;
 use rocks_lib::{
     config::Config,
-    lua_package::{LuaPackage, PackageName, PackageVersion},
+    remote_package::{PackageName, PackageVersion, RemotePackage},
     manifest::{manifest_from_server, ManifestMetadata},
+    tree::Tree,
 };
 
 #[derive(Args)]
@@ -20,13 +21,28 @@ pub async fn remove(remove_args: Remove, config: Config) -> Result<()> {
 
     let metadata = ManifestMetadata::new(&manifest)?;
 
-    let package = LuaPackage::new(
-        remove_args.name.clone(),
-        remove_args
-            .version
-            .or(metadata.latest_version(&remove_args.name).cloned())
-            .unwrap(),
-    );
+    let target_version = remove_args
+        .version
+        .or(metadata.latest_version(&remove_args.name).cloned())
+        .unwrap();
 
-    rocks_lib::operations::remove(&MultiProgress::new(), package, &config).await
+    let tree = Tree::new(
+        config.tree().clone(),
+        config
+            .lua_version()
+            .cloned()
+            .ok_or_eyre("lua version not supplied!")?,
+    )?;
+
+    match tree.has_rock(
+        &RemotePackage::new(remove_args.name.clone(), target_version.clone()).into_package_req(),
+    ) {
+        Some(package) => {
+            rocks_lib::operations::remove(&MultiProgress::new(), package, &config).await
+        }
+        None => {
+            eprintln!("Could not find {}@{}", remove_args.name, target_version);
+            Ok(())
+        }
+    }
 }

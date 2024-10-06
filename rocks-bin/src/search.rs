@@ -7,14 +7,14 @@ use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
 
 use rocks_lib::{
     config::Config,
-    lua_package::{LuaPackageReq, PackageName, PackageVersion},
+    remote_package::{PackageName, PackageReq, PackageVersion},
     manifest::{manifest_from_server, ManifestMetadata},
 };
 
 #[derive(Args)]
 pub struct Search {
     #[clap(flatten)]
-    lua_package_req: LuaPackageReq,
+    lua_package_req: PackageReq,
     // TODO(vhyrro): Add options.
     /// Return a machine readable format.
     #[arg(long)]

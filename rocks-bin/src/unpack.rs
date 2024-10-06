@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use clap::Args;
 use eyre::Result;
 use indicatif::MultiProgress;
-use rocks_lib::{config::Config, lua_package::LuaPackageReq};
+use rocks_lib::{config::Config, remote_package::PackageReq};
 
 #[derive(Args)]
 pub struct Unpack {
@@ -16,7 +16,7 @@ pub struct Unpack {
 #[derive(Args)]
 pub struct UnpackRemote {
     #[clap(flatten)]
-    package_req: LuaPackageReq,
+    package_req: PackageReq,
     /// The directory to unpack to
     path: Option<PathBuf>,
 

@@ -34,11 +34,12 @@ pub async fn outdated(outdated_data: Outdated, config: Config) -> Result<()> {
     // However, this should also take into account dependency constraints made by other rocks.
     // This will naturally occur with lockfiles and should be accounted for directly in the
     // `has_update` function.
-    let rock_list = tree
-        .as_rock_list()?
-        .into_iter()
+    let rock_list = tree.as_rock_list()?;
+    let rock_list = rock_list
+        .iter()
         .filter_map(|rock| {
-            rock.has_update(&metadata)
+            rock.to_remote_package()
+                .has_update(&metadata)
                 .expect("TODO")
                 .map(|version| (rock, version))
         })

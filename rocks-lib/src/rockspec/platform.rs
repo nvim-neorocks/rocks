@@ -10,7 +10,7 @@ use serde::{
     Deserialize, Deserializer, Serialize,
 };
 
-use crate::lua_package::LuaPackageReq;
+use crate::remote_package::PackageReq;
 
 /// Identifier by a platform.
 /// The `PartialOrd` instance views more specific platforms as `Greater`
@@ -210,9 +210,9 @@ pub trait PartialOverride: Sized {
 /// Override `base_deps` with `override_deps`
 /// - Adds missing dependencies
 /// - Replaces dependencies with the same name
-impl PartialOverride for Vec<LuaPackageReq> {
+impl PartialOverride for Vec<PackageReq> {
     fn apply_overrides(&self, override_vec: &Self) -> Result<Self> {
-        let mut result_map: HashMap<String, LuaPackageReq> = self
+        let mut result_map: HashMap<String, PackageReq> = self
             .iter()
             .map(|dep| (dep.name().clone().to_string(), dep.clone()))
             .collect();
@@ -233,7 +233,7 @@ pub trait PlatformOverridable: PartialOverride {
         T: Default;
 }
 
-impl PlatformOverridable for Vec<LuaPackageReq> {
+impl PlatformOverridable for Vec<PackageReq> {
     fn on_nil<T>() -> Result<super::PerPlatform<T>>
     where
         T: PlatformOverridable,
@@ -470,10 +470,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_override_lua_package_req() {
-        let neorg_a: LuaPackageReq = "neorg 1.0.0".parse().unwrap();
-        let neorg_b: LuaPackageReq = "neorg 2.0.0".parse().unwrap();
-        let foo: LuaPackageReq = "foo 1.0.0".parse().unwrap();
-        let bar: LuaPackageReq = "bar 1.0.0".parse().unwrap();
+        let neorg_a: PackageReq = "neorg 1.0.0".parse().unwrap();
+        let neorg_b: PackageReq = "neorg 2.0.0".parse().unwrap();
+        let foo: PackageReq = "foo 1.0.0".parse().unwrap();
+        let bar: PackageReq = "bar 1.0.0".parse().unwrap();
         let base_vec = vec![neorg_a, foo.clone()];
         let override_vec = vec![neorg_b.clone(), bar.clone()];
         let result = base_vec.apply_overrides(&override_vec).unwrap();
