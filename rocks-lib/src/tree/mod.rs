@@ -99,8 +99,12 @@ impl Tree {
     }
 
     pub fn root_for(&self, package: &LocalPackage) -> PathBuf {
-        self.root()
-            .join(format!("{}@{}", package.name, package.version))
+        self.root().join(format!(
+            "{}-{}@{}",
+            package.id(),
+            package.name,
+            package.version
+        ))
     }
 
     pub fn bin(&self) -> PathBuf {
@@ -177,43 +181,47 @@ mod tests {
 
         let tree = Tree::new(tree_path.clone(), LuaVersion::Lua51).unwrap();
 
-        let neorg = tree
-            .rock(&LocalPackage::from(
-                &RemotePackage::parse("neorg".into(), "8.0.0".into()).unwrap(),
-                LockConstraint::Unconstrained,
-            ))
-            .unwrap();
+        let package = LocalPackage::from(
+            &RemotePackage::parse("neorg".into(), "8.0.0".into()).unwrap(),
+            LockConstraint::Unconstrained,
+        );
+
+        let id = package.id();
+
+        let neorg = tree.rock(&package).unwrap();
 
         assert_eq!(
             neorg,
             RockLayout {
-                rock_path: tree_path.join("5.1/neorg@8.0.0"),
-                etc: tree_path.join("5.1/neorg@8.0.0/etc"),
-                lib: tree_path.join("5.1/neorg@8.0.0/lib"),
-                src: tree_path.join("5.1/neorg@8.0.0/src"),
-                bin: tree_path.join("5.1/neorg@8.0.0/bin"),
-                conf: tree_path.join("5.1/neorg@8.0.0/etc/conf"),
-                doc: tree_path.join("5.1/neorg@8.0.0/etc/doc"),
+                rock_path: tree_path.join(format!("5.1/{id}-neorg@8.0.0")),
+                etc: tree_path.join(format!("5.1/{id}-neorg@8.0.0/etc")),
+                lib: tree_path.join(format!("5.1/{id}-neorg@8.0.0/lib")),
+                src: tree_path.join(format!("5.1/{id}-neorg@8.0.0/src")),
+                bin: tree_path.join(format!("5.1/{id}-neorg@8.0.0/bin")),
+                conf: tree_path.join(format!("5.1/{id}-neorg@8.0.0/etc/conf")),
+                doc: tree_path.join(format!("5.1/{id}-neorg@8.0.0/etc/doc")),
             }
         );
 
-        let lua_cjson = tree
-            .rock(&LocalPackage::from(
-                &RemotePackage::parse("lua-cjson".into(), "2.1.0".into()).unwrap(),
-                LockConstraint::Unconstrained,
-            ))
-            .unwrap();
+        let package = LocalPackage::from(
+            &RemotePackage::parse("lua-cjson".into(), "2.1.0".into()).unwrap(),
+            LockConstraint::Unconstrained,
+        );
+
+        let id = package.id();
+
+        let lua_cjson = tree.rock(&package).unwrap();
 
         assert_eq!(
             lua_cjson,
             RockLayout {
-                rock_path: tree_path.join("5.1/lua-cjson@2.1.0"),
-                etc: tree_path.join("5.1/lua-cjson@2.1.0/etc"),
-                lib: tree_path.join("5.1/lua-cjson@2.1.0/lib"),
-                src: tree_path.join("5.1/lua-cjson@2.1.0/src"),
-                bin: tree_path.join("5.1/lua-cjson@2.1.0/bin"),
-                conf: tree_path.join("5.1/lua-cjson@2.1.0/etc/conf"),
-                doc: tree_path.join("5.1/lua-cjson@2.1.0/etc/doc"),
+                rock_path: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0")),
+                etc: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0/etc")),
+                lib: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0/lib")),
+                src: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0/src")),
+                bin: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0/bin")),
+                conf: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0/etc/conf")),
+                doc: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0/etc/doc")),
             }
         );
     }
