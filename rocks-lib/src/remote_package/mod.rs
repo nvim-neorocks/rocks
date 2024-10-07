@@ -32,7 +32,7 @@ impl RemotePackage {
     pub fn into_package_req(self) -> PackageReq {
         PackageReq {
             name: self.name,
-            version_req: self.version.into(),
+            version_req: self.version.into_version_req(),
         }
     }
 }
