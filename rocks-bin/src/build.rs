@@ -5,11 +5,14 @@ use std::path::PathBuf;
 
 use clap::Args;
 use eyre::Result;
-use rocks_lib::{config::Config, rockspec::Rockspec, tree::Tree};
+use rocks_lib::{config::Config, lockfile::LockConstraint::Unconstrained, rockspec::Rockspec, tree::Tree};
 
 #[derive(Args)]
 pub struct Build {
     rockspec_path: Option<PathBuf>,
+
+    #[arg(long)]
+    pin: bool,
 }
 
 pub async fn build(data: Build, config: Config) -> Result<()> {
@@ -71,7 +74,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         rocks_lib::operations::install(&progress, dependency_req.clone(), &config).await?;
     }
 
-    rocks_lib::build::build(&MultiProgress::new(), rockspec, &config).await?;
+    rocks_lib::build::build(&MultiProgress::new(), rockspec, data.pin, Unconstrained, &config).await?;
 
     Ok(())
 }

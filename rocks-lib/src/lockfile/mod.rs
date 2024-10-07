@@ -85,6 +85,7 @@ impl LocalPackage {
     }
 }
 
+#[derive(Clone)]
 pub enum LockConstraint {
     Unconstrained,
     Constrained(PackageVersionReq),
