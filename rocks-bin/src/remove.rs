@@ -1,9 +1,9 @@
 use clap::Args;
-use eyre::{OptionExt as _, Result};
+use eyre::Result;
 use indicatif::MultiProgress;
 use rocks_lib::{
-    config::Config,
     remote_package::{PackageName, PackageVersion, RemotePackage},
+    config::{Config, LuaVersion},
     manifest::{manifest_from_server, ManifestMetadata},
     tree::Tree,
 };
@@ -26,13 +26,7 @@ pub async fn remove(remove_args: Remove, config: Config) -> Result<()> {
         .or(metadata.latest_version(&remove_args.name).cloned())
         .unwrap();
 
-    let tree = Tree::new(
-        config.tree().clone(),
-        config
-            .lua_version()
-            .cloned()
-            .ok_or_eyre("lua version not supplied!")?,
-    )?;
+    let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
 
     match tree.has_rock(
         &RemotePackage::new(remove_args.name.clone(), target_version.clone()).into_package_req(),

@@ -1,5 +1,5 @@
 use directories::ProjectDirs;
-use eyre::{eyre, Result};
+use eyre::{eyre, OptionExt as _, Result};
 use std::{collections::HashMap, fmt::Display, path::PathBuf, str::FromStr, time::Duration};
 
 use crate::{
@@ -17,6 +17,30 @@ pub enum LuaVersion {
     LuaJIT52,
     // TODO(vhyrro): Support luau?
     // LuaU,
+}
+
+pub trait DefaultFromConfig {
+    fn or_default_from(self, config: &Config) -> Result<LuaVersion>;
+}
+
+impl DefaultFromConfig for Option<LuaVersion> {
+    fn or_default_from(self, config: &Config) -> Result<LuaVersion> {
+        match self {
+            Some(value) => Ok(value),
+            None => LuaVersion::from(config),
+        }
+    }
+}
+
+impl LuaVersion {
+    pub fn from(config: &Config) -> Result<Self> {
+        config
+            .lua_version()
+            .ok_or_eyre(
+                "lua version not set! Please provide a version through `--lua-version <ver>`",
+            )
+            .cloned()
+    }
 }
 
 impl FromStr for LuaVersion {

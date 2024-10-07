@@ -1,4 +1,5 @@
 use crate::lockfile::LocalPackage;
+use crate::config::LuaVersion;
 use crate::{config::Config, progress::with_spinner, tree::Tree};
 use eyre::Result;
 use indicatif::MultiProgress;
@@ -14,10 +15,7 @@ pub async fn remove(progress: &MultiProgress, package: LocalPackage, config: &Co
 }
 
 async fn remove_impl(package: LocalPackage, config: &Config) -> Result<()> {
-    let tree = Tree::new(
-        config.tree().clone(),
-        config.lua_version().cloned().unwrap(),
-    )?;
+    let tree = Tree::new(config.tree().clone(), LuaVersion::from(config)?)?;
 
     tree.lockfile()?.remove(&package);
 

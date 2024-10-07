@@ -1,12 +1,13 @@
-use eyre::{OptionExt, Result};
+use eyre::Result;
 use indicatif::MultiProgress;
-use rocks_lib::{config::Config, lua_installation::LuaInstallation, progress::with_spinner};
+use rocks_lib::{
+    config::{Config, LuaVersion},
+    lua_installation::LuaInstallation,
+    progress::with_spinner,
+};
 
 pub async fn install_lua(config: Config) -> Result<()> {
-    // TODO: Make a single, monolithic getter for the lua version that returns a Result<>
-    let version_stringified = config
-        .lua_version()
-        .ok_or_eyre("lua version not set! Please provide it via `--lua-version`.")?;
+    let version_stringified = &LuaVersion::from(&config)?;
 
     with_spinner(
         &MultiProgress::new(),
