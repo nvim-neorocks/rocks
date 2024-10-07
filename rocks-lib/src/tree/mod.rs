@@ -182,7 +182,7 @@ mod tests {
         let tree = Tree::new(tree_path.clone(), LuaVersion::Lua51).unwrap();
 
         let package = LocalPackage::from(
-            &RemotePackage::parse("neorg".into(), "8.0.0".into()).unwrap(),
+            &RemotePackage::parse("neorg".into(), "8.0.0-1".into()).unwrap(),
             LockConstraint::Unconstrained,
         );
 
@@ -193,18 +193,18 @@ mod tests {
         assert_eq!(
             neorg,
             RockLayout {
-                rock_path: tree_path.join(format!("5.1/{id}-neorg@8.0.0")),
-                etc: tree_path.join(format!("5.1/{id}-neorg@8.0.0/etc")),
-                lib: tree_path.join(format!("5.1/{id}-neorg@8.0.0/lib")),
-                src: tree_path.join(format!("5.1/{id}-neorg@8.0.0/src")),
-                bin: tree_path.join(format!("5.1/{id}-neorg@8.0.0/bin")),
-                conf: tree_path.join(format!("5.1/{id}-neorg@8.0.0/etc/conf")),
-                doc: tree_path.join(format!("5.1/{id}-neorg@8.0.0/etc/doc")),
+                rock_path: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1")),
+                etc: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1/etc")),
+                lib: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1/lib")),
+                src: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1/src")),
+                bin: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1/bin")),
+                conf: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1/etc/conf")),
+                doc: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1/etc/doc")),
             }
         );
 
         let package = LocalPackage::from(
-            &RemotePackage::parse("lua-cjson".into(), "2.1.0".into()).unwrap(),
+            &RemotePackage::parse("lua-cjson".into(), "2.1.0-1".into()).unwrap(),
             LockConstraint::Unconstrained,
         );
 
@@ -215,13 +215,13 @@ mod tests {
         assert_eq!(
             lua_cjson,
             RockLayout {
-                rock_path: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0")),
-                etc: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0/etc")),
-                lib: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0/lib")),
-                src: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0/src")),
-                bin: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0/bin")),
-                conf: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0/etc/conf")),
-                doc: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0/etc/doc")),
+                rock_path: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1")),
+                etc: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1/etc")),
+                lib: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1/lib")),
+                src: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1/src")),
+                bin: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1/bin")),
+                conf: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1/etc/conf")),
+                doc: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1/etc/doc")),
             }
         );
     }
@@ -261,7 +261,7 @@ mod tests {
 
         let neorg = tree
             .rock(&LocalPackage::from(
-                &RemotePackage::parse("neorg".into(), "8.0.0-1".into()).unwrap(),
+                &RemotePackage::parse("neorg".into(), "8.0.0-1-1".into()).unwrap(),
                 LockConstraint::Unconstrained,
             ))
             .unwrap();
