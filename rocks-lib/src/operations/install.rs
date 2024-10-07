@@ -72,10 +72,13 @@ async fn install_impl(
     let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
     let mut lockfile = tree.lockfile()?;
 
+    let constraint = LockConstraint::Constrained(package_req.version_req().clone());
+    let pinned = false;
+
     let package = lockfile.add(
         &RemotePackage::new(rockspec.package.clone(), rockspec.version.clone()),
-        LockConstraint::Constrained(package_req.version_req().clone()),
-        false,
+        constraint.clone(),
+        pinned,
     );
 
     // Recursively build all dependencies.
@@ -92,7 +95,7 @@ async fn install_impl(
         lockfile.add_dependency(&package, &dependency);
     }
 
-    crate::build::build(progress, rockspec, config).await?;
+    crate::build::build(progress, rockspec, pinned, constraint, config).await?;
 
     lockfile.flush()?;
 
