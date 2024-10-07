@@ -1,3 +1,5 @@
+use std::io::Cursor;
+
 use crate::{
     config::{Config, DefaultFromConfig},
     lockfile::{LocalPackage, LockConstraint},
@@ -33,20 +35,10 @@ async fn install_impl(
 ) -> Result<LocalPackage> {
     let temp = TempDir::new(&package_req.name().to_string())?;
 
-    let rock = super::download(
-        progress,
-        &package_req,
-        Some(temp.path().to_path_buf()),
-        config,
-    )
-    .await?;
+    let rock = super::download(progress, &package_req, config).await?;
 
-    super::unpack_src_rock(
-        progress,
-        temp.path().join(rock.path),
-        Some(temp.path().to_path_buf()),
-    )
-    .await?;
+    let cursor = Cursor::new(rock.bytes);
+    super::unpack_src_rock(progress, cursor, temp.path().to_path_buf()).await?;
 
     let rockspec_path = walkdir::WalkDir::new(&temp)
         .max_depth(1)
