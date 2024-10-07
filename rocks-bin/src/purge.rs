@@ -1,13 +1,14 @@
 use eyre::Result;
 use indicatif::MultiProgress;
 use inquire::Confirm;
-use rocks_lib::{config::Config, progress::with_spinner, tree::Tree};
+use rocks_lib::{
+    config::{Config, LuaVersion},
+    progress::with_spinner,
+    tree::Tree,
+};
 
 pub async fn purge(config: Config) -> Result<()> {
-    let tree = Tree::new(
-        config.tree().clone(),
-        config.lua_version().cloned().unwrap(),
-    )?;
+    let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
 
     let len = tree.list()?.len();
 
