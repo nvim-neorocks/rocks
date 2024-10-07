@@ -75,7 +75,7 @@ async fn install(
     Ok(())
 }
 
-pub async fn build(progress: &MultiProgress, rockspec: Rockspec, config: &Config) -> Result<()> {
+pub async fn build(progress: &MultiProgress, rockspec: Rockspec, pinned: bool, constraint: LockConstraint, config: &Config) -> Result<()> {
     // TODO(vhyrro): Create a unified way of accessing the Lua version with centralized error
     // handling.
     let lua_version = rockspec.lua_version();
@@ -95,12 +95,11 @@ pub async fn build(progress: &MultiProgress, rockspec: Rockspec, config: &Config
     // operations in the temporary directory itself and then copy all results over once they've
     // succeeded.
 
-    // TODO(vhyrro): The `build` operation needs more metadata, specifically the dependency
-    // and pinning information.
-    let package = LocalPackage::from(
+    let mut package = LocalPackage::from(
         &RemotePackage::new(rockspec.package.clone(), rockspec.version.clone()),
-        LockConstraint::Unconstrained,
+        constraint,
     );
+    package.pinned = pinned;
 
     let output_paths = tree.rock(&package)?;
 

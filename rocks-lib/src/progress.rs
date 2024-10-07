@@ -22,8 +22,7 @@ where
             spinner.abandon_with_message(format!("{} failed: {}", message, err));
             err
         })
-        .map(|result| {
+        .inspect(|_| {
             spinner.finish_with_message(format!("{} - Done.", message));
-            result
         })
 }
