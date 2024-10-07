@@ -1,8 +1,8 @@
 use crate::{
-    lockfile::{LockConstraint, LocalPackage},
-    remote_package::{PackageReq, RemotePackage},
     config::{Config, DefaultFromConfig},
+    lockfile::{LocalPackage, LockConstraint},
     progress::with_spinner,
+    remote_package::{PackageReq, RemotePackage},
     rockspec::Rockspec,
     tree::Tree,
 };

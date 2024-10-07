@@ -1,11 +1,11 @@
 use std::path::Path;
 
 use crate::{
-    lockfile::{LockConstraint, LocalPackage},
     config::{Config, DefaultFromConfig},
+    lockfile::{LocalPackage, LockConstraint},
     lua_installation::LuaInstallation,
-    remote_package::RemotePackage,
     progress::with_spinner,
+    remote_package::RemotePackage,
     rockspec::{utils, Build as _, BuildBackendSpec, Rockspec},
     tree::{RockLayout, Tree},
 };

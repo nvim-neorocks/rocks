@@ -1,11 +1,15 @@
-use crate::lockfile::LocalPackage;
 use crate::config::LuaVersion;
+use crate::lockfile::LocalPackage;
 use crate::{config::Config, progress::with_spinner, tree::Tree};
 use eyre::Result;
 use indicatif::MultiProgress;
 
 // TODO: Remove dependencies recursively too!
-pub async fn remove(progress: &MultiProgress, package: LocalPackage, config: &Config) -> Result<()> {
+pub async fn remove(
+    progress: &MultiProgress,
+    package: LocalPackage,
+    config: &Config,
+) -> Result<()> {
     with_spinner(
         progress,
         format!("🗑️ Removing {}@{}", package.name, package.version),

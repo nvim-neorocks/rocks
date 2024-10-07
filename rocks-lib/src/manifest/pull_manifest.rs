@@ -49,7 +49,7 @@ pub async fn manifest_from_server(url: String, config: &Config) -> Result<String
 
     // If our cache file does not exist then pull the whole manifest.
 
-    let new_manifest = reqwest::get(url).await?.text().await?;
+    let new_manifest = client.get(url).send().await?.text().await?;
 
     fs::write(&cache, &new_manifest)?;
 

@@ -2,9 +2,9 @@ use clap::Args;
 use eyre::Result;
 use indicatif::MultiProgress;
 use rocks_lib::{
-    remote_package::{PackageName, PackageVersion, RemotePackage},
     config::{Config, LuaVersion},
     manifest::{manifest_from_server, ManifestMetadata},
+    remote_package::{PackageName, PackageVersion, RemotePackage},
     tree::Tree,
 };
 

@@ -2,8 +2,8 @@ use eyre::Result;
 use indicatif::MultiProgress;
 
 use crate::{
-    config::Config, lockfile::LocalPackage, remote_package::PackageReq, manifest::ManifestMetadata,
-    progress::with_spinner,
+    config::Config, lockfile::LocalPackage, manifest::ManifestMetadata, progress::with_spinner,
+    remote_package::PackageReq,
 };
 
 use super::{install, remove};

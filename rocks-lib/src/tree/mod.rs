@@ -1,7 +1,7 @@
 use crate::{
     build::variables::{self, HasVariables},
     config::LuaVersion,
-    lockfile::{Lockfile, LocalPackage},
+    lockfile::{LocalPackage, Lockfile},
     remote_package::PackageReq,
 };
 use eyre::Result;
@@ -167,7 +167,7 @@ mod tests {
     use crate::{
         build::variables::HasVariables as _,
         config::LuaVersion,
-        lockfile::{LockConstraint, LocalPackage},
+        lockfile::{LocalPackage, LockConstraint},
         remote_package::{PackageName, PackageVersion, RemotePackage},
         tree::RockLayout,
     };

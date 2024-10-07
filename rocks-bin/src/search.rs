@@ -7,8 +7,8 @@ use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
 
 use rocks_lib::{
     config::Config,
-    remote_package::{PackageName, PackageReq, PackageVersion},
     manifest::{manifest_from_server, ManifestMetadata},
+    remote_package::{PackageName, PackageReq, PackageVersion},
 };
 
 #[derive(Args)]

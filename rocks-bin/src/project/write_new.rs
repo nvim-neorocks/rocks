@@ -12,7 +12,7 @@ use spdx::LicenseId;
 use spinners::{Spinner, Spinners};
 
 use crate::utils::github_metadata::{self, RepoMetadata};
-use rocks_lib::{remote_package::PackageReq, project::Project};
+use rocks_lib::{project::Project, remote_package::PackageReq};
 
 // General notes and ideas:
 // - Create a subdirectory for the project, unless a path is explicitly passed.

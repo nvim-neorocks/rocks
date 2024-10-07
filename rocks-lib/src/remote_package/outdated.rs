@@ -52,7 +52,7 @@ impl Display for RemotePackage {
 mod test {
     use std::path::PathBuf;
 
-    use crate::{remote_package::RemotePackage, manifest::ManifestMetadata};
+    use crate::{manifest::ManifestMetadata, remote_package::RemotePackage};
 
     #[test]
     fn rock_has_update() {

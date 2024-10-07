@@ -4,9 +4,9 @@ use eyre::Result;
 use indicatif::MultiProgress;
 use rocks_lib::{
     config::Config,
-    remote_package::PackageReq,
     manifest::{manifest_from_server, ManifestMetadata},
     operations,
+    remote_package::PackageReq,
     tree::Tree,
 };
 

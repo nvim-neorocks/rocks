@@ -5,8 +5,8 @@ use indicatif::MultiProgress;
 
 use crate::{
     config::Config,
-    remote_package::{PackageName, PackageReq, PackageVersion, RemotePackage},
     progress::with_spinner,
+    remote_package::{PackageName, PackageReq, PackageVersion, RemotePackage},
 };
 
 pub struct DownloadedRock {
