@@ -1,11 +1,16 @@
-use eyre::{eyre, OptionExt as _};
+use eyre::eyre;
 use indicatif::MultiProgress;
 use itertools::Itertools;
 use std::path::PathBuf;
 
 use clap::Args;
 use eyre::Result;
-use rocks_lib::{config::Config, lockfile::LockConstraint::Unconstrained, rockspec::Rockspec, tree::Tree};
+use rocks_lib::{
+    config::{Config, DefaultFromConfig as _},
+    lockfile::LockConstraint::Unconstrained,
+    rockspec::Rockspec,
+    tree::Tree,
+};
 
 #[derive(Args)]
 pub struct Build {
@@ -54,14 +59,9 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
 
     let progress = MultiProgress::new();
 
-    // TODO(vhyrro): Create a unified way of accessing the Lua version with centralized error
-    // handling.
-    let lua_version = rockspec.lua_version();
-    let lua_version = config.lua_version().or(lua_version.as_ref()).ok_or_eyre(
-        "lua version not set! Please provide a version through `--lua-version <ver>`",
-    )?;
+    let lua_version = rockspec.lua_version().or_default_from(&config)?;
 
-    let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
+    let tree = Tree::new(config.tree().clone(), lua_version)?;
 
     // Ensure all dependencies are installed first
     // TODO: Handle regular dependencies as well.
@@ -74,7 +74,14 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         rocks_lib::operations::install(&progress, dependency_req.clone(), &config).await?;
     }
 
-    rocks_lib::build::build(&MultiProgress::new(), rockspec, data.pin, Unconstrained, &config).await?;
+    rocks_lib::build::build(
+        &MultiProgress::new(),
+        rockspec,
+        data.pin,
+        Unconstrained,
+        &config,
+    )
+    .await?;
 
     Ok(())
 }
