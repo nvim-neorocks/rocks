@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use clap::Args;
-use eyre::{OptionExt as _, Result};
+use eyre::Result;
 use itertools::Itertools;
 use rocks_lib::{
-    config::Config,
+    config::{Config, LuaVersion},
     manifest::{manifest_from_server, ManifestMetadata},
     tree::Tree,
 };
@@ -19,14 +19,7 @@ pub struct Outdated {
 pub async fn outdated(outdated_data: Outdated, config: Config) -> Result<()> {
     let manifest = manifest_from_server(config.server().clone(), &config).await?;
 
-    // TODO: Don't perform error checks everywhere, instead add a single function that ensures a
-    // version is set.
-    let tree = Tree::new(
-        config.tree().clone(),
-        config.lua_version().cloned().ok_or_eyre(
-            "lua version not set. You can supply it via '--lua-version' or set it in the config.",
-        )?,
-    )?;
+    let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
 
     let metadata = ManifestMetadata::new(&manifest)?;
 

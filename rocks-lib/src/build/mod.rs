@@ -1,15 +1,15 @@
 use std::path::Path;
 
 use crate::{
-    config::Config,
     lockfile::{LockConstraint, LocalPackage},
+    config::{Config, DefaultFromConfig},
     lua_installation::LuaInstallation,
     remote_package::RemotePackage,
     progress::with_spinner,
     rockspec::{utils, Build as _, BuildBackendSpec, Rockspec},
     tree::{RockLayout, Tree},
 };
-use eyre::{OptionExt as _, Result};
+use eyre::Result;
 use indicatif::MultiProgress;
 mod builtin;
 mod fetch;
@@ -75,13 +75,14 @@ async fn install(
     Ok(())
 }
 
-pub async fn build(progress: &MultiProgress, rockspec: Rockspec, pinned: bool, constraint: LockConstraint, config: &Config) -> Result<()> {
-    // TODO(vhyrro): Create a unified way of accessing the Lua version with centralized error
-    // handling.
-    let lua_version = rockspec.lua_version();
-    let lua_version = config.lua_version().or(lua_version.as_ref()).ok_or_eyre(
-        "lua version not set! Please provide a version through `--lua-version <ver>`",
-    )?;
+pub async fn build(
+    progress: &MultiProgress,
+    rockspec: Rockspec,
+    pinned: bool,
+    constraint: LockConstraint,
+    config: &Config,
+) -> Result<()> {
+    let lua_version = rockspec.lua_version().or_default_from(config)?;
 
     let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
 
@@ -103,7 +104,7 @@ pub async fn build(progress: &MultiProgress, rockspec: Rockspec, pinned: bool, c
 
     let output_paths = tree.rock(&package)?;
 
-    let lua = LuaInstallation::new(lua_version, config)?;
+    let lua = LuaInstallation::new(&lua_version, config)?;
 
     let build_dir = match &rock_source.unpack_dir {
         Some(unpack_dir) => temp_dir.path().join(unpack_dir),
