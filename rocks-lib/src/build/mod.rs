@@ -90,11 +90,18 @@ pub async fn build(
 
     // Install the source in order to build.
     let rock_source = rockspec.source.current_platform();
-    fetch::fetch_src(progress, temp_dir.path(), rock_source).await?;
-
-    // TODO(vhyrro): Instead of copying bit-by-bit we should instead perform all of these
-    // operations in the temporary directory itself and then copy all results over once they've
-    // succeeded.
+    if let Err(err) = fetch::fetch_src(progress, temp_dir.path(), rock_source).await {
+        let package = RemotePackage::new(rockspec.package.clone(), rockspec.version.clone());
+        progress.println(format!(
+            "⚠️ WARNING: Failed to fetch source for {}: {}",
+            &package, err
+        ))?;
+        progress.println(format!(
+            "⚠️ Falling back to .src.rock archive from {}",
+            &config.server()
+        ))?;
+        fetch::fetch_src_rock(progress, &package, temp_dir.path(), config).await?;
+    }
 
     let mut package = LocalPackage::from(
         &RemotePackage::new(rockspec.package.clone(), rockspec.version.clone()),

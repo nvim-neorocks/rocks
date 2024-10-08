@@ -11,14 +11,13 @@ use crate::{
     rockspec::Rockspec,
 };
 
-pub struct DownloadedSrcRockBytes {
+pub struct DownloadedRockBytes {
     pub name: PackageName,
     pub version: PackageVersion,
     pub bytes: Bytes,
-    pub file_name: String,
 }
 
-pub struct DownloadedSrcRock {
+pub struct DownloadedRock {
     pub name: PackageName,
     pub version: PackageVersion,
     pub path: PathBuf,
@@ -32,26 +31,18 @@ pub async fn download_rockspec(
     let package = search_manifest(progress, package_req, config).await?;
     with_spinner(
         progress,
-        format!("📥 Downloading RockSpec for {}", package),
+        format!("📥 Downloading rockspec for {}", package),
         || async { download_rockspec_impl(package, config).await },
     )
     .await
 }
 
-pub async fn search_and_download_src_rock(
+pub async fn download_src_rock(
     progress: &MultiProgress,
     package_req: &PackageReq,
     config: &Config,
-) -> Result<DownloadedSrcRockBytes> {
+) -> Result<DownloadedRockBytes> {
     let package = search_manifest(progress, package_req, config).await?;
-    download_src_rock(progress, &package, config).await
-}
-
-pub async fn download_src_rock(
-    progress: &MultiProgress,
-    package: &RemotePackage,
-    config: &Config,
-) -> Result<DownloadedSrcRockBytes> {
     with_spinner(progress, format!("📥 Downloading {}", package), || async {
         download_src_rock_impl(package, config).await
     })
@@ -63,8 +54,8 @@ pub async fn download_to_file(
     package_req: &PackageReq,
     destination_dir: Option<PathBuf>,
     config: &Config,
-) -> Result<DownloadedSrcRock> {
-    let rock = search_and_download_src_rock(progress, package_req, config).await?;
+) -> Result<DownloadedRock> {
+    let rock = download_src_rock(progress, package_req, config).await?;
     let full_rock_name = full_rock_name(&rock.name, &rock.version);
     std::fs::write(
         destination_dir
@@ -73,7 +64,7 @@ pub async fn download_to_file(
         &rock.bytes,
     )?;
 
-    Ok(DownloadedSrcRock {
+    Ok(DownloadedRock {
         name: rock.name.to_owned(),
         version: rock.version.to_owned(),
         path: full_rock_name.into(),
@@ -88,7 +79,6 @@ async fn search_manifest(
     with_spinner(progress, "🔎 Searching manifest...".into(), || async {
         search_manifest_impl(package_req, config).await
     })
-    .await
 }
 
 async fn search_manifest_impl(package_req: &PackageReq, config: &Config) -> Result<RemotePackage> {
@@ -114,20 +104,19 @@ async fn download_rockspec_impl(package: RemotePackage, config: &Config) -> Resu
 }
 
 async fn download_src_rock_impl(
-    package: &RemotePackage,
+    package: RemotePackage,
     config: &Config,
-) -> Result<DownloadedSrcRockBytes> {
+) -> Result<DownloadedRockBytes> {
     let full_rock_name = full_rock_name(package.name(), package.version());
 
     let bytes = reqwest::get(format!("{}/{}", config.server(), full_rock_name))
         .await?
         .bytes()
         .await?;
-    Ok(DownloadedSrcRockBytes {
+    Ok(DownloadedRockBytes {
         name: package.name().to_owned(),
         version: package.version().to_owned(),
         bytes,
-        file_name: full_rock_name,
     })
 }
 

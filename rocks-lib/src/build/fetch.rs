@@ -9,6 +9,9 @@ use std::io::Read;
 use std::io::Seek;
 use std::path::Path;
 
+use crate::config::Config;
+use crate::operations;
+use crate::remote_package::RemotePackage;
 use crate::{progress::with_spinner, rockspec::RockSource, rockspec::RockSourceSpec};
 
 pub async fn fetch_src(
@@ -89,6 +92,19 @@ pub async fn fetch_src(
         RockSourceSpec::Sscm(_) => unimplemented!(),
         RockSourceSpec::Svn(_) => unimplemented!(),
     }
+    Ok(())
+}
+
+pub async fn fetch_src_rock(
+    progress: &MultiProgress,
+    package: &RemotePackage,
+    dest_dir: &Path,
+    config: &Config,
+) -> Result<()> {
+    let src_rock = operations::download_src_rock(progress, package, config).await?;
+    let cursor = Cursor::new(src_rock.bytes);
+    let mime_type = infer::get(cursor.get_ref()).map(|file_type| file_type.mime_type());
+    unpack(progress, mime_type, cursor, src_rock.file_name, dest_dir).await?;
     Ok(())
 }
 
