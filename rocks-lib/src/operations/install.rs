@@ -8,7 +8,7 @@ use crate::{
 
 use async_recursion::async_recursion;
 use eyre::Result;
-use indicatif::MultiProgress;
+use indicatif::{MultiProgress, ProgressBar};
 
 #[async_recursion]
 pub async fn install(
@@ -47,16 +47,20 @@ async fn install_impl(
 
     // Recursively build all dependencies.
     // TODO: Handle regular dependencies as well.
-    for dependency_req in rockspec
-        .build_dependencies
-        .current_platform()
+    let build_dependencies = rockspec.build_dependencies.current_platform();
+    let bar = progress
+        .add(ProgressBar::new(build_dependencies.len() as u64))
+        .with_message("Installing dependencies...");
+    for (index, dependency_req) in build_dependencies
         .iter()
         .filter(|req| tree.has_rock(req).is_none())
+        .enumerate()
     {
         let dependency =
             crate::operations::install(progress, dependency_req.clone(), config).await?;
 
         lockfile.add_dependency(&package, &dependency);
+        bar.set_position(index as u64);
     }
 
     crate::build::build(progress, rockspec, pinned, constraint, config).await?;

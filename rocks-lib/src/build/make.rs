@@ -1,4 +1,5 @@
 use eyre::eyre;
+use indicatif::MultiProgress;
 use itertools::Itertools;
 use std::{path::Path, process::Command};
 
@@ -13,6 +14,7 @@ use crate::{
 impl Build for MakeBuildSpec {
     fn run(
         self,
+        _progress: &MultiProgress,
         output_paths: &RockLayout,
         no_install: bool,
         lua: &LuaInstallation,
