@@ -16,6 +16,7 @@ use update::Update;
 mod build;
 mod debug;
 mod download;
+mod fetch;
 mod format;
 mod install;
 mod install_lua;
@@ -173,6 +174,9 @@ async fn main() {
             download::download(download_data, config).await.unwrap()
         }
         Commands::Debug(debug) => match debug {
+            Debug::FetchRemote(unpack_data) => {
+                fetch::fetch_remote(unpack_data, config).await.unwrap()
+            }
             Debug::Unpack(unpack_data) => unpack::unpack(unpack_data).await.unwrap(),
             Debug::UnpackRemote(unpack_data) => {
                 unpack::unpack_remote(unpack_data, config).await.unwrap()

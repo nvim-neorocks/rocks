@@ -4,6 +4,7 @@ use crate::{
     config::{Config, DefaultFromConfig},
     lockfile::{LocalPackage, LockConstraint},
     lua_installation::LuaInstallation,
+    operations,
     progress::with_spinner,
     remote_package::RemotePackage,
     rockspec::{utils, Build as _, BuildBackendSpec, Rockspec},
@@ -12,7 +13,6 @@ use crate::{
 use eyre::Result;
 use indicatif::{MultiProgress, ProgressBar};
 mod builtin;
-mod fetch;
 mod make;
 pub mod variables;
 
@@ -107,7 +107,7 @@ pub async fn build(
 
     // Install the source in order to build.
     let rock_source = rockspec.source.current_platform();
-    if let Err(err) = fetch::fetch_src(progress, temp_dir.path(), rock_source).await {
+    if let Err(err) = operations::fetch_src(progress, temp_dir.path(), rock_source).await {
         let package = RemotePackage::new(rockspec.package.clone(), rockspec.version.clone());
         progress.println(format!(
             "⚠️ WARNING: Failed to fetch source for {}: {}",
@@ -117,7 +117,7 @@ pub async fn build(
             "⚠️ Falling back to .src.rock archive from {}",
             &config.server()
         ))?;
-        fetch::fetch_src_rock(progress, &package, temp_dir.path(), config).await?;
+        operations::fetch_src_rock(progress, &package, temp_dir.path(), config).await?;
     }
 
     let mut package = LocalPackage::from(
