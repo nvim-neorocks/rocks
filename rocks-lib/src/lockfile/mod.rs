@@ -5,6 +5,7 @@ use eyre::{bail, Result};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use ssri::Integrity;
 
 use crate::remote_package::{
     PackageName, PackageReq, PackageVersion, PackageVersionReq, RemotePackage,
@@ -18,10 +19,15 @@ pub struct LocalPackage {
     pub dependencies: Vec<String>,
     // TODO: Serialize this directly into a `LuaPackageReq`
     pub constraint: Option<String>,
+    pub hashes: LocalPackageHashes,
 }
 
 impl LocalPackage {
-    pub fn from(package: &RemotePackage, constraint: LockConstraint) -> Self {
+    pub fn from(
+        package: &RemotePackage,
+        constraint: LockConstraint,
+        hashes: LocalPackageHashes,
+    ) -> Self {
         Self {
             name: package.name().clone(),
             version: package.version().clone(),
@@ -31,6 +37,7 @@ impl LocalPackage {
                 LockConstraint::Unconstrained => None,
                 LockConstraint::Constrained(version_req) => Some(version_req.to_string()),
             },
+            hashes,
         }
     }
 
@@ -85,6 +92,26 @@ impl LocalPackage {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct LocalPackageHashes {
+    pub rockspec: Integrity,
+    pub source: Integrity,
+}
+
+impl Ord for LocalPackageHashes {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let a = (self.rockspec.to_hex().1, self.source.to_hex().1);
+        let b = (other.rockspec.to_hex().1, other.source.to_hex().1);
+        a.cmp(&b)
+    }
+}
+
+impl PartialOrd for LocalPackageHashes {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 #[derive(Clone)]
 pub enum LockConstraint {
     Unconstrained,
@@ -129,16 +156,8 @@ impl Lockfile {
         Ok(new)
     }
 
-    pub fn add(
-        &mut self,
-        rock: &RemotePackage,
-        constraint: LockConstraint,
-        pinned: bool,
-    ) -> LocalPackage {
-        let mut rock = LocalPackage::from(rock, constraint);
-        rock.pinned = pinned;
-
-        self.rocks.entry(rock.id()).or_insert(rock).clone()
+    pub fn add(&mut self, rock: &LocalPackage) {
+        self.rocks.insert(rock.id(), rock.clone());
     }
 
     pub fn add_dependency(&mut self, target: &LocalPackage, dependency: &LocalPackage) {
@@ -202,6 +221,7 @@ impl Drop for Lockfile {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::{fs::remove_file, path::PathBuf};
 
     use assert_fs::fixture::PathCopy;
@@ -233,24 +253,37 @@ mod tests {
         )
         .unwrap();
 
+        let mock_hashes = LocalPackageHashes {
+            rockspec: "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
+                .parse()
+                .unwrap(),
+            source: "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
+                .parse()
+                .unwrap(),
+        };
+
         let tree = Tree::new(temp.to_path_buf(), Lua51).unwrap();
         let mut lockfile = tree.lockfile().unwrap();
 
         let test_package = RemotePackage::parse("test1".to_string(), "0.1.0".to_string()).unwrap();
-        let package = lockfile.add(
+        let test_local_package = LocalPackage::from(
             &test_package,
             crate::lockfile::LockConstraint::Unconstrained,
-            false,
+            mock_hashes.clone(),
         );
+        lockfile.add(&test_local_package);
 
-        let test_package = RemotePackage::parse("test2".to_string(), "0.1.0".to_string()).unwrap();
-        let dependency = lockfile.add(
-            &test_package,
+        let test_dep_package =
+            RemotePackage::parse("test2".to_string(), "0.1.0".to_string()).unwrap();
+        let mut test_local_dep_package = LocalPackage::from(
+            &test_dep_package,
             crate::lockfile::LockConstraint::Constrained(">= 1.0.0".parse().unwrap()),
-            true,
+            mock_hashes.clone(),
         );
+        test_local_dep_package.pinned = true;
+        lockfile.add(&test_local_dep_package);
 
-        lockfile.add_dependency(&package, &dependency);
+        lockfile.add_dependency(&test_local_package, &test_local_dep_package);
 
         assert_json_snapshot!(lockfile, { ".**" => sorted_redaction() });
     }

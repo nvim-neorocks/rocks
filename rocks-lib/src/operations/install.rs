@@ -2,7 +2,7 @@ use crate::{
     config::{Config, DefaultFromConfig},
     lockfile::{LocalPackage, LockConstraint},
     progress::with_spinner,
-    remote_package::{PackageReq, RemotePackage},
+    remote_package::PackageReq,
     tree::Tree,
 };
 
@@ -39,18 +39,13 @@ async fn install_impl(
     let constraint = LockConstraint::Constrained(package_req.version_req().clone());
     let pinned = false;
 
-    let package = lockfile.add(
-        &RemotePackage::new(rockspec.package.clone(), rockspec.version.clone()),
-        constraint.clone(),
-        pinned,
-    );
-
     // Recursively build all dependencies.
     // TODO: Handle regular dependencies as well.
     let build_dependencies = rockspec.build_dependencies.current_platform();
     let bar = progress
         .add(ProgressBar::new(build_dependencies.len() as u64))
         .with_message("Installing dependencies...");
+    let mut dependencies = Vec::new();
     for (index, dependency_req) in build_dependencies
         .iter()
         .filter(|req| tree.has_rock(req).is_none())
@@ -59,11 +54,16 @@ async fn install_impl(
         let dependency =
             crate::operations::install(progress, dependency_req.clone(), config).await?;
 
-        lockfile.add_dependency(&package, &dependency);
+        dependencies.push(dependency);
         bar.set_position(index as u64);
     }
 
-    crate::build::build(progress, rockspec, pinned, constraint, config).await?;
+    let package = crate::build::build(progress, rockspec, pinned, constraint, config).await?;
+
+    lockfile.add(&package);
+    for dependency in dependencies {
+        lockfile.add_dependency(&package, &dependency);
+    }
 
     lockfile.flush()?;
 

@@ -1,5 +1,6 @@
 pub mod build;
 pub mod config;
+pub mod hash;
 pub mod lockfile;
 pub mod lua_installation;
 pub mod manifest;

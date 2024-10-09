@@ -14,10 +14,12 @@ pub use build::*;
 pub use dependency::*;
 pub use platform::*;
 pub use rock_source::*;
+use ssri::Integrity;
 pub use test_spec::*;
 
 use crate::{
     config::LuaVersion,
+    hash::HasIntegrity,
     remote_package::{PackageName, PackageReq, PackageVersion},
 };
 
@@ -38,6 +40,8 @@ pub struct Rockspec {
     pub source: PerPlatform<RockSource>,
     pub build: PerPlatform<BuildSpec>,
     pub test: PerPlatform<TestSpec>,
+    /// The sha256 of this rockspec
+    hash: Integrity,
 }
 
 impl Rockspec {
@@ -59,6 +63,7 @@ impl Rockspec {
             source: globals.get("source")?,
             build: globals.get("build")?,
             test: globals.get("test")?,
+            hash: Integrity::from(rockspec_content),
         };
 
         let rockspec_file_name = format!("{}-{}.rockspec", rockspec.package, rockspec.version);
@@ -104,6 +109,12 @@ impl Rockspec {
 
                 None
             })
+    }
+}
+
+impl HasIntegrity for Rockspec {
+    fn hash(&self) -> Result<Integrity> {
+        Ok(self.hash.to_owned())
     }
 }
 

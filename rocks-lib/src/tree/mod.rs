@@ -167,7 +167,7 @@ mod tests {
     use crate::{
         build::variables::HasVariables as _,
         config::LuaVersion,
-        lockfile::{LocalPackage, LockConstraint},
+        lockfile::{LocalPackage, LocalPackageHashes, LockConstraint},
         remote_package::{PackageName, PackageVersion, RemotePackage},
         tree::RockLayout,
     };
@@ -181,9 +181,19 @@ mod tests {
 
         let tree = Tree::new(tree_path.clone(), LuaVersion::Lua51).unwrap();
 
+        let mock_hashes = LocalPackageHashes {
+            rockspec: "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
+                .parse()
+                .unwrap(),
+            source: "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
+                .parse()
+                .unwrap(),
+        };
+
         let package = LocalPackage::from(
             &RemotePackage::parse("neorg".into(), "8.0.0-1".into()).unwrap(),
             LockConstraint::Unconstrained,
+            mock_hashes.clone(),
         );
 
         let id = package.id();
@@ -206,6 +216,7 @@ mod tests {
         let package = LocalPackage::from(
             &RemotePackage::parse("lua-cjson".into(), "2.1.0-1".into()).unwrap(),
             LockConstraint::Unconstrained,
+            mock_hashes.clone(),
         );
 
         let id = package.id();
@@ -259,10 +270,20 @@ mod tests {
 
         let tree = Tree::new(tree_path.clone(), LuaVersion::Lua51).unwrap();
 
+        let mock_hashes = LocalPackageHashes {
+            rockspec: "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
+                .parse()
+                .unwrap(),
+            source: "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
+                .parse()
+                .unwrap(),
+        };
+
         let neorg = tree
             .rock(&LocalPackage::from(
                 &RemotePackage::parse("neorg".into(), "8.0.0-1-1".into()).unwrap(),
                 LockConstraint::Unconstrained,
+                mock_hashes.clone(),
             ))
             .unwrap();
         let build_variables = vec![

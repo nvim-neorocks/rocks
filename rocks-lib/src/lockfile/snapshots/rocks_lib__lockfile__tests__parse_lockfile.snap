@@ -1,6 +1,6 @@
 ---
 source: rocks-lib/src/lockfile/mod.rs
-assertion_line: 224
+assertion_line: 244
 expression: lockfile
 ---
 {
@@ -11,7 +11,11 @@ expression: lockfile
       "version": "2.1.0-1",
       "pinned": false,
       "dependencies": [],
-      "constraint": null
+      "constraint": null,
+      "hashes": {
+        "rockspec": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek=",
+        "source": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
+      }
     },
     "aa0a5bcd396f3b8e59fa9dd8059a06c3bf4952f48473214d96fc46895edb59f0": {
       "name": "neorg",
@@ -20,7 +24,11 @@ expression: lockfile
       "dependencies": [
         "48ec344951668eca0e0a4ff284d804a11e4e709194df3191a72ed8fac89cf2e0"
       ],
-      "constraint": null
+      "constraint": null,
+      "hashes": {
+        "rockspec": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek=",
+        "source": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
+      }
     },
     "d7164c4921869877c7f29fce3f14b8ea78e0aec0d0c36123a3a920a894785ea5": {
       "name": "neorg",
@@ -29,7 +37,11 @@ expression: lockfile
       "dependencies": [
         "48ec344951668eca0e0a4ff284d804a11e4e709194df3191a72ed8fac89cf2e0"
       ],
-      "constraint": null
+      "constraint": null,
+      "hashes": {
+        "rockspec": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek=",
+        "source": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
+      }
     }
   },
   "entrypoints": [

@@ -2,7 +2,8 @@ use std::path::Path;
 
 use crate::{
     config::{Config, DefaultFromConfig},
-    lockfile::{LocalPackage, LockConstraint},
+    hash::HasIntegrity,
+    lockfile::{LocalPackage, LocalPackageHashes, LockConstraint},
     lua_installation::LuaInstallation,
     operations,
     progress::with_spinner,
@@ -98,7 +99,7 @@ pub async fn build(
     pinned: bool,
     constraint: LockConstraint,
     config: &Config,
-) -> Result<()> {
+) -> Result<LocalPackage> {
     let lua_version = rockspec.lua_version().or_default_from(config)?;
 
     let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
@@ -120,9 +121,15 @@ pub async fn build(
         operations::fetch_src_rock(progress, &package, temp_dir.path(), config).await?;
     }
 
+    let hashes = LocalPackageHashes {
+        rockspec: rockspec.hash()?,
+        source: temp_dir.hash()?,
+    };
+
     let mut package = LocalPackage::from(
         &RemotePackage::new(rockspec.package.clone(), rockspec.version.clone()),
         constraint,
+        hashes,
     );
     package.pinned = pinned;
 
@@ -154,5 +161,5 @@ pub async fn build(
         }
     }
 
-    Ok(())
+    Ok(package)
 }
