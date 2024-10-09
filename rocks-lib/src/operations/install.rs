@@ -1,18 +1,14 @@
-use std::io::Cursor;
-
 use crate::{
     config::{Config, DefaultFromConfig},
     lockfile::{LocalPackage, LockConstraint},
     progress::with_spinner,
     remote_package::{PackageReq, RemotePackage},
-    rockspec::Rockspec,
     tree::Tree,
 };
 
 use async_recursion::async_recursion;
 use eyre::Result;
 use indicatif::MultiProgress;
-use tempdir::TempDir;
 
 #[async_recursion]
 pub async fn install(
@@ -33,26 +29,7 @@ async fn install_impl(
     package_req: PackageReq,
     config: &Config,
 ) -> Result<LocalPackage> {
-    let temp = TempDir::new(&package_req.name().to_string())?;
-
-    let rock = super::download(progress, &package_req, config).await?;
-
-    let cursor = Cursor::new(rock.bytes);
-    super::unpack_src_rock(progress, cursor, temp.path().to_path_buf()).await?;
-
-    let rockspec_path = walkdir::WalkDir::new(&temp)
-        .max_depth(1)
-        .same_file_system(true)
-        .into_iter()
-        .filter_map(|entry| entry.ok())
-        .find(|entry| {
-            entry.file_type().is_file()
-                && entry.path().extension().map(|ext| ext.to_str()) == Some(Some("rockspec"))
-        })
-        .expect("could not find rockspec in source directory. this is a bug, please report it.")
-        .into_path();
-
-    let rockspec = Rockspec::new(&std::fs::read_to_string(rockspec_path)?)?;
+    let rockspec = super::download_rockspec(progress, &package_req, config).await?;
 
     let lua_version = rockspec.lua_version().or_default_from(config)?;
 

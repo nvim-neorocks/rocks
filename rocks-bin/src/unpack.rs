@@ -40,7 +40,9 @@ pub async fn unpack(data: Unpack) -> Result<()> {
 pub async fn unpack_remote(data: UnpackRemote, config: Config) -> Result<()> {
     let package_req = data.package_req;
     let progress = MultiProgress::new();
-    let rock = rocks_lib::operations::download(&progress, &package_req, &config).await?;
+    let rock =
+        rocks_lib::operations::search_and_download_src_rock(&progress, &package_req, &config)
+            .await?;
     let cursor = Cursor::new(rock.bytes);
 
     let destination = data
