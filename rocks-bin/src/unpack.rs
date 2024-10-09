@@ -16,9 +16,9 @@ pub struct Unpack {
 #[derive(Args)]
 pub struct UnpackRemote {
     #[clap(flatten)]
-    package_req: PackageReq,
+    pub package_req: PackageReq,
     /// The directory to unpack to
-    path: Option<PathBuf>,
+    pub path: Option<PathBuf>,
 }
 
 pub async fn unpack(data: Unpack) -> Result<()> {
