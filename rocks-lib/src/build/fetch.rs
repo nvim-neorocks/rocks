@@ -1,7 +1,8 @@
 use eyre::eyre;
 use eyre::Result;
 use flate2::read::GzDecoder;
-use git2::Repository;
+use git2::build::RepoBuilder;
+use git2::FetchOptions;
 use indicatif::MultiProgress;
 use std::fs::File;
 use std::io::Cursor;
@@ -23,7 +24,13 @@ pub async fn fetch_src(
         RockSourceSpec::Git(git) => {
             let url = &git.url.to_string();
             let repo = with_spinner(progress, format!("🦠 Cloning {}", url), || async {
-                Ok(Repository::clone(url, dest_dir)?)
+                let mut fetch_options = FetchOptions::new();
+                if git.checkout_ref.is_none() {
+                    fetch_options.depth(1);
+                };
+                let mut repo_builder = RepoBuilder::new();
+                repo_builder.fetch_options(fetch_options);
+                Ok(repo_builder.clone(url, dest_dir)?)
             })
             .await?;
 
