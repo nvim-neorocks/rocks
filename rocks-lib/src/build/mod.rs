@@ -10,7 +10,7 @@ use crate::{
     tree::{RockLayout, Tree},
 };
 use eyre::Result;
-use indicatif::MultiProgress;
+use indicatif::{MultiProgress, ProgressBar};
 mod builtin;
 mod fetch;
 mod make;
@@ -27,10 +27,10 @@ async fn run_build(
     with_spinner(progress, "🛠️ Building...".into(), || async {
         match rockspec.build.default.build_backend.to_owned() {
             Some(BuildBackendSpec::Builtin(build_spec)) => {
-                build_spec.run(output_paths, false, lua, config, build_dir)?
+                build_spec.run(progress, output_paths, false, lua, config, build_dir)?
             }
             Some(BuildBackendSpec::Make(make_spec)) => {
-                make_spec.run(output_paths, false, lua, config, build_dir)?
+                make_spec.run(progress, output_paths, false, lua, config, build_dir)?
             }
             _ => unimplemented!(),
         }
@@ -53,9 +53,21 @@ async fn install(
         format!("💻 Installing {} {}", rockspec.package, rockspec.version),
         || async {
             let install_spec = &rockspec.build.current_platform().install;
+            let lua_len = install_spec.lua.len();
+            let lib_len = install_spec.lib.len();
+            let bin_len = install_spec.bin.len();
+            let total_len = lua_len + lib_len + bin_len;
+            let bar = progress.add(ProgressBar::new(total_len as u64));
+            if lua_len > 0 {
+                bar.set_message("Copying Lua modules...");
+            }
             for (target, source) in &install_spec.lua {
                 let absolute_source = build_dir.join(source);
                 utils::copy_lua_to_module_path(&absolute_source, target, &output_paths.src)?;
+                bar.set_position(bar.position() + 1);
+            }
+            if lib_len > 0 {
+                bar.set_message("Compiling C libraries...");
             }
             for (target, source) in &install_spec.lib {
                 utils::compile_c_files(
@@ -64,9 +76,14 @@ async fn install(
                     &output_paths.lib,
                     lua,
                 )?;
+                bar.set_position(bar.position() + 1);
+            }
+            if lib_len > 0 {
+                bar.set_message("Copying binaries...");
             }
             for (target, source) in &install_spec.bin {
                 std::fs::copy(build_dir.join(source), tree.bin().join(target))?;
+                bar.set_position(bar.position() + 1);
             }
             Ok(())
         },

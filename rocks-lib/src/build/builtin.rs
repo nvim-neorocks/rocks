@@ -10,12 +10,14 @@ use crate::{
     tree::RockLayout,
 };
 use eyre::{OptionExt as _, Result};
+use indicatif::{MultiProgress, ProgressBar};
 use itertools::Itertools as _;
 use walkdir::WalkDir;
 
 impl Build for BuiltinBuildSpec {
     fn run(
         self,
+        progress: &MultiProgress,
         output_paths: &RockLayout,
         _no_install: bool,
         lua: &LuaInstallation,
@@ -28,9 +30,15 @@ impl Build for BuiltinBuildSpec {
             .chain(self.modules)
             .collect::<HashMap<_, _>>();
 
-        for (destination_path, module_type) in &modules {
+        let bar = progress.add(ProgressBar::new(modules.len() as u64));
+        for (counter, (destination_path, module_type)) in modules.iter().enumerate() {
             match module_type {
                 ModuleSpec::SourcePath(source) => {
+                    bar.set_message(format!(
+                        "Copying {} to {}...",
+                        &source.to_string_lossy(),
+                        &destination_path
+                    ));
                     let absolute_source_path = build_dir.join(source);
                     utils::copy_lua_to_module_path(
                         &absolute_source_path,
@@ -39,6 +47,7 @@ impl Build for BuiltinBuildSpec {
                     )?
                 }
                 ModuleSpec::SourcePaths(files) => {
+                    bar.set_message("Compiling C files...");
                     let absolute_source_paths =
                         files.iter().map(|file| build_dir.join(file)).collect();
                     utils::compile_c_files(
@@ -48,14 +57,18 @@ impl Build for BuiltinBuildSpec {
                         lua,
                     )?
                 }
-                ModuleSpec::ModulePaths(data) => utils::compile_c_modules(
-                    data,
-                    build_dir,
-                    destination_path,
-                    &output_paths.lib,
-                    lua,
-                )?,
+                ModuleSpec::ModulePaths(data) => {
+                    bar.set_message("Compiling C modules...");
+                    utils::compile_c_modules(
+                        data,
+                        build_dir,
+                        destination_path,
+                        &output_paths.lib,
+                        lua,
+                    )?
+                }
             }
+            bar.set_position(counter as u64);
         }
 
         Ok(())

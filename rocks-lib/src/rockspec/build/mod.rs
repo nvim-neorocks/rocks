@@ -5,6 +5,7 @@ mod make;
 pub mod utils; // Make build utilities available as a submodule
 pub use builtin::{BuiltinBuildSpec, ModulePaths, ModuleSpec};
 pub use cmake::*;
+use indicatif::MultiProgress;
 pub use make::*;
 
 use builtin::ModuleSpecInternal;
@@ -434,6 +435,7 @@ impl Default for BuildType {
 pub trait Build {
     fn run(
         self,
+        progress: &MultiProgress,
         output_paths: &RockLayout,
         no_install: bool,
         lua: &LuaInstallation,

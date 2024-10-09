@@ -1,5 +1,5 @@
 use eyre::eyre;
-use indicatif::MultiProgress;
+use indicatif::{MultiProgress, ProgressBar};
 use itertools::Itertools;
 use std::path::PathBuf;
 
@@ -65,13 +65,17 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
 
     // Ensure all dependencies are installed first
     // TODO: Handle regular dependencies as well.
-    for dependency_req in rockspec
-        .build_dependencies
-        .current_platform()
+    let build_dependencies = rockspec.build_dependencies.current_platform();
+    let bar = progress
+        .add(ProgressBar::new(build_dependencies.len() as u64))
+        .with_message("Installing dependencies...");
+    for (index, dependency_req) in build_dependencies
         .iter()
         .filter(|req| tree.has_rock(req).is_none())
+        .enumerate()
     {
         rocks_lib::operations::install(&progress, dependency_req.clone(), &config).await?;
+        bar.set_position(index as u64);
     }
 
     rocks_lib::build::build(
