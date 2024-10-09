@@ -74,7 +74,7 @@ impl ManifestMetadata {
             .keys()
             .sorted()
             .rev()
-            .find_or_first(|version| lua_package_req.version_req().matches(version))?;
+            .find(|version| lua_package_req.version_req().matches(version))?;
 
         Some(RemotePackage::new(
             lua_package_req.name().to_owned(),
