@@ -15,7 +15,6 @@ pub struct Unpack {
 
 #[derive(Args)]
 pub struct UnpackRemote {
-    #[clap(flatten)]
     pub package_req: PackageReq,
     /// The directory to unpack to
     pub path: Option<PathBuf>,
