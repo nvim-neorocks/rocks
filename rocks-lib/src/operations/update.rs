@@ -2,8 +2,8 @@ use eyre::Result;
 use indicatif::MultiProgress;
 
 use crate::{
-    config::Config, lockfile::LocalPackage, manifest::ManifestMetadata, progress::with_spinner,
-    remote_package::PackageReq,
+    config::Config, lockfile::LocalPackage, manifest::ManifestMetadata, package::PackageReq,
+    progress::with_spinner,
 };
 
 use super::{install, remove};
@@ -20,7 +20,7 @@ pub async fn update(
         format!("Updating {}...", package.name),
         || async move {
             let latest_version = package
-                .to_remote_package()
+                .to_package()
                 .has_update_with(&constraint, manifest)?;
 
             if latest_version.is_some() {

@@ -6,7 +6,7 @@ use rocks_lib::{
     config::Config,
     manifest::{manifest_from_server, ManifestMetadata},
     operations,
-    remote_package::PackageReq,
+    package::PackageReq,
     tree::Tree,
 };
 

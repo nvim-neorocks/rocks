@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use eyre::Result;
 use itertools::Itertools;
 
-use crate::{lockfile::LocalPackage, remote_package::PackageName};
+use crate::{lockfile::LocalPackage, package::PackageName};
 
 use super::Tree;
 

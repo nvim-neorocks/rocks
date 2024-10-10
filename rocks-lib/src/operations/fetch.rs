@@ -12,7 +12,7 @@ use std::path::Path;
 
 use crate::config::Config;
 use crate::operations;
-use crate::remote_package::RemotePackage;
+use crate::package::RemotePackage;
 use crate::{progress::with_spinner, rockspec::RockSource, rockspec::RockSourceSpec};
 
 pub async fn fetch_src(

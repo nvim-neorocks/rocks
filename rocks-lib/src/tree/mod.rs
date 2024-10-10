@@ -2,7 +2,7 @@ use crate::{
     build::variables::{self, HasVariables},
     config::LuaVersion,
     lockfile::{LocalPackage, Lockfile},
-    remote_package::PackageReq,
+    package::PackageReq,
 };
 use eyre::Result;
 use std::path::PathBuf;
@@ -168,7 +168,7 @@ mod tests {
         build::variables::HasVariables as _,
         config::LuaVersion,
         lockfile::{LocalPackage, LocalPackageHashes, LockConstraint},
-        remote_package::{PackageName, PackageVersion, RemotePackage},
+        package::{PackageName, PackageVersion, RemotePackage},
         tree::RockLayout,
     };
 
