@@ -6,8 +6,8 @@ use indicatif::MultiProgress;
 
 use crate::{
     config::Config,
+    package::{PackageName, PackageReq, PackageVersion, RemotePackage},
     progress::with_spinner,
-    remote_package::{PackageName, PackageReq, PackageVersion, RemotePackage},
     rockspec::Rockspec,
 };
 

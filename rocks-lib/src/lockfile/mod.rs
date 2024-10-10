@@ -7,9 +7,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use ssri::Integrity;
 
-use crate::remote_package::{
-    PackageName, PackageReq, PackageVersion, PackageVersionReq, RemotePackage,
-};
+use crate::package::{PackageName, PackageReq, PackageVersion, PackageVersionReq, RemotePackage};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LocalPackage {
@@ -83,7 +81,7 @@ impl LocalPackage {
         }
     }
 
-    pub fn to_remote_package(&self) -> RemotePackage {
+    pub fn to_package(&self) -> RemotePackage {
         RemotePackage::new(self.name.clone(), self.version.clone())
     }
 
@@ -227,7 +225,7 @@ mod tests {
     use assert_fs::fixture::PathCopy;
     use insta::{assert_json_snapshot, sorted_redaction};
 
-    use crate::{config::LuaVersion::Lua51, remote_package::RemotePackage, tree::Tree};
+    use crate::{config::LuaVersion::Lua51, package::RemotePackage, tree::Tree};
 
     #[test]
     fn parse_lockfile() {

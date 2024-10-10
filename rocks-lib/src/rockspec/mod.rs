@@ -20,7 +20,7 @@ pub use test_spec::*;
 use crate::{
     config::LuaVersion,
     hash::HasIntegrity,
-    remote_package::{PackageName, PackageReq, PackageVersion},
+    package::{PackageName, PackageReq, PackageVersion},
 };
 
 #[derive(Debug)]
@@ -198,7 +198,7 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use crate::remote_package::RemotePackage;
+    use crate::package::RemotePackage;
     use crate::rockspec::PlatformIdentifier;
 
     use super::*;

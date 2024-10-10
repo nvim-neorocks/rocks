@@ -1,6 +1,6 @@
 use eyre::Result;
 use indicatif::MultiProgress;
-use rocks_lib::{config::Config, remote_package::PackageReq};
+use rocks_lib::{config::Config, package::PackageReq};
 
 #[derive(clap::Args)]
 pub struct Install {

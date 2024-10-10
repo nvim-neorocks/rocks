@@ -4,7 +4,7 @@ use indicatif::MultiProgress;
 use rocks_lib::{
     config::{Config, LuaVersion},
     manifest::{manifest_from_server, ManifestMetadata},
-    remote_package::{PackageName, PackageVersion, RemotePackage},
+    package::{PackageName, PackageVersion, RemotePackage},
     tree::Tree,
 };
 

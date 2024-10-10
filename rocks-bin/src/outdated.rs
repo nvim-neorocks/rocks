@@ -31,7 +31,7 @@ pub async fn outdated(outdated_data: Outdated, config: Config) -> Result<()> {
     let rock_list = rock_list
         .iter()
         .filter_map(|rock| {
-            rock.to_remote_package()
+            rock.to_package()
                 .has_update(&metadata)
                 .expect("TODO")
                 .map(|version| (rock, version))

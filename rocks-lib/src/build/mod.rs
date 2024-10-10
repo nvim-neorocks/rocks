@@ -6,8 +6,8 @@ use crate::{
     lockfile::{LocalPackage, LocalPackageHashes, LockConstraint},
     lua_installation::LuaInstallation,
     operations,
+    package::RemotePackage,
     progress::with_spinner,
-    remote_package::RemotePackage,
     rockspec::{utils, Build as _, BuildBackendSpec, Rockspec},
     tree::{RockLayout, Tree},
 };

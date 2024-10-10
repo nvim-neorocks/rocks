@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use crate::{
     config::Config,
-    remote_package::{PackageName, PackageReq, PackageVersion, RemotePackage},
+    package::{PackageName, PackageReq, PackageVersion, RemotePackage},
 };
 
 pub struct ManifestMetadata {

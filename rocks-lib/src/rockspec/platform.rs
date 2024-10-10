@@ -10,7 +10,7 @@ use serde::{
     Deserialize, Deserializer, Serialize,
 };
 
-use crate::remote_package::PackageReq;
+use crate::package::PackageReq;
 
 /// Identifier by a platform.
 /// The `PartialOrd` instance views more specific platforms as `Greater`

@@ -1,7 +1,7 @@
 use clap::Args;
 use eyre::Result;
 use indicatif::MultiProgress;
-use rocks_lib::{config::Config, remote_package::PackageReq};
+use rocks_lib::{config::Config, package::PackageReq};
 
 #[derive(Args)]
 pub struct Download {

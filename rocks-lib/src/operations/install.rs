@@ -1,8 +1,8 @@
 use crate::{
     config::{Config, DefaultFromConfig},
     lockfile::{LocalPackage, LockConstraint},
+    package::PackageReq,
     progress::with_spinner,
-    remote_package::PackageReq,
     tree::Tree,
 };
 
