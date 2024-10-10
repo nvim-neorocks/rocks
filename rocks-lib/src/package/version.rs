@@ -285,6 +285,7 @@ fn parse_version_req(version_constraints: &str) -> Result<VersionReq, Error> {
         .to_owned();
     let transformed = match unescaped {
         s if s.starts_with("~>") => parse_pessimistic_version_constraint(s)?,
+        s if s.starts_with("@") => format!("={}", &s[1..]),
         // The semver crate only understands "= version", unlike luarocks which understands "== version".
         s if s.starts_with("==") => s[1..].to_string(),
         s => s,

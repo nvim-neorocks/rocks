@@ -5,7 +5,6 @@ use rocks_lib::{config::Config, package::PackageReq};
 
 #[derive(Args)]
 pub struct Download {
-    #[clap(flatten)]
     package_req: PackageReq,
 }
 

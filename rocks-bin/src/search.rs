@@ -13,7 +13,6 @@ use rocks_lib::{
 
 #[derive(Args)]
 pub struct Search {
-    #[clap(flatten)]
     lua_package_req: PackageReq,
     // TODO(vhyrro): Add options.
     /// Return a machine readable format.

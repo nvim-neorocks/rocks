@@ -4,7 +4,6 @@ use rocks_lib::{config::Config, package::PackageReq};
 
 #[derive(clap::Args)]
 pub struct Install {
-    #[clap(flatten)]
     package_req: PackageReq,
 }
 
