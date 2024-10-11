@@ -5,6 +5,7 @@ use build::Build;
 use clap::{Parser, Subcommand};
 use debug::Debug;
 use download::Download;
+use info::Info;
 use install::Install;
 use list::ListCmd;
 use outdated::Outdated;
@@ -18,6 +19,7 @@ mod debug;
 mod download;
 mod fetch;
 mod format;
+mod info;
 mod install;
 mod install_lua;
 mod list;
@@ -108,6 +110,8 @@ enum Commands {
     Download(Download),
     /// Formats the codebase with stylua.
     Fmt,
+    /// Show information about an installed rock.
+    Info(Info),
     /// Install a rock for use on the system.
     #[command(arg_required_else_help = true)]
     Install(Install),
@@ -132,8 +136,6 @@ enum Commands {
     /// Query the Luarocks servers.
     #[command(arg_required_else_help = true)]
     Search(Search),
-    /// Show information about an installed rock.
-    Show,
     /// Run the test suite in the current directory.
     Test,
     /// Uninstall a rock from the system.
@@ -194,6 +196,7 @@ async fn main() {
         Commands::Purge => purge::purge(config).await.unwrap(),
         Commands::Remove(remove_args) => remove::remove(remove_args, config).await.unwrap(),
         Commands::Update(_update_args) => update::update(config).await.unwrap(),
+        Commands::Info(info_data) => info::info(info_data, config).await.unwrap(),
         _ => unimplemented!(),
     }
 }
