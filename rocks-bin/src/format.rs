@@ -39,5 +39,18 @@ pub fn format() -> Result<()> {
             Ok::<_, eyre::Report>(())
         })?;
 
+    // Format the rockspec
+
+    let rockspec = project.root().join("project.rockspec");
+
+    let formatted_code = stylua_lib::format_code(
+        &std::fs::read_to_string(&rockspec)?,
+        config,
+        None,
+        stylua_lib::OutputVerification::Full,
+    )?;
+
+    std::fs::write(rockspec, formatted_code)?;
+
     Ok(())
 }
