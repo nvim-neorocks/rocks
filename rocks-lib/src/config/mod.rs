@@ -90,6 +90,9 @@ pub struct Config {
     timeout: Duration,
     make: String,
     variables: HashMap<String, String>,
+
+    cache_dir: PathBuf,
+    data_dir: PathBuf,
 }
 
 impl Config {
@@ -162,6 +165,14 @@ impl Config {
     pub fn variables(&self) -> &HashMap<String, String> {
         &self.variables
     }
+
+    pub fn cache_dir(&self) -> &PathBuf {
+        &self.cache_dir
+    }
+
+    pub fn data_dir(&self) -> &PathBuf {
+        &self.data_dir
+    }
 }
 
 impl HasVariables for Config {
@@ -185,6 +196,9 @@ pub struct ConfigBuilder {
     timeout: Option<Duration>,
     make: Option<String>,
     variables: Option<HashMap<String, String>>,
+
+    cache_dir: Option<PathBuf>,
+    data_dir: Option<PathBuf>,
 }
 
 impl ConfigBuilder {
@@ -257,8 +271,16 @@ impl ConfigBuilder {
         Self { variables, ..self }
     }
 
+    pub fn cache_dir(self, cache_dir: Option<PathBuf>) -> Self {
+        Self { cache_dir, ..self }
+    }
+
+    pub fn data_dir(self, data_dir: Option<PathBuf>) -> Self {
+        Self { data_dir, ..self }
+    }
+
     pub fn build(self) -> Result<Config> {
-        let data_path = Config::get_default_data_path()?;
+        let data_dir = self.data_dir.unwrap_or(Config::get_default_data_path()?);
         let current_project = Project::current()?;
 
         Ok(Config {
@@ -269,7 +291,7 @@ impl ConfigBuilder {
             only_server: self.only_server,
             only_sources: self.only_sources,
             namespace: self.namespace.unwrap_or_default(),
-            lua_dir: self.lua_dir.unwrap_or_else(|| data_path.join("lua")),
+            lua_dir: self.lua_dir.unwrap_or_else(|| data_dir.join("lua")),
             lua_version: self.lua_version.or(current_project
                 .as_ref()
                 .and_then(|project| project.rockspec().lua_version())),
@@ -284,12 +306,14 @@ impl ConfigBuilder {
                             .map(|project| project.root().join(".rocks"))
                     }
                 })
-                .unwrap_or(data_path),
+                .unwrap_or_else(|| data_dir.clone()),
             no_project: self.no_project.unwrap_or(false),
             verbose: self.verbose.unwrap_or(false),
             timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(30)),
             make: self.make.unwrap_or("make".into()),
             variables: self.variables.unwrap_or_default(),
+            cache_dir: self.cache_dir.unwrap_or(Config::get_default_cache_path()?),
+            data_dir,
         })
     }
 }
