@@ -265,5 +265,13 @@ mod tests {
         assert!(package_req.matches(&neorg));
         let neorg = RemotePackage::parse("neorg".into(), "1.0.6".into()).unwrap();
         assert!(!package_req.matches(&neorg));
+        // Testing incomplete version constraints
+        let package_req: PackageReq = "lua-utils.nvim ~> 1.1-1".parse().unwrap();
+        let lua_utils = RemotePackage::parse("lua-utils.nvim".into(), "1.1.4".into()).unwrap();
+        assert!(package_req.matches(&lua_utils));
+        let lua_utils = RemotePackage::parse("lua-utils.nvim".into(), "1.1.5".into()).unwrap();
+        assert!(package_req.matches(&lua_utils));
+        let lua_utils = RemotePackage::parse("lua-utils.nvim".into(), "1.2-1".into()).unwrap();
+        assert!(!package_req.matches(&lua_utils));
     }
 }

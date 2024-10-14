@@ -2,6 +2,7 @@ use std::{cmp::Ordering, fmt::Display, str::FromStr};
 
 use eyre::{eyre, Result};
 use html_escape::decode_html_entities;
+use itertools::Itertools;
 use mlua::FromLua;
 use semver::{Comparator, Error, Op, Version, VersionReq};
 use serde::{de, Deserialize, Deserializer, Serialize};
@@ -238,11 +239,22 @@ impl FromStr for PackageVersionReq {
     type Err = eyre::Error;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
+        let text = text
+            .split('-')
+            .map(str::to_string)
+            .coalesce(|version, rest| {
+                Ok(format!(
+                    "{version}{}",
+                    rest.trim_start_matches(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
+                ))
+            })
+            .collect::<String>();
+
         if is_dev_version_str(text.trim_start_matches("==").trim()) {
-            return Ok(PackageVersionReq::Dev(text.into()));
+            return Ok(PackageVersionReq::Dev(text));
         }
 
-        Ok(PackageVersionReq::SemVer(parse_version_req(text)?))
+        Ok(PackageVersionReq::SemVer(parse_version_req(&text)?))
     }
 }
 
@@ -251,20 +263,21 @@ fn split_specrev(version_str: &str) -> Result<(&str, u16)> {
         if let Some(specrev_str) = version_str.get(pos + 1..) {
             if specrev_str.chars().all(|c| c.is_ascii_digit()) {
                 let specrev = specrev_str.parse::<u16>()?;
-                return Ok((&version_str[..pos], specrev));
+                Ok((&version_str[..pos], specrev))
             } else {
-                return Err(eyre!(
+                Err(eyre!(
                     "Specrev {} in version {} contains non-numeric characters",
                     specrev_str,
                     version_str
-                ));
+                ))
             }
         } else {
-            return Err(eyre!("Could not parse specrev in version {}", version_str));
+            Err(eyre!("Could not parse specrev in version {}", version_str))
         }
+    } else {
+        // We assume a specrev of 1 if none can be found.
+        Ok((version_str, 1))
     }
-    // We assume a specrev of 1 if none can be found.
-    Ok((version_str, 1))
 }
 
 fn is_dev_version_str(text: &str) -> bool {
@@ -424,6 +437,14 @@ mod tests {
         assert_eq!(
             PackageVersionReq::parse("== scm").unwrap(),
             PackageVersionReq::Dev("== scm".into())
+        );
+        assert_eq!(
+            PackageVersionReq::parse(">1-1,<1.2-2").unwrap(),
+            PackageVersionReq::SemVer(">1,<1.2".parse().unwrap())
+        );
+        assert_eq!(
+            PackageVersionReq::parse("> 1-1, < 1.2-2").unwrap(),
+            PackageVersionReq::SemVer("> 1, < 1.2".parse().unwrap())
         );
     }
 }

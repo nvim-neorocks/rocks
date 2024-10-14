@@ -110,7 +110,7 @@ enum Commands {
     Download(Download),
     /// Formats the codebase with stylua.
     Fmt,
-    /// Show information about an installed rock.
+    /// Show metadata for any rock.
     Info(Info),
     /// Install a rock for use on the system.
     #[command(arg_required_else_help = true)]
