@@ -2,7 +2,10 @@ use clap::Args;
 use eyre::Result;
 use indicatif::MultiProgress;
 use rocks_lib::{
-    config::{Config, LuaVersion}, operations::download_rockspec, package::PackageReq, tree::Tree
+    config::{Config, LuaVersion},
+    operations::download_rockspec,
+    package::PackageReq,
+    tree::Tree,
 };
 
 #[derive(Args)]
@@ -24,10 +27,32 @@ pub async fn info(data: Info, config: Config) -> Result<()> {
     println!("Package version: {}", rockspec.version);
     println!();
 
-    println!("Summary: {}", rockspec.description.summary.unwrap_or("None".into()));
-    println!("Description: {}", rockspec.description.detailed.unwrap_or("None".into()));
-    println!("License: {}", rockspec.description.license.unwrap_or("None (all rights reserved by the author)".into()));
-    println!("Maintainer: {}", rockspec.description.maintainer.unwrap_or("Unspecified".into()));
+    println!(
+        "Summary: {}",
+        rockspec.description.summary.unwrap_or("None".into())
+    );
+    println!(
+        "Description: {}",
+        rockspec
+            .description
+            .detailed
+            .unwrap_or("None".into())
+            .trim()
+    );
+    println!(
+        "License: {}",
+        rockspec
+            .description
+            .license
+            .unwrap_or("Unknown (all rights reserved by the author)".into())
+    );
+    println!(
+        "Maintainer: {}",
+        rockspec
+            .description
+            .maintainer
+            .unwrap_or("Unspecified".into())
+    );
 
     Ok(())
 }
