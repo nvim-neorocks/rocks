@@ -8,6 +8,7 @@ use eyre::Result;
 use rocks_lib::{
     config::{Config, DefaultFromConfig as _},
     lockfile::LockConstraint::Unconstrained,
+    package::PackageName,
     rockspec::Rockspec,
     tree::Tree,
 };
@@ -64,13 +65,17 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     let tree = Tree::new(config.tree().clone(), lua_version)?;
 
     // Ensure all dependencies are installed first
-    // TODO: Handle regular dependencies as well.
-    let build_dependencies = rockspec.build_dependencies.current_platform();
-    let bar = progress
-        .add(ProgressBar::new(build_dependencies.len() as u64))
-        .with_message("Installing dependencies...");
-    for (index, dependency_req) in build_dependencies
+    let dependencies = rockspec
+        .dependencies
+        .current_platform()
         .iter()
+        .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
+        .collect_vec();
+    let bar = progress
+        .add(ProgressBar::new(dependencies.len() as u64))
+        .with_message("Installing dependencies...");
+    for (index, dependency_req) in dependencies
+        .into_iter()
         .filter(|req| tree.has_rock(req).is_none())
         .enumerate()
     {
