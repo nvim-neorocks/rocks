@@ -3,20 +3,19 @@ use itertools::Itertools;
 use mlua::{FromLua, Lua, LuaSerdeExt as _, Value};
 use std::{cmp::Ordering, collections::HashMap, marker::PhantomData};
 use strum::IntoEnumIterator;
-use strum_macros::{Display, EnumIter, EnumString};
+use strum_macros::EnumIter;
 
 use serde::{
     de::{self, DeserializeOwned},
-    Deserialize, Deserializer, Serialize,
+    Deserialize, Deserializer,
 };
+use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
 
 use crate::package::PackageReq;
 
 /// Identifier by a platform.
 /// The `PartialOrd` instance views more specific platforms as `Greater`
-#[derive(
-    Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Copy, Clone, Display, EnumString, EnumIter,
-)]
+#[derive(Deserialize_enum_str, Serialize_enum_str, PartialEq, Eq, Hash, Debug, Clone, EnumIter)]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum PlatformIdentifier {
@@ -28,6 +27,8 @@ pub enum PlatformIdentifier {
     MacOSX,
     Linux,
     FreeBSD,
+    #[serde(other)]
+    Unknown(String),
 }
 
 // Order by specificity -> less specific = `Less`
@@ -151,7 +152,7 @@ impl PlatformSupport {
                     return Err(eyre!("Conflicting supported platform entries!"));
                 }
 
-                platforms.insert(platform_identifier, is_positive_assertion);
+                platforms.insert(platform_identifier.clone(), is_positive_assertion);
 
                 let subset_or_extended_platforms = if is_positive_assertion {
                     platform_identifier.get_extended_platforms()
@@ -384,7 +385,7 @@ where
                 .cloned()
                 .unwrap_or_default();
             per_platform.insert(
-                *extended_platform,
+                extended_platform.to_owned(),
                 extended_overrides.apply_overrides(&overrides)?,
             );
         }
