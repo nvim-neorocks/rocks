@@ -23,7 +23,7 @@ use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
 use crate::{config::Config, lua_installation::LuaInstallation, tree::RockLayout};
 
-use super::{PartialOverride, PerPlatform, PlatformIdentifier};
+use super::{mlua_json_value_to_vec, PartialOverride, PerPlatform, PlatformIdentifier};
 
 /// The build specification for a given rock, serialized from `rockspec.build = { ... }`.
 ///
@@ -179,7 +179,11 @@ fn deserialize_copy_directories<'de, D>(deserializer: D) -> Result<Option<Vec<Pa
 where
     D: Deserializer<'de>,
 {
-    let copy_directories: Option<Vec<String>> = Option::deserialize(deserializer)?;
+    let value: Option<serde_json::Value> = Option::deserialize(deserializer)?;
+    let copy_directories: Option<Vec<String>> = match value {
+        Some(json_value) => Some(mlua_json_value_to_vec(json_value).map_err(de::Error::custom)?),
+        None => None,
+    };
     let special_directories: Vec<String> = vec!["lua".into(), "lib".into(), "rock_manifest".into()];
     match special_directories
         .into_iter()
@@ -280,7 +284,7 @@ fn override_platform_specs(
                 .unwrap_or(&base.to_owned())
                 .to_owned();
             per_platform.insert(
-                *extended_platform,
+                extended_platform.to_owned(),
                 override_build_spec_internal(&extended_spec, &build_spec)?,
             );
         }

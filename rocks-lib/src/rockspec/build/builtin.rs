@@ -1,9 +1,12 @@
 use eyre::{eyre, Result};
-use itertools::Itertools;
+use itertools::Itertools as _;
 use serde::{de, Deserialize, Deserializer};
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::rockspec::{FromPlatformOverridable, PartialOverride, PerPlatform, PlatformOverridable};
+use crate::rockspec::{
+    deserialize_vec_from_lua, FromPlatformOverridable, PartialOverride, PerPlatform,
+    PlatformOverridable,
+};
 
 #[derive(Debug, PartialEq, Deserialize, Default, Clone)]
 pub struct BuiltinBuildSpec {
@@ -80,29 +83,14 @@ fn deserialize_definitions<'de, D>(
 where
     D: Deserializer<'de>,
 {
-    let values = serde_json::Value::deserialize(deserializer)?;
-
-    // If `defines` is an empty Lua table, it's treated as a dictionary.
-    // This case is handled here.
-    if let Some(values_as_obj) = values.as_object() {
-        if values_as_obj.is_empty() {
-            return Ok(Vec::default());
-        }
-    }
-
+    let values: Vec<String> = deserialize_vec_from_lua(deserializer)?;
     values
-        .as_array()
-        .ok_or_else(|| de::Error::custom("expected `defines` to be a list of strings"))?
         .iter()
         .map(|val| {
-            if let Some((key, value)) = val
-                .as_str()
-                .ok_or_else(|| de::Error::custom("expected item in `defines` to be a string"))?
-                .split_once('=')
-            {
+            if let Some((key, value)) = val.split_once('=') {
                 Ok((key.into(), Some(value.into())))
             } else {
-                Ok((val.as_str().unwrap().into(), None))
+                Ok((val.into(), None))
             }
         })
         .try_collect()
@@ -179,15 +167,15 @@ impl<'de> Deserialize<'de> for ModulePaths {
 
 #[derive(Debug, PartialEq, Deserialize, Clone, Default)]
 pub struct ModulePathsInternal {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_vec_from_lua")]
     pub sources: Vec<PathBuf>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_vec_from_lua")]
     pub libraries: Vec<PathBuf>,
     #[serde(default, deserialize_with = "deserialize_definitions")]
     pub defines: Vec<(String, Option<String>)>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_vec_from_lua")]
     pub incdirs: Vec<PathBuf>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_vec_from_lua")]
     pub libdirs: Vec<PathBuf>,
 }
 
