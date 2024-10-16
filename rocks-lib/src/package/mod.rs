@@ -194,11 +194,20 @@ mod tests {
         let neorg = RemotePackage::parse("neorg".into(), "1.0.0".into()).unwrap();
         let expected_version = PackageVersion::parse("1.0.0").unwrap();
         assert_eq!(neorg.name().to_string(), "neorg");
-        assert_eq!(*neorg.version(), expected_version);
+        assert!(matches!(
+            neorg.version().cmp(&expected_version),
+            std::cmp::Ordering::Equal
+        ));
         let neorg = RemotePackage::parse("neorg".into(), "1.0".into()).unwrap();
-        assert_eq!(*neorg.version(), expected_version);
+        assert!(matches!(
+            neorg.version().cmp(&expected_version),
+            std::cmp::Ordering::Equal
+        ));
         let neorg = RemotePackage::parse("neorg".into(), "1".into()).unwrap();
-        assert_eq!(*neorg.version(), expected_version);
+        assert!(matches!(
+            neorg.version().cmp(&expected_version),
+            std::cmp::Ordering::Equal
+        ));
     }
 
     #[tokio::test]
