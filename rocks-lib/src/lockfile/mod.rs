@@ -118,7 +118,7 @@ pub enum LockConstraint {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Lockfile {
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(skip)]
     filepath: PathBuf,
     // TODO: Serialize this directly into a `Version`
     version: String,
