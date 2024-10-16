@@ -111,21 +111,32 @@ impl FromStr for PackageVersion {
             }));
         }
         Ok(PackageVersion::SemVer(SemVer {
+            component_count: text.chars().filter(|c| *c == '.').count() + 1,
             version: parse_version(modrev)?,
             specrev,
         }))
     }
 }
 
+// TODO: Stop deriving Eq here
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct SemVer {
     version: Version,
+    component_count: usize,
     specrev: u16,
 }
 
 impl Display for SemVer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let str = format!("{}-{}", self.version, self.specrev);
+        let str = format!(
+            "{}-{}",
+            self.version
+                .to_string()
+                .split('.')
+                .take(self.component_count)
+                .join("."),
+            self.specrev
+        );
         str.fmt(f)
     }
 }
@@ -350,13 +361,23 @@ mod tests {
             PackageVersion::parse("1-1").unwrap(),
             PackageVersion::SemVer(SemVer {
                 version: "1.0.0".parse().unwrap(),
-                specrev: 1
+                component_count: 1,
+                specrev: 1,
             })
         );
         assert_eq!(
             PackageVersion::parse("1.0-1").unwrap(),
             PackageVersion::SemVer(SemVer {
                 version: "1.0.0".parse().unwrap(),
+                component_count: 2,
+                specrev: 1,
+            })
+        );
+        assert_eq!(
+            PackageVersion::parse("1.0.0-1").unwrap(),
+            PackageVersion::SemVer(SemVer {
+                version: "1.0.0".parse().unwrap(),
+                component_count: 3,
                 specrev: 1
             })
         );
@@ -364,13 +385,7 @@ mod tests {
             PackageVersion::parse("1.0.0-1").unwrap(),
             PackageVersion::SemVer(SemVer {
                 version: "1.0.0".parse().unwrap(),
-                specrev: 1
-            })
-        );
-        assert_eq!(
-            PackageVersion::parse("1.0.0-1").unwrap(),
-            PackageVersion::SemVer(SemVer {
-                version: "1.0.0".parse().unwrap(),
+                component_count: 3,
                 specrev: 1
             })
         );
