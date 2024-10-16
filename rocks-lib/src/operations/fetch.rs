@@ -9,6 +9,7 @@ use std::io::Cursor;
 use std::io::Read;
 use std::io::Seek;
 use std::path::Path;
+use std::path::PathBuf;
 
 use crate::config::Config;
 use crate::operations;
@@ -135,7 +136,18 @@ async fn unpack<R: Read + Seek + Send>(
             Some("application/gzip") => {
                 let tar = GzDecoder::new(reader);
                 let mut archive = tar::Archive::new(tar);
-                archive.unpack(dest_dir)?;
+
+                if archive.entries()?.count() == 1 {
+                    archive.entries()?.try_for_each(|entry| {
+                        let mut entry = entry?;
+                        entry.unpack(
+                            dest_dir.join(entry.path()?.components().skip(1).collect::<PathBuf>()),
+                        )?;
+                        Ok::<_, eyre::Report>(())
+                    })?;
+                } else {
+                    archive.unpack(dest_dir)?;
+                }
             }
             Some(other) => {
                 return Err(eyre!("Rockspec source has unsupported file type {}", other));
