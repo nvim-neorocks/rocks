@@ -15,6 +15,7 @@ use eyre::Result;
 use indicatif::{MultiProgress, ProgressBar};
 mod builtin;
 mod make;
+mod rust_mlua;
 pub mod variables;
 
 async fn run_build(
@@ -28,10 +29,19 @@ async fn run_build(
     with_spinner(progress, "🛠️ Building...".into(), || async {
         match rockspec.build.default.build_backend.to_owned() {
             Some(BuildBackendSpec::Builtin(build_spec)) => {
-                build_spec.run(progress, output_paths, false, lua, config, build_dir)?
+                build_spec
+                    .run(progress, output_paths, false, lua, config, build_dir)
+                    .await?
             }
             Some(BuildBackendSpec::Make(make_spec)) => {
-                make_spec.run(progress, output_paths, false, lua, config, build_dir)?
+                make_spec
+                    .run(progress, output_paths, false, lua, config, build_dir)
+                    .await?
+            }
+            Some(BuildBackendSpec::RustMlua(rust_mlua_spec)) => {
+                rust_mlua_spec
+                    .run(progress, output_paths, false, lua, config, build_dir)
+                    .await?
             }
             _ => unimplemented!(),
         }

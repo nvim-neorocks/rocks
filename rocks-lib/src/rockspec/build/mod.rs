@@ -1,12 +1,14 @@
 mod builtin;
 mod cmake;
 mod make;
+mod rust_mlua;
 
 pub mod utils; // Make build utilities available as a submodule
 pub use builtin::{BuiltinBuildSpec, ModulePaths, ModuleSpec};
 pub use cmake::*;
 use indicatif::MultiProgress;
 pub use make::*;
+pub use rust_mlua::*;
 
 use builtin::ModuleSpecInternal;
 
@@ -16,6 +18,8 @@ use eyre::{eyre, OptionExt as _, Result};
 use mlua::{FromLua, Lua, LuaSerdeExt, Value};
 use std::{
     collections::HashMap,
+    env::consts::DLL_EXTENSION,
+    future::Future,
     path::{Path, PathBuf},
 };
 
@@ -23,7 +27,9 @@ use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
 use crate::{config::Config, lua_installation::LuaInstallation, tree::RockLayout};
 
-use super::{mlua_json_value_to_vec, PartialOverride, PerPlatform, PlatformIdentifier};
+use super::{
+    mlua_json_value_to_vec, LuaTableKey, PartialOverride, PerPlatform, PlatformIdentifier,
+};
 
 /// The build specification for a given rock, serialized from `rockspec.build = { ... }`.
 ///
@@ -52,8 +58,14 @@ impl BuildSpec {
                     .unwrap_or_default()
                     .into_iter()
                     .map(|(key, module_spec_internal)| {
+                        let key_str = match key {
+                            LuaTableKey::IntKey(_) => {
+                                Err(eyre!("'builtin' modules should not have list elements"))
+                            }
+                            LuaTableKey::StringKey(str) => Ok(str),
+                        }?;
                         match ModuleSpec::from_internal(module_spec_internal) {
-                            Ok(module_spec) => Ok((key, module_spec)),
+                            Ok(module_spec) => Ok((key_str, module_spec)),
                             Err(err) => Err(err),
                         }
                     })
@@ -81,10 +93,10 @@ impl BuildSpec {
             BuildType::Command => {
                 let build_command = internal
                     .build_command
-                    .ok_or_eyre("no 'build_command' specied")?;
+                    .ok_or_eyre("no 'build_command' specified for the 'command' build backend")?;
                 let install_command = internal
                     .install_command
-                    .ok_or_eyre("no 'install_command' specied")?;
+                    .ok_or_eyre("no 'install_command' specified for the 'command' build backend")?;
                 Some(BuildBackendSpec::Command(CommandBuildSpec {
                     build_command,
                     install_command,
@@ -92,6 +104,41 @@ impl BuildSpec {
             }
             BuildType::None => None,
             BuildType::LuaRock(s) => Some(BuildBackendSpec::LuaRock(s)),
+            BuildType::RustMlua => Some(BuildBackendSpec::RustMlua(RustMluaBuildSpec {
+                modules: internal
+                    .builtin_spec
+                    .ok_or_eyre("No 'modules' specified for the 'rust-mlua' build backend")?
+                    .into_iter()
+                    .map(|(key, value)| match (key, value) {
+                        (LuaTableKey::IntKey(_), ModuleSpecInternal::SourcePath(module)) => {
+                            let mut rust_lib: PathBuf = format!("lib{}", module.display()).into();
+                            rust_lib.set_extension(DLL_EXTENSION);
+                            Ok((module.to_string_lossy().to_string(), rust_lib))
+                        }
+                        (
+                            LuaTableKey::StringKey(module_name),
+                            ModuleSpecInternal::SourcePath(module),
+                        ) => {
+                            let mut rust_lib: PathBuf = format!("lib{}", module.display()).into();
+                            rust_lib.set_extension(DLL_EXTENSION);
+                            Ok((module_name, rust_lib))
+                        }
+                        _ => Err(eyre!("Invalid 'rust-mlua' modules format.")),
+                    })
+                    .try_collect()?,
+                target_path: internal.target_path.unwrap_or("target".into()),
+                default_features: internal.default_features.unwrap_or(true),
+                include: internal
+                    .include
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|(key, dest)| match key {
+                        LuaTableKey::IntKey(_) => (dest.clone(), dest),
+                        LuaTableKey::StringKey(src) => (src.into(), dest),
+                    })
+                    .collect(),
+                features: internal.features.unwrap_or_default(),
+            })),
         };
         Ok(Self {
             build_backend,
@@ -139,8 +186,7 @@ pub enum BuildBackendSpec {
     CMake(CMakeBuildSpec),
     Command(CommandBuildSpec),
     LuaRock(String),
-    // TODO: /// "cargo" (rust)?
-    // Cargo,
+    RustMlua(RustMluaBuildSpec),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -205,7 +251,7 @@ struct BuildSpecInternal {
     #[serde(rename = "type", default)]
     build_type: Option<BuildType>,
     #[serde(rename = "modules", default)]
-    builtin_spec: Option<HashMap<String, ModuleSpecInternal>>,
+    builtin_spec: Option<HashMap<LuaTableKey, ModuleSpecInternal>>,
     #[serde(default)]
     makefile: Option<PathBuf>,
     #[serde(rename = "build_target", default)]
@@ -234,6 +280,15 @@ struct BuildSpecInternal {
     copy_directories: Option<Vec<PathBuf>>,
     #[serde(default)]
     patches: Option<HashMap<PathBuf, String>>,
+    // rust-mlua fields
+    #[serde(default)]
+    target_path: Option<PathBuf>,
+    #[serde(default)]
+    default_features: Option<bool>,
+    #[serde(default)]
+    include: Option<HashMap<LuaTableKey, PathBuf>>,
+    #[serde(default)]
+    features: Option<Vec<String>>,
 }
 
 impl<'lua> FromLua<'lua> for PerPlatform<BuildSpecInternal> {
@@ -296,71 +351,89 @@ fn override_build_spec_internal(
     base: &BuildSpecInternal,
     override_spec: &BuildSpecInternal,
 ) -> Result<BuildSpecInternal> {
-    Ok(BuildSpecInternal {
-        build_type: override_opt(&override_spec.build_type, &base.build_type),
-        builtin_spec: match (
-            override_spec.builtin_spec.clone(),
-            base.builtin_spec.clone(),
-        ) {
-            (Some(override_val), Some(base_spec_map)) => {
-                Some(base_spec_map.into_iter().chain(override_val).try_fold(
-                    HashMap::default(),
-                    |mut acc: HashMap<String, ModuleSpecInternal>, (k, module_spec_override)|
-                        -> Result<HashMap<String, ModuleSpecInternal>, eyre::Error> {
-                        let overridden = match acc.get(&k) {
-                            None => module_spec_override,
-                            Some(base_module_spec) => {
-                                base_module_spec.apply_overrides(&module_spec_override)?
-                            }
-                        };
-                        acc.insert(k, overridden);
-                        Ok(acc)
-                    },
-                )?)
-            }
-            (override_val @ Some(_), _) => override_val,
-            (_, base_val @ Some(_)) => base_val,
-            _ => None,
+    Ok(
+        BuildSpecInternal {
+            build_type: override_opt(&override_spec.build_type, &base.build_type),
+            builtin_spec:
+                match (
+                    override_spec.builtin_spec.clone(),
+                    base.builtin_spec.clone(),
+                ) {
+                    (Some(override_val), Some(base_spec_map)) => {
+                        Some(
+                            base_spec_map.into_iter().chain(override_val).try_fold(
+                                HashMap::default(),
+                                |mut acc: HashMap<LuaTableKey, ModuleSpecInternal>,
+                                 (k, module_spec_override)|
+                                 -> Result<
+                                    HashMap<LuaTableKey, ModuleSpecInternal>,
+                                    eyre::Error,
+                                > {
+                                    let overridden = match acc.get(&k) {
+                                        None => module_spec_override,
+                                        Some(base_module_spec) => base_module_spec
+                                            .apply_overrides(&module_spec_override)?,
+                                    };
+                                    acc.insert(k, overridden);
+                                    Ok(acc)
+                                },
+                            )?,
+                        )
+                    }
+                    (override_val @ Some(_), _) => override_val,
+                    (_, base_val @ Some(_)) => base_val,
+                    _ => None,
+                },
+            makefile: override_opt(&override_spec.makefile, &base.makefile),
+            make_build_target: override_opt(
+                &override_spec.make_build_target,
+                &base.make_build_target,
+            ),
+            make_build_pass: override_opt(&override_spec.make_build_pass, &base.make_build_pass),
+            make_install_target: override_opt(
+                &override_spec.make_install_target,
+                &base.make_install_target,
+            ),
+            make_install_pass: override_opt(
+                &override_spec.make_install_pass,
+                &base.make_install_pass,
+            ),
+            make_build_variables: merge_map_opts(
+                &override_spec.make_build_variables,
+                &base.make_build_variables,
+            ),
+            make_install_variables: merge_map_opts(
+                &override_spec.make_install_variables,
+                &base.make_build_variables,
+            ),
+            variables: merge_map_opts(&override_spec.variables, &base.variables),
+            cmake_lists_content: override_opt(
+                &override_spec.cmake_lists_content,
+                &base.cmake_lists_content,
+            ),
+            build_command: override_opt(&override_spec.build_command, &base.build_command),
+            install_command: override_opt(&override_spec.install_command, &base.install_command),
+            install: override_opt(&override_spec.install, &base.install),
+            copy_directories: match (
+                override_spec.copy_directories.clone(),
+                base.copy_directories.clone(),
+            ) {
+                (Some(override_vec), Some(base_vec)) => {
+                    let merged: Vec<PathBuf> =
+                        base_vec.into_iter().chain(override_vec).unique().collect();
+                    Some(merged)
+                }
+                (None, base_vec @ Some(_)) => base_vec,
+                (override_vec @ Some(_), None) => override_vec,
+                _ => None,
+            },
+            patches: override_opt(&override_spec.patches, &base.patches),
+            target_path: override_opt(&override_spec.target_path, &base.target_path),
+            default_features: override_opt(&override_spec.default_features, &base.default_features),
+            features: override_opt(&override_spec.features, &base.features),
+            include: merge_map_opts(&override_spec.include, &base.include),
         },
-        makefile: override_opt(&override_spec.makefile, &base.makefile),
-        make_build_target: override_opt(&override_spec.make_build_target, &base.make_build_target),
-        make_build_pass: override_opt(&override_spec.make_build_pass, &base.make_build_pass),
-        make_install_target: override_opt(
-            &override_spec.make_install_target,
-            &base.make_install_target,
-        ),
-        make_install_pass: override_opt(&override_spec.make_install_pass, &base.make_install_pass),
-        make_build_variables: merge_map_opts(
-            &override_spec.make_build_variables,
-            &base.make_build_variables,
-        ),
-        make_install_variables: merge_map_opts(
-            &override_spec.make_install_variables,
-            &base.make_build_variables,
-        ),
-        variables: merge_map_opts(&override_spec.variables, &base.variables),
-        cmake_lists_content: override_opt(
-            &override_spec.cmake_lists_content,
-            &base.cmake_lists_content,
-        ),
-        build_command: override_opt(&override_spec.build_command, &base.build_command),
-        install_command: override_opt(&override_spec.install_command, &base.install_command),
-        install: override_opt(&override_spec.install, &base.install),
-        copy_directories: match (
-            override_spec.copy_directories.clone(),
-            base.copy_directories.clone(),
-        ) {
-            (Some(override_vec), Some(base_vec)) => {
-                let merged: Vec<PathBuf> =
-                    base_vec.into_iter().chain(override_vec).unique().collect();
-                Some(merged)
-            }
-            (None, base_vec @ Some(_)) => base_vec,
-            (override_vec @ Some(_), None) => override_vec,
-            _ => None,
-        },
-        patches: override_opt(&override_spec.patches, &base.patches),
-    })
+    )
 }
 
 fn override_opt<T: Clone>(override_opt: &Option<T>, base: &Option<T>) -> Option<T> {
@@ -406,8 +479,8 @@ enum BuildType {
     None,
     /// external Lua rock
     LuaRock(String),
-    // TODO: /// "cargo" (rust)?
-    // Cargo,
+    #[serde(rename = "rust-mlua")]
+    RustMlua,
 }
 
 // Special Deserialize case for BuildType:
@@ -445,7 +518,7 @@ pub trait Build {
         lua: &LuaInstallation,
         config: &Config,
         build_dir: &Path,
-    ) -> Result<()>;
+    ) -> impl Future<Output = Result<()>> + Send;
 }
 
 #[cfg(test)]
@@ -461,10 +534,12 @@ mod tests {
         assert_eq!(build_type, BuildType::Builtin);
         let build_type: BuildType = serde_json::from_str("\"make\"").unwrap();
         assert_eq!(build_type, BuildType::Make);
-        let build_type: BuildType = serde_json::from_str("\"luarocks_build_rust_mlua\"").unwrap();
+        let build_type: BuildType = serde_json::from_str("\"custom_build_backend\"").unwrap();
         assert_eq!(
             build_type,
-            BuildType::LuaRock("luarocks_build_rust_mlua".into())
+            BuildType::LuaRock("custom_build_backend".into())
         );
+        let build_type: BuildType = serde_json::from_str("\"rust-mlua\"").unwrap();
+        assert_eq!(build_type, BuildType::RustMlua);
     }
 }

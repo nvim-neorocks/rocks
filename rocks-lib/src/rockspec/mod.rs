@@ -992,3 +992,53 @@ build = {
         Rockspec::new(&rockspec_content).unwrap();
     }
 }
+#[tokio::test]
+pub async fn rust_mlua_rockspec() {
+    let rockspec_content = "
+package = 'foo'\n
+version = 'scm-1'\n
+source = {\n
+    url = 'https://github.com/nvim-neorocks/rocks.nvim/archive/1.0.0/rocks.nvim.zip',\n
+}\n
+build = {
+    type = 'rust-mlua',
+    modules = {
+        'foo',
+        bar = 'baz',
+    },
+    target_path = 'path/to/cargo/target/directory',
+    default_features = false,
+    include = {
+        'file.lua',
+        ['path/to/another/file.lua'] = 'another-file.lua',
+    },
+    features = {'extra', 'features'},
+}
+        "
+    .into();
+    let rockspec = Rockspec::new(&rockspec_content).unwrap();
+    let build_spec = rockspec.build.current_platform();
+    if let Some(BuildBackendSpec::RustMlua(build_spec)) = build_spec.build_backend.to_owned() {
+        assert_eq!(
+            build_spec.modules.get("foo").unwrap(),
+            &PathBuf::from(format!("libfoo.{}", std::env::consts::DLL_EXTENSION))
+        );
+        assert_eq!(
+            build_spec.modules.get("bar").unwrap(),
+            &PathBuf::from(format!("libbaz.{}", std::env::consts::DLL_EXTENSION))
+        );
+        assert_eq!(
+            build_spec.include.get(&PathBuf::from("file.lua")).unwrap(),
+            &PathBuf::from("file.lua")
+        );
+        assert_eq!(
+            build_spec
+                .include
+                .get(&PathBuf::from("path/to/another/file.lua"))
+                .unwrap(),
+            &PathBuf::from("another-file.lua")
+        );
+    } else {
+        panic!("Expected RustMlua build backend");
+    }
+}
