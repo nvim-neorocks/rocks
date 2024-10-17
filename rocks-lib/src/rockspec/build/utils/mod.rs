@@ -71,6 +71,26 @@ pub fn compile_c_files(
     Ok(())
 }
 
+/// the extension for Lua libraries.
+pub fn lua_lib_extension() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "dll"
+    } else {
+        "so"
+    }
+}
+
+/// the extension for external libraries.
+pub fn external_lib_extension() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "dll"
+    } else if cfg!(target_os = "macos") {
+        "dylib"
+    } else {
+        "so"
+    }
+}
+
 /// Compiles a set of C files (with extra metadata) to a given destination.
 /// # Panics
 /// Panics if no filename for the target path can be determined.
