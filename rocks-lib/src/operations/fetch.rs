@@ -4,7 +4,9 @@ use flate2::read::GzDecoder;
 use git2::build::RepoBuilder;
 use git2::FetchOptions;
 use indicatif::MultiProgress;
+use itertools::Itertools;
 use std::fs::File;
+use std::io::BufReader;
 use std::io::Cursor;
 use std::io::Read;
 use std::io::Seek;
@@ -60,7 +62,15 @@ pub async fn fetch_src(
                 .unwrap_or(url.to_string());
             let cursor = Cursor::new(response);
             let mime_type = infer::get(cursor.get_ref()).map(|file_type| file_type.mime_type());
-            unpack(progress, mime_type, cursor, file_name, dest_dir).await?
+            unpack(
+                progress,
+                mime_type,
+                cursor,
+                rock_source.unpack_dir.is_none(),
+                file_name,
+                dest_dir,
+            )
+            .await?
         }
         RockSourceSpec::File(path) => {
             if path.is_dir() {
@@ -92,7 +102,15 @@ pub async fn fetch_src(
                     .map(|os_str| os_str.to_string_lossy())
                     .unwrap_or(path.to_string_lossy())
                     .to_string();
-                unpack(progress, mime_type, file, file_name, dest_dir).await?
+                unpack(
+                    progress,
+                    mime_type,
+                    file,
+                    rock_source.unpack_dir.is_none(),
+                    file_name,
+                    dest_dir,
+                )
+                .await?
             }
         }
         RockSourceSpec::Cvs(_) => unimplemented!(),
@@ -112,7 +130,15 @@ pub async fn fetch_src_rock(
     let src_rock = operations::download_src_rock(progress, package, config).await?;
     let cursor = Cursor::new(src_rock.bytes);
     let mime_type = infer::get(cursor.get_ref()).map(|file_type| file_type.mime_type());
-    unpack(progress, mime_type, cursor, src_rock.file_name, dest_dir).await?;
+    unpack(
+        progress,
+        mime_type,
+        cursor,
+        false,
+        src_rock.file_name,
+        dest_dir,
+    )
+    .await?;
     Ok(())
 }
 
@@ -120,6 +146,7 @@ async fn unpack<R: Read + Seek + Send>(
     progress: &MultiProgress,
     mime_type: Option<&str>,
     reader: R,
+    auto_find_lua_sources: bool,
     file_name: String,
     dest_dir: &Path,
 ) -> Result<()> {
@@ -134,19 +161,64 @@ async fn unpack<R: Read + Seek + Send>(
                 archive.unpack(dest_dir)?;
             }
             Some("application/gzip") => {
-                let tar = GzDecoder::new(reader);
+                let mut bufreader = BufReader::new(reader);
+
+                let extract_subdirectory = auto_find_lua_sources && {
+                    let tar = GzDecoder::new(&mut bufreader);
+                    let mut archive = tar::Archive::new(tar);
+
+                    let entries: Vec<_> = archive
+                        .entries()?
+                        .filter_map(|entry| {
+                            if entry.as_ref().ok()?.path().ok()?.file_name()? != "pax_global_header"
+                            {
+                                Some(entry)
+                            } else {
+                                None
+                            }
+                        })
+                        .try_collect()?;
+
+                    let directory: PathBuf = entries
+                        .first()
+                        .unwrap()
+                        .path()?
+                        .components()
+                        .take(1)
+                        .collect();
+
+                    entries.into_iter().all(|entry| {
+                        entry
+                            .path()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .starts_with(directory.to_str().unwrap())
+                    })
+                };
+
+                bufreader.rewind()?;
+                let tar = GzDecoder::new(bufreader);
                 let mut archive = tar::Archive::new(tar);
 
-                if archive.entries()?.count() == 1 {
+                if extract_subdirectory {
                     archive.entries()?.try_for_each(|entry| {
                         let mut entry = entry?;
-                        entry.unpack(
-                            dest_dir.join(entry.path()?.components().skip(1).collect::<PathBuf>()),
-                        )?;
+
+                        let path: PathBuf = entry.path()?.components().skip(1).collect();
+                        if path.components().count() > 0 {
+                            let dest = dest_dir.join(path);
+                            std::fs::create_dir_all(dest.parent().unwrap())?;
+                            entry.unpack(dest)?;
+                        }
+
                         Ok::<_, eyre::Report>(())
                     })?;
                 } else {
-                    archive.unpack(dest_dir)?;
+                    archive.entries()?.try_for_each(|entry| {
+                        entry?.unpack_in(dest_dir)?;
+                        Ok::<_, eyre::Report>(())
+                    })?;
                 }
             }
             Some(other) => {
