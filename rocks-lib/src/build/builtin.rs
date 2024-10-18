@@ -15,7 +15,7 @@ use itertools::Itertools as _;
 use walkdir::WalkDir;
 
 impl Build for BuiltinBuildSpec {
-    fn run(
+    async fn run(
         self,
         progress: &MultiProgress,
         output_paths: &RockLayout,

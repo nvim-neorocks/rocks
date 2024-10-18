@@ -2,6 +2,31 @@ use eyre::{OptionExt, Result};
 use itertools::Itertools as _;
 use serde::{de, Deserialize, Deserializer};
 
+#[derive(Hash, Debug, Eq, PartialEq, Clone)]
+pub enum LuaTableKey {
+    IntKey(u64),
+    StringKey(String),
+}
+
+impl<'de> Deserialize<'de> for LuaTableKey {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        if value.is_u64() {
+            Ok(LuaTableKey::IntKey(value.as_u64().unwrap()))
+        } else if value.is_string() {
+            Ok(LuaTableKey::StringKey(value.as_str().unwrap().into()))
+        } else {
+            Err(de::Error::custom(format!(
+                "Could not parse Lua table key. Expected an integer or string, but got {}",
+                value
+            )))
+        }
+    }
+}
+
 /// Deserialize a json value into a Vec<T>, treating empty json objects as empty lists
 /// This is needed to be able to deserialise Lua tables.
 pub fn deserialize_vec_from_lua<'de, D, T>(deserializer: D) -> std::result::Result<Vec<T>, D::Error>
