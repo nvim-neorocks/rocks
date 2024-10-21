@@ -79,7 +79,8 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         .filter(|req| tree.has_rock(req).is_none())
         .enumerate()
     {
-        rocks_lib::operations::install(&progress, dependency_req.clone(), &config).await?;
+        rocks_lib::operations::install(&progress, dependency_req.clone(), data.pin, &config)
+            .await?;
         bar.set_position(index as u64);
     }
 

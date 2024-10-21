@@ -15,12 +15,13 @@ use itertools::Itertools;
 pub async fn install(
     progress: &MultiProgress,
     package_req: PackageReq,
+    pin: bool,
     config: &Config,
 ) -> Result<LocalPackage> {
     with_spinner(
         progress,
         format!("💻 Installing {}", package_req),
-        || async { install_impl(progress, package_req, config).await },
+        || async { install_impl(progress, package_req, pin, config).await },
     )
     .await
 }
@@ -28,6 +29,7 @@ pub async fn install(
 async fn install_impl(
     progress: &MultiProgress,
     package_req: PackageReq,
+    pin: bool,
     config: &Config,
 ) -> Result<LocalPackage> {
     let rockspec = super::download_rockspec(progress, &package_req, config).await?;
@@ -38,7 +40,6 @@ async fn install_impl(
     let mut lockfile = tree.lockfile()?;
 
     let constraint = LockConstraint::Constrained(package_req.version_req().clone());
-    let pinned = false;
 
     // Recursively build all dependencies.
     let dependencies = rockspec
@@ -57,13 +58,13 @@ async fn install_impl(
         .enumerate()
     {
         let dependency =
-            crate::operations::install(progress, dependency_req.clone(), config).await?;
+            crate::operations::install(progress, dependency_req.clone(), pin, config).await?;
 
         installed_dependencies.push(dependency);
         bar.set_position(index as u64);
     }
 
-    let package = crate::build::build(progress, rockspec, pinned, constraint, config).await?;
+    let package = crate::build::build(progress, rockspec, pin, constraint, config).await?;
 
     lockfile.add(&package);
     for dependency in installed_dependencies {
