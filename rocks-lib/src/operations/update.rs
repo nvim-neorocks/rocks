@@ -23,9 +23,9 @@ pub async fn update(
                 .to_package()
                 .has_update_with(&constraint, manifest)?;
 
-            if latest_version.is_some() {
+            if latest_version.is_some() && !package.pinned() {
                 // Install the newest package.
-                install(progress, constraint, config).await?;
+                install(progress, constraint, false, config).await?;
 
                 // Remove the old package
                 remove(progress, package, config).await?;
