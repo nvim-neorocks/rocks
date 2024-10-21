@@ -323,7 +323,7 @@ mod tests {
         external_dependencies = { FOO = { header = 'foo.h' } }\n
         test_dependencies = { 'busted >= 2.0.0' }\n
         source = {\n
-            url = 'git://github.com/nvim-neorocks/rocks.nvim',\n
+            url = 'git+https://github.com/nvim-neorocks/rocks.nvim',\n
             hash = 'sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek=',\n
         }\n
         "
@@ -376,7 +376,7 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
-            url = 'git://hub.com/example-project/',\n
+            url = 'git+https://hub.com/example-project/',\n
             branch = 'bar',\n
         }\n
         "
@@ -385,7 +385,7 @@ mod tests {
         assert_eq!(
             rockspec.source.default.source_spec,
             RockSourceSpec::Git(GitSource {
-                url: "git://hub.com/example-project/".parse().unwrap(),
+                url: "https://hub.com/example-project/".parse().unwrap(),
                 checkout_ref: Some("bar".into())
             })
         );
@@ -395,7 +395,7 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
-            url = 'git://hub.com/example-project/',\n
+            url = 'git+https://hub.com/example-project/',\n
             tag = 'bar',\n
         }\n
         "
@@ -404,7 +404,7 @@ mod tests {
         assert_eq!(
             rockspec.source.default.source_spec,
             RockSourceSpec::Git(GitSource {
-                url: "git://hub.com/example-project/".parse().unwrap(),
+                url: "https://hub.com/example-project/".parse().unwrap(),
                 checkout_ref: Some("bar".into())
             })
         );
@@ -413,7 +413,7 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
-            url = 'git://hub.com/example-project/',\n
+            url = 'git+https://hub.com/example-project/',\n
             branch = 'bar',\n
             tag = 'baz',\n
         }\n
@@ -425,7 +425,7 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
-            url = 'git://hub.com/example-project/',\n
+            url = 'git+https://hub.com/example-project/',\n
             module = 'bar',\n
         }\n
         "
@@ -436,7 +436,7 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
-            url = 'git://hub.com/example-project/',\n
+            url = 'git+https://hub.com/example-project/',\n
             tag = 'bar',\n
             file = 'foo.tar.gz',\n
         }\n
@@ -459,7 +459,7 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
-            url = 'git://hub.com/example-project/foo.zip',\n
+            url = 'git+https://hub.com/example-project/foo.zip',\n
         }\n
         build = {\n
             install = {\n
@@ -483,7 +483,7 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
-            url = 'git://hub.com/example-project/',\n
+            url = 'git+https://hub.com/example-project/',\n
         }\n
         build = {\n
             copy_directories = { 'lua' },\n
@@ -496,7 +496,7 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
-            url = 'git://hub.com/example-project/',\n
+            url = 'git+https://hub.com/example-project/',\n
         }\n
         build = {\n
             copy_directories = { 'lib' },\n
@@ -509,7 +509,7 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
-            url = 'git://hub.com/example-project/',\n
+            url = 'git+https://hub.com/example-project/',\n
         }\n
         build = {\n
             copy_directories = { 'rock_manifest' },\n
@@ -522,7 +522,7 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
-            url = 'git://hub.com/example-project/foo.zip',\n
+            url = 'git+https://hub.com/example-project/foo.zip',\n
             dir = 'baz',\n
         }\n
         build = {\n
@@ -563,7 +563,7 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
-            url = 'git://hub.com/example-project/foo.zip',\n
+            url = 'git+https://hub.com/example-project/foo.zip',\n
         }\n
         build = {\n
             type = 'cmake',\n
@@ -580,7 +580,7 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
-            url = 'git://hub.com/example-project/foo.zip',\n
+            url = 'git+https://hub.com/example-project/foo.zip',\n
         }\n
         build = {\n
             type = 'command',\n
@@ -599,7 +599,7 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
-            url = 'git://hub.com/example-project/foo.zip',\n
+            url = 'git+https://hub.com/example-project/foo.zip',\n
         }\n
         build = {\n
             type = 'command',\n
@@ -613,7 +613,7 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
-            url = 'git://hub.com/example-project/foo.zip',\n
+            url = 'git+https://hub.com/example-project/foo.zip',\n
         }\n
         build = {\n
             type = 'command',\n
@@ -643,7 +643,7 @@ mod tests {
           },\n
         }\n
         source = {\n
-            url = 'git://github.com/nvim-neorocks/rocks.nvim',\n
+            url = 'git+https://github.com/nvim-neorocks/rocks.nvim',\n
             hash = 'sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek=',\n
         }\n
         "
@@ -755,7 +755,7 @@ mod tests {
         package = 'foo'\n
         version = '1.0.0-1'\n
         source = {\n
-            url = 'git://hub.com/example-project/.git',\n
+            url = 'git+https://hub.com/example-project/.git',\n
             branch = 'bar',\n
             platforms = {\n
                 macosx = {\n
@@ -773,7 +773,7 @@ mod tests {
         assert_eq!(
             rockspec.source.default.source_spec,
             RockSourceSpec::Git(GitSource {
-                url: "git://hub.com/example-project/.git".parse().unwrap(),
+                url: "https://hub.com/example-project/.git".parse().unwrap(),
                 checkout_ref: Some("bar".into())
             })
         );
@@ -785,7 +785,7 @@ mod tests {
                 .map(|it| it.source_spec.clone())
                 .unwrap(),
             RockSourceSpec::Git(GitSource {
-                url: "git://hub.com/example-project/.git".parse().unwrap(),
+                url: "https://hub.com/example-project/.git".parse().unwrap(),
                 checkout_ref: Some("mac".into())
             })
         );
@@ -805,7 +805,7 @@ mod tests {
         rockspec_format = '1.0'\n
         package = 'foo'\n
         version = '1.0.0-1'\n
-        source = { url = 'git://hub.com/example-project/foo.zip' }\n
+        source = { url = 'git+https://hub.com/example-project/foo.zip' }\n
         build = {\n
             type = 'make',\n
             install = {\n
@@ -842,7 +842,7 @@ mod tests {
         let rockspec_content = "
         package = 'foo'\n
         version = '1.0.0-1'\n
-        source = { url = 'git://hub.com/example-project/foo.zip' }\n
+        source = { url = 'git+https://hub.com/example-project/foo.zip' }\n
         build = {\n
             type = 'builtin',\n
             modules = {\n
