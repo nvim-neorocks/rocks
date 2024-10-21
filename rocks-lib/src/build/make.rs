@@ -12,7 +12,7 @@ use crate::{
 };
 
 impl Build for MakeBuildSpec {
-    fn run(
+    async fn run(
         self,
         _progress: &MultiProgress,
         output_paths: &RockLayout,
@@ -81,29 +81,21 @@ stderr: {}",
                 .arg(self.install_target)
                 .args(["-f", self.makefile.to_str().unwrap()])
                 .args(install_args)
-                .spawn()
+                .output()
             {
-                Ok(child) => match child.wait_with_output() {
-                    Ok(output) if output.status.success() => {}
-                    Ok(output) => {
-                        return Err(eyre!(
-                            "`make` install step failed.
+                Ok(output) if output.status.success() => {}
+                Ok(output) => {
+                    return Err(eyre!(
+                        "`make` install step failed.
 status: {}
 stdout: {}
 stderr: {}",
-                            output.status,
-                            String::from_utf8_lossy(&output.stdout),
-                            String::from_utf8_lossy(&output.stderr),
-                        ));
-                    }
-                    Err(err) => return Err(eyre!("Failed to run `make` install step: {err}")),
-                },
-                Err(_) => {
-                    return Err(eyre!(
-                        "Failed to run install step: `{}` command not found!",
-                        config.make_cmd()
-                    ))
+                        output.status,
+                        String::from_utf8_lossy(&output.stdout),
+                        String::from_utf8_lossy(&output.stderr),
+                    ));
                 }
+                Err(err) => return Err(eyre!("Failed to run `make` install step: {err}")),
             }
         };
 
