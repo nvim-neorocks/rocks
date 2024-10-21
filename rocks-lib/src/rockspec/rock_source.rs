@@ -228,7 +228,7 @@ impl FromStr for SourceUrl {
                 let path = fs::canonicalize(&path_buf)?;
                 Ok(Self::File(path))
             }
-            s if s.starts_with("git://") => Ok(Self::Git(s.parse()?)),
+            s if s.starts_with("git://") => Ok(Self::Git(s.replacen("git", "https", 1).parse()?)),
             s if starts_with_any(
                 s,
                 ["git+file://", "git+http://", "git+https://", "git+ssh://"].into(),
