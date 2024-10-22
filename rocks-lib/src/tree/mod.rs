@@ -124,6 +124,22 @@ impl Tree {
             .cloned()
     }
 
+    pub fn has_rock_and<F>(&self, req: &PackageReq, filter: F) -> Option<LocalPackage>
+    where
+        F: Fn(&LocalPackage) -> bool,
+    {
+        self.list()
+            .ok()?
+            .get(req.name())
+            .map(|packages| {
+                packages
+                    .iter()
+                    .rev()
+                    .find(|package| req.version_req().matches(&package.version) && filter(package))
+            })?
+            .cloned()
+    }
+
     pub fn rock(&self, package: &LocalPackage) -> Result<RockLayout> {
         let rock_path = self.root_for(package);
 
