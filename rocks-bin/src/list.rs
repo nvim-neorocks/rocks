@@ -1,7 +1,10 @@
 use clap::Args;
-use eyre::{OptionExt as _, Result};
+use eyre::Result;
 use itertools::Itertools as _;
-use rocks_lib::{config::Config, tree::Tree};
+use rocks_lib::{
+    config::{Config, LuaVersion},
+    tree::Tree,
+};
 use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
 
 #[derive(Args)]
@@ -11,13 +14,7 @@ pub struct ListCmd {
 }
 
 pub fn list_installed(list_data: ListCmd, config: Config) -> Result<()> {
-    let tree = Tree::new(
-        config.tree().clone(),
-        config
-            .lua_version()
-            .cloned()
-            .ok_or_eyre("lua version not supplied!")?,
-    )?;
+    let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
     let available_rocks = tree.list()?;
 
     if list_data.porcelain {
@@ -28,7 +25,12 @@ pub fn list_installed(list_data: ListCmd, config: Config) -> Result<()> {
             let mut tree = StringTreeNode::new(name.to_string());
 
             for package in packages {
-                tree.push(format!("{} {}", package.name(), package.version()));
+                tree.push(format!(
+                    "{} {}{}",
+                    package.name(),
+                    package.version(),
+                    if package.pinned() { " (pinned)" } else { "" }
+                ));
             }
 
             println!("{}", tree.to_string_with_format(&formatting)?);
