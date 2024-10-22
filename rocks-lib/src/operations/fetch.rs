@@ -223,6 +223,11 @@ async fn unpack<R: Read + Seek + Send>(
                     })?;
                 }
             }
+            Some("text/html") => {
+                return Err(eyre!(
+                    "Source returned HTML - it may have been moved or deleted."
+                ));
+            }
             Some(other) => {
                 return Err(eyre!("Rockspec source has unsupported file type {}", other));
             }
