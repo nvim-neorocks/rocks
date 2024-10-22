@@ -8,6 +8,8 @@ pub use version::{PackageVersion, PackageVersionReq};
 mod outdated;
 mod version;
 
+#[derive(Clone)]
+#[cfg_attr(feature = "clap", derive(clap::Args))]
 pub struct RemotePackage {
     name: PackageName,
     version: PackageVersion,
@@ -34,6 +36,18 @@ impl RemotePackage {
             name: self.name,
             version_req: self.version.into_version_req(),
         }
+    }
+}
+
+impl FromStr for RemotePackage {
+    type Err = eyre::Report;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let (name, version) = s
+            .split_once('@')
+            .ok_or_else(|| eyre!("unable to parse package {s}. expected format: `name@version`"))?;
+
+        Self::parse(name.to_string(), version.to_string())
     }
 }
 

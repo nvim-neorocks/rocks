@@ -9,6 +9,7 @@ use info::Info;
 use install::Install;
 use list::ListCmd;
 use outdated::Outdated;
+use pin::Pin;
 use remove::Remove;
 use rocks_lib::config::{ConfigBuilder, LuaVersion};
 use search::Search;
@@ -24,6 +25,7 @@ mod install;
 mod install_lua;
 mod list;
 mod outdated;
+mod pin;
 mod project;
 mod purge;
 mod remove;
@@ -129,6 +131,8 @@ enum Commands {
     Pack,
     /// Return the currently configured package path.
     Path,
+    /// Pin an existing rock, preventing any updates to the package.
+    Pin(Pin),
     /// Remove all installed rocks from a tree.
     Purge,
     /// Uninstall a rock.
@@ -197,6 +201,7 @@ async fn main() {
         Commands::Remove(remove_args) => remove::remove(remove_args, config).await.unwrap(),
         Commands::Update(_update_args) => update::update(config).await.unwrap(),
         Commands::Info(info_data) => info::info(info_data, config).await.unwrap(),
+        Commands::Pin(pin_data) => pin::pin(pin_data, config).unwrap(),
         _ => unimplemented!(),
     }
 }
