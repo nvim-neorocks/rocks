@@ -1,7 +1,7 @@
 use clap::Args;
-use eyre::OptionExt;
 use eyre::Result;
 use indicatif::MultiProgress;
+use rocks_lib::config::LuaVersion;
 use rocks_lib::{
     config::Config,
     manifest::{manifest_from_server, ManifestMetadata},
@@ -14,13 +14,7 @@ use rocks_lib::{
 pub struct Update {}
 
 pub async fn update(config: Config) -> Result<()> {
-    let tree = Tree::new(
-        config.tree().clone(),
-        config
-            .lua_version()
-            .cloned()
-            .ok_or_eyre("lua version not supplied!")?,
-    )?;
+    let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
 
     let lockfile = tree.lockfile()?;
     let rocks = lockfile.rocks();
