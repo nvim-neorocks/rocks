@@ -20,6 +20,10 @@ pub fn pin(package: &mut LocalPackage, tree: &Tree) -> Result<()> {
 
     package.pinned = true;
 
+    if lockfile.get(&package.id()).is_some() {
+        bail!("Cannot change pin status of {0}, since a second version of {0} is already installed with `pin: {1}`", package.name(), package.pinned());
+    }
+
     let new_root = tree.root_for(package);
 
     std::fs::create_dir_all(&new_root)?;
