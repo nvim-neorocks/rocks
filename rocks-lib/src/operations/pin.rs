@@ -19,6 +19,11 @@ pub enum PinError {
         pin_state: PinnedState,
         rock: RemotePackage,
     },
+    #[error("cannot change pin state of {rock}, since a second version of {rock} is already installed with `pin: {}`", .pin_state.as_bool())]
+    PinStateConflict {
+        pin_state: PinnedState,
+        rock: RemotePackage,
+    },
     #[error(transparent)]
     Io(#[from] io::Error),
     #[error("failed to move old package: {0}")]
@@ -45,6 +50,13 @@ pub fn set_pinned_state(
         .collect_vec();
 
     package.pinned = pin;
+
+    if lockfile.get(&package.id()).is_some() {
+        return Err(PinError::PinStateConflict {
+            pin_state: package.pinned(),
+            rock: package.to_package(),
+        });
+    }
 
     let new_root = tree.root_for(package);
 

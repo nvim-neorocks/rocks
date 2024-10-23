@@ -2,6 +2,7 @@ use indicatif::MultiProgress;
 use thiserror::Error;
 
 use crate::{
+    build::BuildBehaviour,
     config::Config,
     lockfile::{LocalPackage, PinnedState},
     manifest::ManifestMetadata,
@@ -46,12 +47,18 @@ pub async fn update(
 
             if latest_version.is_some() && package.pinned() == PinnedState::Unpinned {
                 // Install the newest package.
-                install(progress, constraint, PinnedState::Unpinned, config)
-                    .await
-                    .map_err(|error| UpdateError::Install {
-                        error,
-                        package: package.to_package(),
-                    })?;
+                install(
+                    progress,
+                    constraint,
+                    PinnedState::Unpinned,
+                    BuildBehaviour::NoForce,
+                    config,
+                )
+                .await
+                .map_err(|error| UpdateError::Install {
+                    error,
+                    package: package.to_package(),
+                })?;
 
                 // Remove the old package
                 remove(progress, package.clone(), config)

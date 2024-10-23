@@ -25,7 +25,7 @@ impl From<bool> for PinnedState {
 }
 
 impl PinnedState {
-    fn as_bool(&self) -> bool {
+    pub fn as_bool(&self) -> bool {
         match self {
             Self::Unpinned => false,
             Self::Pinned => true,
