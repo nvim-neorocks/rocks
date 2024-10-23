@@ -1,7 +1,7 @@
 use crate::{
     config::{Config, DefaultFromConfig},
     lockfile::{LocalPackage, LockConstraint},
-    package::{PackageName, PackageReq},
+    package::{PackageName, PackageReq, PackageVersionReq},
     progress::with_spinner,
     tree::Tree,
 };
@@ -10,6 +10,7 @@ use async_recursion::async_recursion;
 use eyre::Result;
 use indicatif::{MultiProgress, ProgressBar};
 use itertools::Itertools;
+use semver::VersionReq;
 
 #[async_recursion]
 pub async fn install(
@@ -39,7 +40,11 @@ async fn install_impl(
     let tree = Tree::new(config.tree().clone(), lua_version)?;
     let mut lockfile = tree.lockfile()?;
 
-    let constraint = LockConstraint::Constrained(package_req.version_req().clone());
+    let constraint = if *package_req.version_req() == PackageVersionReq::SemVer(VersionReq::STAR) {
+        LockConstraint::Unconstrained
+    } else {
+        LockConstraint::Constrained(package_req.version_req().clone())
+    };
 
     // Recursively build all dependencies.
     let dependencies = rockspec
