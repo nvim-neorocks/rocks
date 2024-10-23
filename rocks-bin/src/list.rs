@@ -3,6 +3,7 @@ use eyre::Result;
 use itertools::Itertools as _;
 use rocks_lib::{
     config::{Config, LuaVersion},
+    lockfile::PinnedState,
     tree::Tree,
 };
 use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
@@ -29,7 +30,11 @@ pub fn list_installed(list_data: ListCmd, config: Config) -> Result<()> {
                     "{} {}{}",
                     package.name(),
                     package.version(),
-                    if package.pinned() { " (pinned)" } else { "" }
+                    if package.pinned() == PinnedState::Pinned {
+                        " (pinned)"
+                    } else {
+                        ""
+                    }
                 ));
             }
 

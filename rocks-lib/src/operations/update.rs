@@ -2,7 +2,10 @@ use eyre::Result;
 use indicatif::MultiProgress;
 
 use crate::{
-    config::Config, lockfile::LocalPackage, manifest::ManifestMetadata, package::PackageReq,
+    config::Config,
+    lockfile::{LocalPackage, PinnedState},
+    manifest::ManifestMetadata,
+    package::PackageReq,
     progress::with_spinner,
 };
 
@@ -23,9 +26,9 @@ pub async fn update(
                 .to_package()
                 .has_update_with(&constraint, manifest)?;
 
-            if latest_version.is_some() && !package.pinned() {
+            if latest_version.is_some() && package.pinned() == PinnedState::Unpinned {
                 // Install the newest package.
-                install(progress, constraint, false, config).await?;
+                install(progress, constraint, PinnedState::Unpinned, config).await?;
 
                 // Remove the old package
                 remove(progress, package, config).await?;

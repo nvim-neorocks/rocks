@@ -2,13 +2,24 @@ use eyre::{bail, Result};
 use fs_extra::dir::CopyOptions;
 use itertools::Itertools;
 
-use crate::{lockfile::LocalPackage, tree::Tree};
+use crate::{
+    lockfile::{LocalPackage, PinnedState},
+    tree::Tree,
+};
 
 // TODO(vhyrro): Differentiate pinned LocalPackages at the type level?
 
-pub fn pin(package: &mut LocalPackage, tree: &Tree) -> Result<()> {
-    if package.pinned() {
-        bail!("Rock {} is already pinned!", package.to_package());
+pub fn set_pinned_state(package: &mut LocalPackage, tree: &Tree, pin: PinnedState) -> Result<()> {
+    if pin == package.pinned() {
+        bail!(
+            "Rock {} is already {}pinned!",
+            package.to_package(),
+            if pin == PinnedState::Unpinned {
+                "un"
+            } else {
+                ""
+            }
+        );
     }
 
     let mut lockfile = tree.lockfile()?;
@@ -18,7 +29,7 @@ pub fn pin(package: &mut LocalPackage, tree: &Tree) -> Result<()> {
         .map(|dir| dir.path())
         .collect_vec();
 
-    package.pinned = true;
+    package.pinned = pin;
 
     let new_root = tree.root_for(package);
 

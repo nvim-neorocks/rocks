@@ -2,6 +2,7 @@ use clap::Args;
 use eyre::Result;
 use indicatif::MultiProgress;
 use rocks_lib::config::LuaVersion;
+use rocks_lib::lockfile::PinnedState;
 use rocks_lib::{
     config::Config,
     manifest::{manifest_from_server, ManifestMetadata},
@@ -24,7 +25,7 @@ pub async fn update(config: Config) -> Result<()> {
     let progress = MultiProgress::new();
 
     for package in rocks.values() {
-        if !package.pinned {
+        if package.pinned == PinnedState::Unpinned {
             operations::update(
                 &progress,
                 package.clone(),

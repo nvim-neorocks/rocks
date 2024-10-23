@@ -9,9 +9,12 @@ use info::Info;
 use install::Install;
 use list::ListCmd;
 use outdated::Outdated;
-use pin::Pin;
+use pin::ChangePin;
 use remove::Remove;
-use rocks_lib::config::{ConfigBuilder, LuaVersion};
+use rocks_lib::{
+    config::{ConfigBuilder, LuaVersion},
+    lockfile::PinnedState::{Pinned, Unpinned},
+};
 use search::Search;
 use update::Update;
 
@@ -132,7 +135,7 @@ enum Commands {
     /// Return the currently configured package path.
     Path,
     /// Pin an existing rock, preventing any updates to the package.
-    Pin(Pin),
+    Pin(ChangePin),
     /// Remove all installed rocks from a tree.
     Purge,
     /// Uninstall a rock.
@@ -144,6 +147,8 @@ enum Commands {
     Test,
     /// Uninstall a rock from the system.
     Uninstall,
+    /// Unpins an existing rock, allowing updates to alter the package.
+    Unpin(ChangePin),
     /// Updates all rocks in a project.
     Update(Update),
     /// Upload a rockspec to the public rocks repository.
@@ -201,7 +206,8 @@ async fn main() {
         Commands::Remove(remove_args) => remove::remove(remove_args, config).await.unwrap(),
         Commands::Update(_update_args) => update::update(config).await.unwrap(),
         Commands::Info(info_data) => info::info(info_data, config).await.unwrap(),
-        Commands::Pin(pin_data) => pin::pin(pin_data, config).unwrap(),
+        Commands::Pin(pin_data) => pin::set_pinned_state(pin_data, config, Pinned).unwrap(),
+        Commands::Unpin(pin_data) => pin::set_pinned_state(pin_data, config, Unpinned).unwrap(),
         _ => unimplemented!(),
     }
 }
