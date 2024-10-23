@@ -1,14 +1,16 @@
 use eyre::eyre;
 use indicatif::{MultiProgress, ProgressBar};
+use inquire::Confirm;
 use itertools::Itertools;
 use std::path::PathBuf;
 
 use clap::Args;
 use eyre::Result;
 use rocks_lib::{
+    build::BuildBehaviour,
     config::{Config, DefaultFromConfig as _},
-    lockfile::LockConstraint::Unconstrained,
-    package::PackageName,
+    lockfile::{LockConstraint::Unconstrained, PinnedState},
+    package::{PackageName, PackageReq},
     rockspec::Rockspec,
     tree::Tree,
 };
@@ -19,9 +21,14 @@ pub struct Build {
 
     #[arg(long)]
     pin: bool,
+
+    #[arg(long)]
+    force: bool,
 }
 
 pub async fn build(data: Build, config: Config) -> Result<()> {
+    let pin = PinnedState::from(data.pin);
+
     let rockspec_path = data.rockspec_path.map_or_else(|| {
         // Try to infer the rockspec the user meant.
 
@@ -64,6 +71,29 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
 
     let tree = Tree::new(config.tree().clone(), lua_version)?;
 
+    let build_behaviour = match tree.has_rock_and(
+        &PackageReq::new(
+            rockspec.package.to_string(),
+            Some(rockspec.version.to_string()),
+        )?,
+        |rock| pin == rock.pinned(),
+    ) {
+        Some(_) if !data.force => {
+            if Confirm::new(&format!(
+                "Package {} already exists. Overwrite?",
+                rockspec.package,
+            ))
+            .with_default(false)
+            .prompt()?
+            {
+                BuildBehaviour::Force
+            } else {
+                return Ok(());
+            }
+        }
+        _ => BuildBehaviour::from(data.force),
+    };
+
     // Ensure all dependencies are installed first
     let dependencies = rockspec
         .dependencies
@@ -79,16 +109,23 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         .filter(|req| tree.has_rock(req).is_none())
         .enumerate()
     {
-        rocks_lib::operations::install(&progress, dependency_req.clone(), data.pin.into(), &config)
-            .await?;
+        rocks_lib::operations::install(
+            &progress,
+            dependency_req.clone(),
+            pin,
+            build_behaviour,
+            &config,
+        )
+        .await?;
         bar.set_position(index as u64);
     }
 
     rocks_lib::build::build(
         &MultiProgress::new(),
         rockspec,
-        data.pin.into(),
+        pin,
         Unconstrained,
+        build_behaviour,
         &config,
     )
     .await?;

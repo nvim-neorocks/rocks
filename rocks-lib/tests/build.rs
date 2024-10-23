@@ -1,6 +1,6 @@
 use indicatif::MultiProgress;
 use rocks_lib::{
-    build,
+    build::{self, BuildBehaviour::Force},
     config::{ConfigBuilder, LuaVersion},
     lockfile::{LockConstraint::Unconstrained, PinnedState::Unpinned},
     rockspec::Rockspec,
@@ -27,6 +27,7 @@ async fn builtin_build() {
         rockspec,
         Unpinned,
         Unconstrained,
+        Force,
         &config,
     )
     .await
@@ -54,6 +55,7 @@ async fn make_build() {
         rockspec,
         Unpinned,
         Unconstrained,
+        Force,
         &config,
     )
     .await

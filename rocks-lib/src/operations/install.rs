@@ -1,7 +1,7 @@
 use std::io;
 
 use crate::{
-    build::BuildError,
+    build::{BuildBehaviour, BuildError},
     config::{Config, DefaultFromConfig as _, LuaVersionUnset},
     lockfile::{LocalPackage, LockConstraint, PinnedState},
     package::{PackageName, PackageReq, PackageVersionReq},
@@ -31,12 +31,13 @@ pub async fn install(
     progress: &MultiProgress,
     package_req: PackageReq,
     pin: PinnedState,
+    build_behaviour: BuildBehaviour,
     config: &Config,
 ) -> Result<LocalPackage, InstallError> {
     with_spinner(
         progress,
         format!("💻 Installing {}", package_req),
-        || async { install_impl(progress, package_req, pin, config).await },
+        || async { install_impl(progress, package_req, pin, build_behaviour, config).await },
     )
     .await
 }
@@ -45,6 +46,7 @@ async fn install_impl(
     progress: &MultiProgress,
     package_req: PackageReq,
     pin: PinnedState,
+    build_behaviour: BuildBehaviour,
     config: &Config,
 ) -> Result<LocalPackage, InstallError> {
     let rockspec = super::download_rockspec(progress, &package_req, config).await?;
@@ -76,14 +78,21 @@ async fn install_impl(
         .filter(|req| tree.has_rock(req).is_none())
         .enumerate()
     {
-        let dependency =
-            crate::operations::install(progress, dependency_req.clone(), pin, config).await?;
+        let dependency = crate::operations::install(
+            progress,
+            dependency_req.clone(),
+            pin,
+            build_behaviour,
+            config,
+        )
+        .await?;
 
         installed_dependencies.push(dependency);
         bar.set_position(index as u64);
     }
 
-    let package = crate::build::build(progress, rockspec, pin, constraint, config).await?;
+    let package =
+        crate::build::build(progress, rockspec, pin, constraint, build_behaviour, config).await?;
 
     lockfile.add(&package);
     for dependency in installed_dependencies {

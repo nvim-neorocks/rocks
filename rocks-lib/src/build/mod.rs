@@ -38,6 +38,22 @@ pub enum BuildError {
     FetchSrcRockError(#[from] FetchSrcRockError),
 }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum BuildBehaviour {
+    NoForce,
+    Force,
+}
+
+impl From<bool> for BuildBehaviour {
+    fn from(value: bool) -> Self {
+        if value {
+            Self::Force
+        } else {
+            Self::NoForce
+        }
+    }
+}
+
 async fn run_build(
     progress: &MultiProgress,
     rockspec: &Rockspec,
@@ -128,6 +144,7 @@ pub async fn build(
     rockspec: Rockspec,
     pinned: PinnedState,
     constraint: LockConstraint,
+    behaviour: BuildBehaviour,
     config: &Config,
 ) -> Result<LocalPackage, BuildError> {
     let lua_version = rockspec.lua_version().or_default_from(config)?;
@@ -163,33 +180,38 @@ pub async fn build(
     );
     package.pinned = pinned;
 
-    let output_paths = tree.rock(&package)?;
+    match tree.lockfile()?.get(&package.id()) {
+        Some(package) if behaviour == BuildBehaviour::NoForce => Ok(package.clone()),
+        _ => {
+            let output_paths = tree.rock(&package)?;
 
-    let lua = LuaInstallation::new(&lua_version, config);
+            let lua = LuaInstallation::new(&lua_version, config);
 
-    let build_dir = match &rock_source.unpack_dir {
-        Some(unpack_dir) => temp_dir.path().join(unpack_dir),
-        None => temp_dir.path().into(),
-    };
+            let build_dir = match &rock_source.unpack_dir {
+                Some(unpack_dir) => temp_dir.path().join(unpack_dir),
+                None => temp_dir.path().into(),
+            };
 
-    run_build(progress, &rockspec, &output_paths, &lua, config, &build_dir).await?;
+            run_build(progress, &rockspec, &output_paths, &lua, config, &build_dir).await?;
 
-    install(progress, &rockspec, &tree, &output_paths, &lua, &build_dir).await?;
+            install(progress, &rockspec, &tree, &output_paths, &lua, &build_dir).await?;
 
-    // Copy over all `copy_directories` to their respective paths
-    for directory in &rockspec.build.current_platform().copy_directories {
-        for file in walkdir::WalkDir::new(build_dir.join(directory))
-            .into_iter()
-            .flatten()
-        {
-            if file.file_type().is_file() {
-                let filepath = file.path();
-                let target = output_paths.etc.join(filepath);
-                std::fs::create_dir_all(target.parent().unwrap())?;
-                std::fs::copy(filepath, target)?;
+            // Copy over all `copy_directories` to their respective paths
+            for directory in &rockspec.build.current_platform().copy_directories {
+                for file in walkdir::WalkDir::new(build_dir.join(directory))
+                    .into_iter()
+                    .flatten()
+                {
+                    if file.file_type().is_file() {
+                        let filepath = file.path();
+                        let target = output_paths.etc.join(filepath);
+                        std::fs::create_dir_all(target.parent().unwrap())?;
+                        std::fs::copy(filepath, target)?;
+                    }
+                }
             }
+
+            Ok(package)
         }
     }
-
-    Ok(package)
 }
