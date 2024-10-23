@@ -79,7 +79,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         .filter(|req| tree.has_rock(req).is_none())
         .enumerate()
     {
-        rocks_lib::operations::install(&progress, dependency_req.clone(), data.pin, &config)
+        rocks_lib::operations::install(&progress, dependency_req.clone(), data.pin.into(), &config)
             .await?;
         bar.set_position(index as u64);
     }
@@ -87,7 +87,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     rocks_lib::build::build(
         &MultiProgress::new(),
         rockspec,
-        data.pin,
+        data.pin.into(),
         Unconstrained,
         &config,
     )

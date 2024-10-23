@@ -2,8 +2,8 @@ use std::io;
 
 use crate::{
     build::BuildError,
-    config::{Config, DefaultFromConfig, LuaVersionUnset},
-    lockfile::{LocalPackage, LockConstraint},
+    config::{Config, DefaultFromConfig as _, LuaVersionUnset},
+    lockfile::{LocalPackage, LockConstraint, PinnedState},
     package::{PackageName, PackageReq, PackageVersionReq},
     progress::with_spinner,
     tree::Tree,
@@ -30,7 +30,7 @@ pub enum InstallError {
 pub async fn install(
     progress: &MultiProgress,
     package_req: PackageReq,
-    pin: bool,
+    pin: PinnedState,
     config: &Config,
 ) -> Result<LocalPackage, InstallError> {
     with_spinner(
@@ -44,7 +44,7 @@ pub async fn install(
 async fn install_impl(
     progress: &MultiProgress,
     package_req: PackageReq,
-    pin: bool,
+    pin: PinnedState,
     config: &Config,
 ) -> Result<LocalPackage, InstallError> {
     let rockspec = super::download_rockspec(progress, &package_req, config).await?;

@@ -8,13 +8,60 @@ use ssri::Integrity;
 
 use crate::package::{PackageName, PackageReq, PackageVersion, PackageVersionReq, RemotePackage};
 
+#[derive(Copy, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
+pub enum PinnedState {
+    Unpinned,
+    Pinned,
+}
+
+impl From<bool> for PinnedState {
+    fn from(value: bool) -> Self {
+        if value {
+            Self::Pinned
+        } else {
+            Self::Unpinned
+        }
+    }
+}
+
+impl PinnedState {
+    fn as_bool(&self) -> bool {
+        match self {
+            Self::Unpinned => false,
+            Self::Pinned => true,
+        }
+    }
+}
+
+impl Serialize for PinnedState {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bool(self.as_bool())
+    }
+}
+
+impl<'de> Deserialize<'de> for PinnedState {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(match bool::deserialize(deserializer)? {
+            false => Self::Unpinned,
+            true => Self::Pinned,
+        })
+    }
+}
+
+// TODO(vhyrro): Move to `package/local.rs`
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LocalPackage {
     pub name: PackageName,
     pub version: PackageVersion,
-    pub pinned: bool,
+    pub pinned: PinnedState,
     pub dependencies: Vec<String>,
-    // TODO: Serialize this directly into a `LuaPackageReq`
+    // TODO: Deserialize this directly into a `LuaPackageReq`
     pub constraint: Option<String>,
     pub hashes: LocalPackageHashes,
 }
@@ -28,7 +75,7 @@ impl LocalPackage {
         Self {
             name: package.name().clone(),
             version: package.version().clone(),
-            pinned: false,
+            pinned: PinnedState::Unpinned,
             dependencies: Vec::default(),
             constraint: match constraint {
                 LockConstraint::Unconstrained => None,
@@ -45,7 +92,7 @@ impl LocalPackage {
             "{}{}{}{}",
             self.name,
             self.version,
-            self.pinned,
+            self.pinned.as_bool(),
             self.constraint.clone().unwrap_or_default()
         ));
 
@@ -60,7 +107,7 @@ impl LocalPackage {
         &self.version
     }
 
-    pub fn pinned(&self) -> bool {
+    pub fn pinned(&self) -> PinnedState {
         self.pinned
     }
 
@@ -277,7 +324,7 @@ mod tests {
             crate::lockfile::LockConstraint::Constrained(">= 1.0.0".parse().unwrap()),
             mock_hashes.clone(),
         );
-        test_local_dep_package.pinned = true;
+        test_local_dep_package.pinned = PinnedState::Pinned;
         lockfile.add(&test_local_dep_package);
 
         lockfile.add_dependency(&test_local_package, &test_local_dep_package);
