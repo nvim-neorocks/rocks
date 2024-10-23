@@ -3,7 +3,7 @@ use std::path::Path;
 use crate::{
     config::{Config, DefaultFromConfig},
     hash::HasIntegrity,
-    lockfile::{LocalPackage, LocalPackageHashes, LockConstraint},
+    lockfile::{LocalPackage, LocalPackageHashes, LockConstraint, PinnedState},
     lua_installation::LuaInstallation,
     operations,
     package::RemotePackage,
@@ -106,7 +106,7 @@ async fn install(
 pub async fn build(
     progress: &MultiProgress,
     rockspec: Rockspec,
-    pinned: bool,
+    pinned: PinnedState,
     constraint: LockConstraint,
     config: &Config,
 ) -> Result<LocalPackage> {

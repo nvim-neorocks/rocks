@@ -1,6 +1,6 @@
 use crate::{
     config::{Config, DefaultFromConfig},
-    lockfile::{LocalPackage, LockConstraint},
+    lockfile::{LocalPackage, LockConstraint, PinnedState},
     package::{PackageName, PackageReq},
     progress::with_spinner,
     tree::Tree,
@@ -15,7 +15,7 @@ use itertools::Itertools;
 pub async fn install(
     progress: &MultiProgress,
     package_req: PackageReq,
-    pin: bool,
+    pin: PinnedState,
     config: &Config,
 ) -> Result<LocalPackage> {
     with_spinner(
@@ -29,7 +29,7 @@ pub async fn install(
 async fn install_impl(
     progress: &MultiProgress,
     package_req: PackageReq,
-    pin: bool,
+    pin: PinnedState,
     config: &Config,
 ) -> Result<LocalPackage> {
     let rockspec = super::download_rockspec(progress, &package_req, config).await?;

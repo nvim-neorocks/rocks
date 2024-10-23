@@ -15,7 +15,7 @@ pub async fn install(install_data: Install, config: Config) -> Result<()> {
     rocks_lib::operations::install(
         &MultiProgress::new(),
         install_data.package_req,
-        install_data.pin,
+        install_data.pin.into(),
         &config,
     )
     .await?;
