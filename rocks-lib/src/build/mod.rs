@@ -11,7 +11,7 @@ use crate::{
     rockspec::{utils, Build as _, BuildBackendSpec, Rockspec},
     tree::{RockLayout, Tree},
 };
-use eyre::Result;
+use eyre::{bail, Result};
 use indicatif::{MultiProgress, ProgressBar};
 mod builtin;
 mod make;
@@ -142,6 +142,14 @@ pub async fn build(
         hashes,
     );
     package.pinned = pinned;
+
+    if tree.lockfile()?.get(&package.id()).is_some() {
+        bail!(
+            "Unable to build {}, identical rock already found in tree {}",
+            package.into_package_req(),
+            tree.root().display()
+        );
+    }
 
     let output_paths = tree.rock(&package)?;
 
