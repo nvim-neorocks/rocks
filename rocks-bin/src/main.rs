@@ -1,6 +1,7 @@
 use crate::project::write_new::NewProject;
 use std::{path::PathBuf, time::Duration};
 
+use add::Add;
 use build::Build;
 use clap::{Parser, Subcommand};
 use debug::Debug;
@@ -18,6 +19,7 @@ use rocks_lib::{
 use search::Search;
 use update::Update;
 
+mod add;
 mod build;
 mod debug;
 mod download;
@@ -100,7 +102,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Add a dependency to the current project.
-    Add,
+    Add(Add),
     /// Build/compile a rock.
     Build(Build),
     /// Query information about Rocks's configuration.
@@ -208,6 +210,7 @@ async fn main() {
         Commands::Info(info_data) => info::info(info_data, config).await.unwrap(),
         Commands::Pin(pin_data) => pin::set_pinned_state(pin_data, config, Pinned).unwrap(),
         Commands::Unpin(pin_data) => pin::set_pinned_state(pin_data, config, Unpinned).unwrap(),
+        Commands::Add(add_data) => add::add(add_data, config).unwrap(),
         _ => unimplemented!(),
     }
 }
