@@ -2,7 +2,7 @@ use indicatif::MultiProgress;
 use rocks_lib::{
     build,
     config::{ConfigBuilder, LuaVersion},
-    lockfile::LockConstraint::Unconstrained,
+    lockfile::{LockConstraint::Unconstrained, PinnedState::Unpinned},
     rockspec::Rockspec,
 };
 use tempdir::TempDir;
@@ -25,7 +25,7 @@ async fn builtin_build() {
     build::build(
         &MultiProgress::new(),
         rockspec,
-        false,
+        Unpinned,
         Unconstrained,
         &config,
     )
@@ -52,7 +52,7 @@ async fn make_build() {
     build::build(
         &MultiProgress::new(),
         rockspec,
-        false,
+        Unpinned,
         Unconstrained,
         &config,
     )

@@ -3,7 +3,7 @@ use thiserror::Error;
 
 use crate::{
     config::Config,
-    lockfile::LocalPackage,
+    lockfile::{LocalPackage, PinnedState},
     manifest::ManifestMetadata,
     package::{PackageReq, RemotePackage, RockConstraintUnsatisfied},
     progress::with_spinner,
@@ -44,9 +44,9 @@ pub async fn update(
                 .to_package()
                 .has_update_with(&constraint, manifest)?;
 
-            if latest_version.is_some() && !package.pinned() {
+            if latest_version.is_some() && package.pinned() == PinnedState::Unpinned {
                 // Install the newest package.
-                install(progress, constraint, false, config)
+                install(progress, constraint, PinnedState::Unpinned, config)
                     .await
                     .map_err(|error| UpdateError::Install {
                         error,
