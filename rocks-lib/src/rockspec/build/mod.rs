@@ -14,7 +14,6 @@ use builtin::ModuleSpecInternal;
 
 use itertools::Itertools as _;
 
-use eyre::{eyre, OptionExt as _, Result};
 use mlua::{FromLua, Lua, LuaSerdeExt, Value};
 use std::{
     collections::HashMap,
@@ -22,10 +21,13 @@ use std::{
     future::Future,
     path::{Path, PathBuf},
 };
+use thiserror::Error;
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
-use crate::{config::Config, lua_installation::LuaInstallation, tree::RockLayout};
+use crate::{
+    build::BuildError, config::Config, lua_installation::LuaInstallation, tree::RockLayout,
+};
 
 use super::{
     mlua_json_value_to_vec, LuaTableKey, PartialOverride, PerPlatform, PlatformIdentifier,
@@ -49,8 +51,22 @@ pub struct BuildSpec {
     pub patches: HashMap<PathBuf, String>,
 }
 
+#[derive(Error, Debug)]
+pub enum BuildSpecInternalError {
+    #[error("'builtin' modules should not have list elements")]
+    ModulesHaveListElements,
+    #[error("no 'build_command' specified for the 'command' build backend")]
+    NoBuildCommand,
+    #[error("no 'install_command' specified for the 'command' build backend")]
+    NoInstallCommand,
+    #[error("no 'modules' specified for the 'rust-mlua' build backend")]
+    NoModulesSpecified,
+    #[error("invalid 'rust-mlua' modules format")]
+    InvalidRustMLuaFormat,
+}
+
 impl BuildSpec {
-    fn from_internal_spec(internal: BuildSpecInternal) -> Result<Self> {
+    fn from_internal_spec(internal: BuildSpecInternal) -> Result<Self, BuildSpecInternalError> {
         let build_backend = match internal.build_type.unwrap_or_default() {
             BuildType::Builtin => Some(BuildBackendSpec::Builtin(BuiltinBuildSpec {
                 modules: internal
@@ -60,7 +76,7 @@ impl BuildSpec {
                     .map(|(key, module_spec_internal)| {
                         let key_str = match key {
                             LuaTableKey::IntKey(_) => {
-                                Err(eyre!("'builtin' modules should not have list elements"))
+                                Err(BuildSpecInternalError::ModulesHaveListElements)
                             }
                             LuaTableKey::StringKey(str) => Ok(str),
                         }?;
@@ -69,7 +85,7 @@ impl BuildSpec {
                             Err(err) => Err(err),
                         }
                     })
-                    .collect::<Result<HashMap<String, ModuleSpec>>>()?,
+                    .collect::<Result<HashMap<String, ModuleSpec>, BuildSpecInternalError>>()?,
             })),
             BuildType::Make => {
                 let default = MakeBuildSpec::default();
@@ -93,10 +109,10 @@ impl BuildSpec {
             BuildType::Command => {
                 let build_command = internal
                     .build_command
-                    .ok_or_eyre("no 'build_command' specified for the 'command' build backend")?;
+                    .ok_or(BuildSpecInternalError::NoBuildCommand)?;
                 let install_command = internal
                     .install_command
-                    .ok_or_eyre("no 'install_command' specified for the 'command' build backend")?;
+                    .ok_or(BuildSpecInternalError::NoInstallCommand)?;
                 Some(BuildBackendSpec::Command(CommandBuildSpec {
                     build_command,
                     install_command,
@@ -107,7 +123,7 @@ impl BuildSpec {
             BuildType::RustMlua => Some(BuildBackendSpec::RustMlua(RustMluaBuildSpec {
                 modules: internal
                     .builtin_spec
-                    .ok_or_eyre("No 'modules' specified for the 'rust-mlua' build backend")?
+                    .ok_or(BuildSpecInternalError::NoModulesSpecified)?
                     .into_iter()
                     .map(|(key, value)| match (key, value) {
                         (LuaTableKey::IntKey(_), ModuleSpecInternal::SourcePath(module)) => {
@@ -123,7 +139,7 @@ impl BuildSpec {
                             rust_lib.set_extension(DLL_EXTENSION);
                             Ok((module_name, rust_lib))
                         }
-                        _ => Err(eyre!("Invalid 'rust-mlua' modules format.")),
+                        _ => Err(BuildSpecInternalError::InvalidRustMLuaFormat),
                     })
                     .try_collect()?,
                 target_path: internal.target_path.unwrap_or("target".into()),
@@ -237,8 +253,8 @@ where
     {
         // NOTE(mrcjkb): There also shouldn't be a directory named the same as the rockspec,
         // but I'm not sure how to (or if it makes sense to) enforce this here.
-        Some(d) => Err(eyre!(
-            "Directory '{}' in copy_directories clashes with the .rock format", // TODO(vhyrro): More informative error message.
+        Some(d) => Err(format!(
+            "directory '{}' in copy_directories clashes with the .rock format", // TODO(vhyrro): More informative error message.
             d
         )),
         _ => Ok(copy_directories.map(|vec| vec.into_iter().map(PathBuf::from).collect())),
@@ -518,7 +534,7 @@ pub trait Build {
         lua: &LuaInstallation,
         config: &Config,
         build_dir: &Path,
-    ) -> impl Future<Output = Result<()>> + Send;
+    ) -> impl Future<Output = Result<(), impl std::error::Error>> + Send;
 }
 
 #[cfg(test)]

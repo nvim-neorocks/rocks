@@ -1,8 +1,8 @@
-use std::path::PathBuf;
+use std::{io, path::PathBuf, string::FromUtf8Error};
 
 use bytes::Bytes;
-use eyre::{eyre, Result};
 use indicatif::MultiProgress;
+use thiserror::Error;
 
 use crate::{
     config::Config,
@@ -24,34 +24,58 @@ pub struct DownloadedSrcRock {
     pub path: PathBuf,
 }
 
+#[derive(Error, Debug)]
+pub enum DownloadRockspecError {
+    #[error("failed to download rockspec: {0}")]
+    Request(#[from] reqwest::Error),
+    #[error("failed to convert rockspec response: {0}")]
+    ResponseConversion(#[from] FromUtf8Error),
+}
+
 pub async fn download_rockspec(
     progress: &MultiProgress,
     package_req: &PackageReq,
     config: &Config,
-) -> Result<Rockspec> {
+) -> Result<Rockspec, SearchAndDownloadError> {
     let package = search_manifest(progress, package_req, config).await?;
-    with_spinner(
+    Ok(with_spinner(
         progress,
         format!("📥 Downloading RockSpec for {}", package),
         || async { download_rockspec_impl(package, config).await },
     )
-    .await
+    .await?)
+}
+
+#[derive(Error, Debug)]
+pub enum SearchAndDownloadError {
+    #[error(transparent)]
+    Search(#[from] SearchManifestError),
+    #[error(transparent)]
+    Download(#[from] DownloadSrcRockError),
+    #[error(transparent)]
+    DownloadRockspec(#[from] DownloadRockspecError),
+    #[error("io operation failed: {0}")]
+    Io(#[from] io::Error),
 }
 
 pub async fn search_and_download_src_rock(
     progress: &MultiProgress,
     package_req: &PackageReq,
     config: &Config,
-) -> Result<DownloadedSrcRockBytes> {
+) -> Result<DownloadedSrcRockBytes, SearchAndDownloadError> {
     let package = search_manifest(progress, package_req, config).await?;
-    download_src_rock(progress, &package, config).await
+    Ok(download_src_rock(progress, &package, config).await?)
 }
+
+#[derive(Error, Debug)]
+#[error("failed to download source rock: {0}")]
+pub struct DownloadSrcRockError(#[from] reqwest::Error);
 
 pub async fn download_src_rock(
     progress: &MultiProgress,
     package: &RemotePackage,
     config: &Config,
-) -> Result<DownloadedSrcRockBytes> {
+) -> Result<DownloadedSrcRockBytes, DownloadSrcRockError> {
     with_spinner(progress, format!("📥 Downloading {}", package), || async {
         download_src_rock_impl(package, config).await
     })
@@ -63,7 +87,7 @@ pub async fn download_to_file(
     package_req: &PackageReq,
     destination_dir: Option<PathBuf>,
     config: &Config,
-) -> Result<DownloadedSrcRock> {
+) -> Result<DownloadedSrcRock, SearchAndDownloadError> {
     let rock = search_and_download_src_rock(progress, package_req, config).await?;
     let full_rock_name = full_rock_name(&rock.name, &rock.version);
     std::fs::write(
@@ -80,30 +104,43 @@ pub async fn download_to_file(
     })
 }
 
+#[derive(Error, Debug)]
+pub enum SearchManifestError {
+    #[error(transparent)]
+    Mlua(#[from] mlua::Error),
+    #[error("rock '{}' does not exist on {}'s manifest", .name, .server)]
+    RockNotFound { name: PackageName, server: String },
+}
+
 async fn search_manifest(
     progress: &MultiProgress,
     package_req: &PackageReq,
     config: &Config,
-) -> Result<RemotePackage> {
+) -> Result<RemotePackage, SearchManifestError> {
     with_spinner(progress, "🔎 Searching manifest...".into(), || async {
         search_manifest_impl(package_req, config).await
     })
     .await
 }
 
-async fn search_manifest_impl(package_req: &PackageReq, config: &Config) -> Result<RemotePackage> {
+async fn search_manifest_impl(
+    package_req: &PackageReq,
+    config: &Config,
+) -> Result<RemotePackage, SearchManifestError> {
     let manifest = crate::manifest::ManifestMetadata::from_config(config).await?;
     if !manifest.has_rock(package_req.name()) {
-        return Err(eyre!(format!(
-            "Rock '{}' does not exist on {}'s manifest.",
-            package_req.name(),
-            config.server()
-        )));
+        return Err(SearchManifestError::RockNotFound {
+            name: package_req.name().clone(),
+            server: config.server().clone(),
+        });
     }
     Ok(manifest.latest_match(package_req).unwrap())
 }
 
-async fn download_rockspec_impl(package: RemotePackage, config: &Config) -> Result<Rockspec> {
+async fn download_rockspec_impl(
+    package: RemotePackage,
+    config: &Config,
+) -> Result<Rockspec, DownloadRockspecError> {
     let rockspec_name = format!("{}-{}.rockspec", package.name(), package.version());
     let bytes = reqwest::get(format!("{}/{}", config.server(), rockspec_name))
         .await?
@@ -116,7 +153,7 @@ async fn download_rockspec_impl(package: RemotePackage, config: &Config) -> Resu
 async fn download_src_rock_impl(
     package: &RemotePackage,
     config: &Config,
-) -> Result<DownloadedSrcRockBytes> {
+) -> Result<DownloadedSrcRockBytes, DownloadSrcRockError> {
     let full_rock_name = full_rock_name(package.name(), package.version());
 
     let bytes = reqwest::get(format!("{}/{}", config.server(), full_rock_name))

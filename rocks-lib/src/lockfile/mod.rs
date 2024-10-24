@@ -1,7 +1,6 @@
-use std::io::Write;
+use std::io::{self, Write};
 use std::{collections::HashMap, fs::File, io::ErrorKind, path::PathBuf};
 
-use eyre::{bail, Result};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -128,7 +127,7 @@ pub struct Lockfile {
 }
 
 impl Lockfile {
-    pub fn new(filepath: PathBuf) -> Result<Self> {
+    pub fn new(filepath: PathBuf) -> io::Result<Self> {
         // Ensure that the lockfile exists
         match File::options().create_new(true).write(true).open(&filepath) {
             Ok(mut file) => {
@@ -144,7 +143,7 @@ impl Lockfile {
                 )?;
             }
             Err(err) if err.kind() == ErrorKind::AlreadyExists => {}
-            Err(err) => bail!(err),
+            Err(err) => return Err(err),
         }
 
         let mut new: Lockfile = serde_json::from_str(&std::fs::read_to_string(&filepath)?)?;
@@ -189,7 +188,7 @@ impl Lockfile {
 
     // TODO: `fn entrypoints() -> Vec<LockedRock>`
 
-    pub fn flush(&mut self) -> Result<()> {
+    pub fn flush(&mut self) -> io::Result<()> {
         let dependencies = self
             .rocks
             .iter()

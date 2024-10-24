@@ -1,6 +1,8 @@
-use eyre::Result;
 use lets_find_up::{find_up_with, FindUpKind, FindUpOptions};
-use std::path::{Path, PathBuf};
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 
 use crate::{config::LuaVersion, rockspec::Rockspec, tree::Tree};
 
@@ -13,11 +15,11 @@ pub struct Project {
 }
 
 impl Project {
-    pub fn current() -> Result<Option<Self>> {
+    pub fn current() -> io::Result<Option<Self>> {
         Self::from(std::env::current_dir()?)
     }
 
-    pub fn from(start: PathBuf) -> Result<Option<Self>> {
+    pub fn from(start: PathBuf) -> io::Result<Option<Self>> {
         match find_up_with(
             "project.rockspec",
             FindUpOptions {
@@ -52,7 +54,7 @@ impl Project {
         &self.rockspec
     }
 
-    pub fn tree(&self, lua_version: LuaVersion) -> Result<Tree> {
+    pub fn tree(&self, lua_version: LuaVersion) -> io::Result<Tree> {
         Tree::new(self.root.clone(), lua_version)
     }
 }

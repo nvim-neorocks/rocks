@@ -1,19 +1,23 @@
-use eyre::Result;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use std::time::Duration;
+use std::{error::Error, time::Duration};
 
-pub async fn with_spinner<F, Fut, T>(
+pub async fn with_spinner<F, Fut, T, E>(
     progress: &MultiProgress,
     message: String,
     callback: F,
-) -> Result<T>
+) -> Result<T, E>
 where
     F: FnOnce() -> Fut + Send,
-    Fut: std::future::Future<Output = Result<T>> + Send,
+    Fut: std::future::Future<Output = Result<T, E>> + Send,
     T: Send + 'static,
+    E: Error,
 {
     let spinner = progress.add(ProgressBar::new_spinner());
-    spinner.set_style(ProgressStyle::default_spinner().template("{spinner:.green} {msg}")?);
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.green} {msg}")
+            .unwrap(),
+    );
     spinner.enable_steady_tick(Duration::from_millis(100));
     spinner.set_message(message.clone());
     callback()
