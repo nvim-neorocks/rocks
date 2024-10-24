@@ -5,9 +5,8 @@ mod rock_source;
 mod serde_util;
 mod test_spec;
 
-use std::{collections::HashMap, path::PathBuf, str::FromStr};
+use std::{collections::HashMap, io, path::PathBuf, str::FromStr};
 
-use eyre::{eyre, Result};
 use mlua::{FromLua, Lua, LuaSerdeExt, Value};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -18,12 +17,23 @@ pub use rock_source::*;
 pub use serde_util::*;
 use ssri::Integrity;
 pub use test_spec::*;
+use thiserror::Error;
 
 use crate::{
     config::LuaVersion,
     hash::HasIntegrity,
     package::{PackageName, PackageReq, PackageVersion},
 };
+
+#[derive(Error, Debug)]
+pub enum RockspecError {
+    #[error(transparent)]
+    MLua(#[from] mlua::Error),
+    #[error("{}copy_directories cannot contain the rockspec name", ._0.as_ref().map(|p| format!("{p}: ")).unwrap_or_default())]
+    CopyDirectoriesContainRockspecName(Option<String>),
+    #[error(transparent)]
+    LuaTable(#[from] LuaTableError),
+}
 
 #[derive(Debug)]
 pub struct Rockspec {
@@ -47,7 +57,7 @@ pub struct Rockspec {
 }
 
 impl Rockspec {
-    pub fn new(rockspec_content: &String) -> Result<Self> {
+    pub fn new(rockspec_content: &String) -> Result<Self, RockspecError> {
         let lua = Lua::new();
         lua.load(rockspec_content).exec()?;
 
@@ -75,7 +85,7 @@ impl Rockspec {
             .copy_directories
             .contains(&PathBuf::from(&rockspec_file_name))
         {
-            return Err(eyre!("copy_directories cannot contain the rockspec name!"));
+            return Err(RockspecError::CopyDirectoriesContainRockspecName(None));
         }
 
         for (platform, build_override) in &rockspec.build.per_platform {
@@ -83,10 +93,9 @@ impl Rockspec {
                 .copy_directories
                 .contains(&PathBuf::from(&rockspec_file_name))
             {
-                return Err(eyre!(
-                    "platform {}: copy_directories cannot contain the rockspec name!",
-                    platform
-                ));
+                return Err(RockspecError::CopyDirectoriesContainRockspecName(Some(
+                    platform.to_string(),
+                )));
             }
         }
         Ok(rockspec)
@@ -115,7 +124,7 @@ impl Rockspec {
 }
 
 impl HasIntegrity for Rockspec {
-    fn hash(&self) -> Result<Integrity> {
+    fn hash(&self) -> io::Result<Integrity> {
         Ok(self.hash.to_owned())
     }
 }
@@ -139,6 +148,10 @@ pub struct RockDescription {
     pub labels: Vec<String>,
 }
 
+#[derive(Error, Debug)]
+#[error("invalid rockspec format: {0}")]
+pub struct InvalidRockspecFormat(String);
+
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RockspecFormat {
     #[serde(rename = "1.0")]
@@ -150,14 +163,14 @@ pub enum RockspecFormat {
 }
 
 impl FromStr for RockspecFormat {
-    type Err = eyre::Error;
+    type Err = InvalidRockspecFormat;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "1.0" => Ok(Self::_1_0),
             "2.0" => Ok(Self::_2_0),
             "3.0" => Ok(Self::_3_0),
-            txt => Err(eyre!("Invalid rockspec format: {}", txt)),
+            txt => Err(InvalidRockspecFormat(txt.to_string())),
         }
     }
 }
@@ -178,7 +191,18 @@ impl<'lua> FromLua<'lua> for RockspecFormat {
     }
 }
 
-fn parse_lua_tbl_or_default<T>(lua: &Lua, lua_var_name: &str) -> Result<T>
+#[derive(Error, Debug)]
+pub enum LuaTableError {
+    #[error("could not parse {variable}. Expected list, but got {invalid_type}")]
+    ParseError {
+        variable: String,
+        invalid_type: String,
+    },
+    #[error(transparent)]
+    MLua(#[from] mlua::Error),
+}
+
+fn parse_lua_tbl_or_default<T>(lua: &Lua, lua_var_name: &str) -> Result<T, LuaTableError>
 where
     T: Default,
     T: DeserializeOwned,
@@ -186,11 +210,10 @@ where
     let ret = match lua.globals().get(lua_var_name)? {
         Value::Nil => T::default(),
         value @ Value::Table(_) => lua.from_value(value)?,
-        value => Err(eyre!(format!(
-            "Could not parse {}. Expected list, but got {}",
-            lua_var_name,
-            value.type_name(),
-        )))?,
+        value => Err(LuaTableError::ParseError {
+            variable: lua_var_name.to_string(),
+            invalid_type: value.type_name().to_string(),
+        })?,
     };
     Ok(ret)
 }

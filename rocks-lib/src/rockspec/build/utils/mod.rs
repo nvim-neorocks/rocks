@@ -1,8 +1,10 @@
-use eyre::Result;
 use itertools::Itertools;
-use std::path::{Path, PathBuf};
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 
-use crate::lua_installation::LuaInstallation;
+use crate::{build::BuildError, lua_installation::LuaInstallation};
 
 use super::ModulePaths;
 
@@ -16,7 +18,7 @@ pub fn copy_lua_to_module_path(
     source: &PathBuf,
     target_module_name: &str,
     target_dir: &Path,
-) -> Result<()> {
+) -> io::Result<()> {
     let target = lua_module_to_pathbuf(target_module_name, ".lua");
     let target = target_dir.join(target);
 
@@ -35,7 +37,7 @@ pub fn compile_c_files(
     target_file: &str,
     target_dir: &Path,
     lua: &LuaInstallation,
-) -> Result<()> {
+) -> Result<(), BuildError> {
     let target = lua_module_to_pathbuf(target_file, std::env::consts::DLL_SUFFIX);
     let target = target_dir.join(target);
 
@@ -89,7 +91,7 @@ pub fn compile_c_modules(
     target_file: &str,
     target_dir: &Path,
     lua: &LuaInstallation,
-) -> Result<()> {
+) -> Result<(), BuildError> {
     let target = lua_module_to_pathbuf(target_file, std::env::consts::DLL_SUFFIX);
     let target = target_dir.join(target);
 

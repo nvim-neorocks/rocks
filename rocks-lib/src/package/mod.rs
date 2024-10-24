@@ -1,4 +1,3 @@
-use eyre::{eyre, Result};
 use itertools::Itertools;
 use mlua::FromLua;
 use serde::{de, Deserialize, Deserializer, Serialize};

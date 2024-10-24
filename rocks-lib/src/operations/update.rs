@@ -1,5 +1,5 @@
-use eyre::Result;
 use indicatif::MultiProgress;
+use thiserror::Error;
 
 use crate::{
     config::Config, lockfile::LocalPackage, manifest::ManifestMetadata, package::PackageReq,
@@ -8,13 +8,16 @@ use crate::{
 
 use super::{install, remove};
 
+#[derive(Error, Debug)]
+pub enum UpdateError {}
+
 pub async fn update(
     progress: &MultiProgress,
     package: LocalPackage,
     constraint: PackageReq,
     manifest: &ManifestMetadata,
     config: &Config,
-) -> Result<()> {
+) -> Result<(), UpdateError> {
     with_spinner(
         progress,
         format!("Updating {}...", package.name),

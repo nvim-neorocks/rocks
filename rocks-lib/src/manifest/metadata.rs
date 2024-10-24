@@ -1,4 +1,3 @@
-use eyre::Result;
 use itertools::Itertools;
 use mlua::{Lua, LuaSerdeExt};
 use std::collections::HashMap;
@@ -25,7 +24,7 @@ impl<'de> serde::Deserialize<'de> for ManifestMetadata {
 impl ManifestMetadata {
     // TODO(vhyrro): Perhaps make these functions return a cached, in-memory version of the
     // manifest if it has already been parsed?
-    pub fn new(manifest: &String) -> Result<Self> {
+    pub fn new(manifest: &String) -> mlua::Result<Self> {
         let lua = Lua::new();
 
         lua.load(manifest).exec()?;
@@ -38,7 +37,7 @@ impl ManifestMetadata {
         Ok(manifest)
     }
 
-    pub async fn from_config(config: &Config) -> Result<Self> {
+    pub async fn from_config(config: &Config) -> mlua::Result<Self> {
         let manifest =
             crate::manifest::manifest_from_server(config.server().clone(), config).await?;
 

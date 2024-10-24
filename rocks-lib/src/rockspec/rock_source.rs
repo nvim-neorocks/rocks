@@ -1,4 +1,3 @@
-use eyre::{eyre, Result};
 use git_url_parse::GitUrl;
 use mlua::{FromLua, Lua, Value};
 use reqwest::Url;
