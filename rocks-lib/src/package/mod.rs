@@ -1,14 +1,17 @@
-use eyre::{eyre, Result};
 use itertools::Itertools;
 use mlua::FromLua;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{fmt::Display, str::FromStr};
-pub use version::{PackageVersion, PackageVersionReq};
+use thiserror::Error;
+use version::{PackageVersionParseError, PackageVersionReqError};
 
 mod outdated;
 mod version;
 
-#[derive(Clone)]
+pub use outdated::*;
+pub use version::{PackageVersion, PackageVersionReq};
+
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]
 pub struct RemotePackage {
     name: PackageName,
@@ -19,7 +22,7 @@ impl RemotePackage {
     pub fn new(name: PackageName, version: PackageVersion) -> Self {
         Self { name, version }
     }
-    pub fn parse(name: String, version: String) -> Result<Self> {
+    pub fn parse(name: String, version: String) -> Result<Self, PackageVersionParseError> {
         Ok(Self::new(
             PackageName::new(name),
             PackageVersion::parse(&version)?,
@@ -39,15 +42,32 @@ impl RemotePackage {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum ParseRemotePackageError {
+    #[error("unable to parse package {0}. expected format: `name@version`")]
+    InvalidInput(String),
+    #[error("unable to parse package {package_str}: {error}")]
+    InvalidPackageVersion {
+        #[source]
+        error: PackageVersionParseError,
+        package_str: String,
+    },
+}
+
 impl FromStr for RemotePackage {
-    type Err = eyre::Report;
+    type Err = ParseRemotePackageError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let (name, version) = s
             .split_once('@')
-            .ok_or_else(|| eyre!("unable to parse package {s}. expected format: `name@version`"))?;
+            .ok_or_else(|| ParseRemotePackageError::InvalidInput(s.to_string()))?;
 
-        Self::parse(name.to_string(), version.to_string())
+        Self::parse(name.to_string(), version.to_string()).map_err(|error| {
+            ParseRemotePackageError::InvalidPackageVersion {
+                error,
+                package_str: s.to_string(),
+            }
+        })
     }
 }
 
@@ -63,7 +83,7 @@ pub struct PackageReq {
 }
 
 impl PackageReq {
-    pub fn new(name: String, version: Option<String>) -> Result<Self> {
+    pub fn new(name: String, version: Option<String>) -> Result<Self, PackageVersionReqError> {
         Ok(Self {
             name: PackageName::new(name),
             version_req: match version {
@@ -72,7 +92,7 @@ impl PackageReq {
             },
         })
     }
-    pub fn parse(pkg_constraints: &String) -> Result<Self> {
+    pub fn parse(pkg_constraints: &String) -> Result<Self, PackageReqParseError> {
         Self::from_str(&pkg_constraints.to_string())
     }
     pub fn name(&self) -> &PackageName {
@@ -104,26 +124,40 @@ impl From<RemotePackage> for PackageReq {
     }
 }
 
-impl FromStr for PackageReq {
-    type Err = eyre::Error;
+#[derive(Error, Debug)]
+pub enum PackageReqParseError {
+    #[error("could not parse dependency name from {0}")]
+    InvalidDependencyName(String),
+    #[error("could not parse version requirement in '{str}': {error}")]
+    InvalidPackageVersionReq {
+        #[source]
+        error: PackageVersionReqError,
+        str: String,
+    },
+}
 
-    fn from_str(str: &str) -> Result<Self> {
+impl FromStr for PackageReq {
+    type Err = PackageReqParseError;
+
+    fn from_str(str: &str) -> Result<Self, PackageReqParseError> {
         let rock_name_str = str
             .chars()
             .peeking_take_while(|t| t.is_alphanumeric() || matches!(t, '-' | '_' | '.'))
             .collect::<String>();
 
         if rock_name_str.is_empty() {
-            return Err(eyre!(
-                "Could not parse dependency name from {}",
-                str.to_string()
-            ));
+            return Err(PackageReqParseError::InvalidDependencyName(str.to_string()));
         }
 
         let constraints = str.trim_start_matches(&rock_name_str).trim();
         let version_req = match constraints {
             "" => PackageVersionReq::default(),
-            constraints => PackageVersionReq::parse(constraints.trim_start())?,
+            constraints => PackageVersionReq::parse(constraints.trim_start()).map_err(|error| {
+                PackageReqParseError::InvalidPackageVersionReq {
+                    error,
+                    str: str.to_string(),
+                }
+            })?,
         };
         Ok(Self {
             name: PackageName::new(rock_name_str),

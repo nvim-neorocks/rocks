@@ -19,7 +19,7 @@ pub fn pin(data: Pin, config: Config) -> Result<()> {
     if let Some(mut rock) = tree.has_rock_and(&data.package.clone().into_package_req(), |package| {
         !package.pinned()
     }) {
-        operations::pin(&mut rock, &tree)
+        Ok(operations::pin(&mut rock, &tree)?)
     } else {
         Err(eyre!("Rock {} not found!", data.package))
     }

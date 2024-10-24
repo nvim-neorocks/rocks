@@ -1,18 +1,32 @@
 use std::fmt::Display;
 
-use eyre::{eyre, Result};
+use thiserror::Error;
 
 use crate::manifest::ManifestMetadata;
 
-use super::{version::PackageVersion, PackageReq, RemotePackage};
+use super::{version::PackageVersion, PackageName, PackageReq, PackageVersionReq, RemotePackage};
+
+#[derive(Error, Debug)]
+#[error("rock {0} not found")]
+pub struct RockNotFound(PackageName);
+
+#[derive(Error, Debug)]
+#[error("rock {name} has no version that satisfies constraint {constraint}")]
+pub struct RockConstraintUnsatisfied {
+    name: PackageName,
+    constraint: PackageVersionReq,
+}
 
 impl RemotePackage {
     /// Tries to find a newer version of a given rock.
     /// Returns the latest version if found.
-    pub fn has_update(&self, manifest: &ManifestMetadata) -> Result<Option<PackageVersion>> {
+    pub fn has_update(
+        &self,
+        manifest: &ManifestMetadata,
+    ) -> Result<Option<PackageVersion>, RockNotFound> {
         let latest_version = manifest
             .latest_version(&self.name)
-            .ok_or(eyre!("rock {} not found!", self.name))?;
+            .ok_or_else(|| RockNotFound(self.name.clone()))?;
 
         if self.version < *latest_version {
             Ok(Some(latest_version.to_owned()))
@@ -27,12 +41,14 @@ impl RemotePackage {
         &self,
         constraint: &PackageReq,
         manifest: &ManifestMetadata,
-    ) -> Result<Option<PackageVersion>> {
-        let latest_version = manifest.latest_match(constraint).ok_or(eyre!(
-            "rock {} has no version that satisfies constraint {}",
-            self.name,
-            constraint.version_req
-        ))?;
+    ) -> Result<Option<PackageVersion>, RockConstraintUnsatisfied> {
+        let latest_version =
+            manifest
+                .latest_match(constraint)
+                .ok_or_else(|| RockConstraintUnsatisfied {
+                    name: self.name.clone(),
+                    constraint: constraint.version_req.clone(),
+                })?;
 
         if self.version < latest_version.version {
             Ok(Some(latest_version.version))

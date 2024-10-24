@@ -1,6 +1,6 @@
-use eyre::{OptionExt, Result};
 use itertools::Itertools as _;
 use serde::{de, Deserialize, Deserializer};
+use thiserror::Error;
 
 #[derive(Hash, Debug, Eq, PartialEq, Clone)]
 pub enum LuaTableKey {
@@ -38,9 +38,13 @@ where
     mlua_json_value_to_vec(values).map_err(de::Error::custom)
 }
 
+#[derive(Error, Debug)]
+#[error("expected list of strings")]
+pub struct ExpectedListOfStrings;
+
 /// Convert a json value into a Vec<T>, treating empty json objects as empty lists
 /// This is needed to be able to deserialise Lua tables.
-pub fn mlua_json_value_to_vec<T>(values: serde_json::Value) -> Result<Vec<T>>
+pub fn mlua_json_value_to_vec<T>(values: serde_json::Value) -> Result<Vec<T>, ExpectedListOfStrings>
 where
     T: From<String>,
 {
@@ -53,13 +57,13 @@ where
     }
     values
         .as_array()
-        .ok_or_eyre("expected a list of strings")?
+        .ok_or(ExpectedListOfStrings)?
         .iter()
         .map(|val| {
             let str: String = val
                 .as_str()
                 .map(|s| s.into())
-                .ok_or_eyre("expected a list of strings")?;
+                .ok_or(ExpectedListOfStrings)?;
             Ok(str.into())
         })
         .try_collect()

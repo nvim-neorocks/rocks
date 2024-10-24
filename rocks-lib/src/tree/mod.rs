@@ -4,8 +4,7 @@ use crate::{
     lockfile::{LocalPackage, Lockfile},
     package::PackageReq,
 };
-use eyre::Result;
-use std::path::PathBuf;
+use std::{io, path::PathBuf};
 
 mod list;
 
@@ -82,7 +81,7 @@ impl HasVariables for RockLayout {
 }
 
 impl Tree {
-    pub fn new(root: PathBuf, version: LuaVersion) -> Result<Self> {
+    pub fn new(root: PathBuf, version: LuaVersion) -> io::Result<Self> {
         let path_with_version = root.join(version.to_string());
 
         // Ensure that the root and the version directory exist.
@@ -140,7 +139,7 @@ impl Tree {
             .cloned()
     }
 
-    pub fn rock(&self, package: &LocalPackage) -> Result<RockLayout> {
+    pub fn rock(&self, package: &LocalPackage) -> io::Result<RockLayout> {
         let rock_path = self.root_for(package);
 
         let etc = rock_path.join("etc");
@@ -168,17 +167,17 @@ impl Tree {
         })
     }
 
-    pub fn lockfile(&self) -> Result<Lockfile> {
+    pub fn lockfile(&self) -> io::Result<Lockfile> {
         Lockfile::new(self.root().join("lock.json"))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
     use std::path::PathBuf;
 
     use insta::assert_yaml_snapshot;
-    use itertools::Itertools;
 
     use crate::{
         build::variables::HasVariables as _,

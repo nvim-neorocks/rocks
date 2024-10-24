@@ -1,3 +1,5 @@
+use std::io;
+
 use eyre::Result;
 use indicatif::MultiProgress;
 use inquire::Confirm;
@@ -22,7 +24,7 @@ pub async fn purge(config: Config) -> Result<()> {
             format!("🗑️ Purging {}", root_dir.display()),
             || async {
                 std::fs::remove_dir_all(tree.root())?;
-                Ok(())
+                Ok::<_, io::Error>(())
             },
         )
         .await?

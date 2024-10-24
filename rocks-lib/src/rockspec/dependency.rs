@@ -1,6 +1,5 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::Infallible};
 
-use eyre::Result;
 use serde::Deserialize;
 
 use super::{PartialOverride, PerPlatform, PlatformOverridable};
@@ -16,7 +15,9 @@ pub enum ExternalDependency {
 }
 
 impl PartialOverride for HashMap<String, ExternalDependency> {
-    fn apply_overrides(&self, override_map: &Self) -> Result<Self> {
+    type Err = Infallible;
+
+    fn apply_overrides(&self, override_map: &Self) -> Result<Self, Self::Err> {
         let mut result = Self::new();
         for (key, value) in self {
             result.insert(key.clone(), value.clone());
@@ -29,7 +30,9 @@ impl PartialOverride for HashMap<String, ExternalDependency> {
 }
 
 impl PlatformOverridable for HashMap<String, ExternalDependency> {
-    fn on_nil<T>() -> Result<super::PerPlatform<T>>
+    type Err = Infallible;
+
+    fn on_nil<T>() -> Result<super::PerPlatform<T>, <Self as PlatformOverridable>::Err>
     where
         T: PlatformOverridable,
         T: Default,

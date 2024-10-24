@@ -1,7 +1,7 @@
-use eyre::{eyre, Result};
 use itertools::Itertools as _;
 use serde::{de, Deserialize, Deserializer};
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, convert::Infallible, path::PathBuf};
+use thiserror::Error;
 
 use crate::rockspec::{
     deserialize_vec_from_lua, FromPlatformOverridable, PartialOverride, PerPlatform,
@@ -24,7 +24,9 @@ pub enum ModuleSpec {
 }
 
 impl ModuleSpec {
-    pub fn from_internal(internal: ModuleSpecInternal) -> Result<ModuleSpec> {
+    pub fn from_internal(
+        internal: ModuleSpecInternal,
+    ) -> Result<ModuleSpec, ModulePathsMissingSources> {
         match internal {
             ModuleSpecInternal::SourcePath(path) => Ok(ModuleSpec::SourcePath(path)),
             ModuleSpecInternal::SourcePaths(paths) => Ok(ModuleSpec::SourcePaths(paths)),
@@ -46,7 +48,9 @@ impl<'de> Deserialize<'de> for ModuleSpec {
 }
 
 impl FromPlatformOverridable<ModuleSpecInternal, Self> for ModuleSpec {
-    fn from_platform_overridable(internal: ModuleSpecInternal) -> Result<Self> {
+    type Err = ModulePathsMissingSources;
+
+    fn from_platform_overridable(internal: ModuleSpecInternal) -> Result<Self, Self::Err> {
         Self::from_internal(internal)
     }
 }
@@ -96,8 +100,14 @@ where
         .try_collect()
 }
 
+#[derive(Error, Debug)]
+#[error("cannot resolve ambiguous platform override for `build.modules`.")]
+pub struct ModuleSpecAmbiguousPlatformOverride;
+
 impl PartialOverride for ModuleSpecInternal {
-    fn apply_overrides(&self, override_spec: &Self) -> Result<Self> {
+    type Err = ModuleSpecAmbiguousPlatformOverride;
+
+    fn apply_overrides(&self, override_spec: &Self) -> Result<Self, Self::Err> {
         match (override_spec, self) {
             (ModuleSpecInternal::SourcePath(_), b @ ModuleSpecInternal::SourcePath(_)) => {
                 Ok(b.to_owned())
@@ -105,26 +115,32 @@ impl PartialOverride for ModuleSpecInternal {
             (ModuleSpecInternal::SourcePaths(_), b @ ModuleSpecInternal::SourcePaths(_)) => {
                 Ok(b.to_owned())
             }
-            (ModuleSpecInternal::ModulePaths(a), ModuleSpecInternal::ModulePaths(b)) => {
-                Ok(ModuleSpecInternal::ModulePaths(a.apply_overrides(b)?))
-            }
-            _ => Err(eyre!(
-                "cannot resolve ambiguous platform override for `build.modules`."
-            )),
+            (ModuleSpecInternal::ModulePaths(a), ModuleSpecInternal::ModulePaths(b)) => Ok(
+                ModuleSpecInternal::ModulePaths(a.apply_overrides(b).unwrap()),
+            ),
+            _ => Err(ModuleSpecAmbiguousPlatformOverride),
         }
     }
 }
 
+#[derive(Error, Debug)]
+#[error("could not resolve platform override for `build.modules`. This is a bug!")]
+pub struct BuildModulesPlatformOverride;
+
 impl PlatformOverridable for ModuleSpecInternal {
-    fn on_nil<T>() -> Result<PerPlatform<T>>
+    type Err = BuildModulesPlatformOverride;
+
+    fn on_nil<T>() -> Result<PerPlatform<T>, <Self as PlatformOverridable>::Err>
     where
         T: PlatformOverridable,
     {
-        Err(eyre!(
-            "could not resolve platform override for `build.modules`. This is a bug!"
-        ))
+        Err(BuildModulesPlatformOverride)
     }
 }
+
+#[derive(Error, Debug)]
+#[error("missing or empty field `sources`")]
+pub struct ModulePathsMissingSources;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ModulePaths {
@@ -141,17 +157,20 @@ pub struct ModulePaths {
 }
 
 impl ModulePaths {
-    fn from_internal(internal: ModulePathsInternal) -> Result<ModulePaths> {
+    fn from_internal(
+        internal: ModulePathsInternal,
+    ) -> Result<ModulePaths, ModulePathsMissingSources> {
         if internal.sources.is_empty() {
-            return Err(eyre!("missing or empty field `sources`"));
+            Err(ModulePathsMissingSources)
+        } else {
+            Ok(ModulePaths {
+                sources: internal.sources,
+                libraries: internal.libraries,
+                defines: internal.defines,
+                incdirs: internal.incdirs,
+                libdirs: internal.libdirs,
+            })
         }
-        Ok(ModulePaths {
-            sources: internal.sources,
-            libraries: internal.libraries,
-            defines: internal.defines,
-            incdirs: internal.incdirs,
-            libdirs: internal.libdirs,
-        })
     }
 }
 
@@ -180,7 +199,9 @@ pub struct ModulePathsInternal {
 }
 
 impl PartialOverride for ModulePathsInternal {
-    fn apply_overrides(&self, override_spec: &Self) -> Result<Self> {
+    type Err = Infallible;
+
+    fn apply_overrides(&self, override_spec: &Self) -> Result<Self, Self::Err> {
         Ok(Self {
             sources: override_vec(override_spec.sources.as_ref(), self.sources.as_ref()),
             libraries: override_vec(override_spec.libraries.as_ref(), self.libraries.as_ref()),
@@ -192,7 +213,9 @@ impl PartialOverride for ModulePathsInternal {
 }
 
 impl PlatformOverridable for ModulePathsInternal {
-    fn on_nil<T>() -> Result<PerPlatform<T>>
+    type Err = Infallible;
+
+    fn on_nil<T>() -> Result<PerPlatform<T>, <Self as PlatformOverridable>::Err>
     where
         T: PlatformOverridable,
         T: Default,

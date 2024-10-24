@@ -1,22 +1,42 @@
-use std::path::Path;
+use std::{io, path::Path};
 
 use crate::{
-    config::{Config, DefaultFromConfig},
+    config::{Config, DefaultFromConfig, LuaVersionUnset},
     hash::HasIntegrity,
     lockfile::{LocalPackage, LocalPackageHashes, LockConstraint},
     lua_installation::LuaInstallation,
-    operations,
+    operations::{self, FetchSrcRockError},
     package::RemotePackage,
     progress::with_spinner,
     rockspec::{utils, Build as _, BuildBackendSpec, Rockspec},
     tree::{RockLayout, Tree},
 };
-use eyre::Result;
-use indicatif::{MultiProgress, ProgressBar};
+use indicatif::{style::TemplateError, MultiProgress, ProgressBar};
+use make::MakeError;
+use rust_mlua::RustError;
+use thiserror::Error;
 mod builtin;
 mod make;
 mod rust_mlua;
 pub mod variables;
+
+#[derive(Error, Debug)]
+pub enum BuildError {
+    #[error("IO operation failed: {0}")]
+    Io(#[from] io::Error),
+    #[error("failed to create spinner: {0}")]
+    SpinnerFailure(#[from] TemplateError),
+    #[error("failed to compile build modules: {0}")]
+    CompilationError(#[from] cc::Error),
+    #[error(transparent)]
+    MakeError(#[from] MakeError),
+    #[error(transparent)]
+    RustError(#[from] RustError),
+    #[error(transparent)]
+    LuaVersionUnset(#[from] LuaVersionUnset),
+    #[error("failed to fetch rock source: {0}")]
+    FetchSrcRockError(#[from] FetchSrcRockError),
+}
 
 async fn run_build(
     progress: &MultiProgress,
@@ -25,7 +45,7 @@ async fn run_build(
     lua: &LuaInstallation,
     config: &Config,
     build_dir: &Path,
-) -> Result<()> {
+) -> Result<(), BuildError> {
     with_spinner(progress, "🛠️ Building...".into(), || async {
         match rockspec.build.default.build_backend.to_owned() {
             Some(BuildBackendSpec::Builtin(build_spec)) => {
@@ -45,7 +65,7 @@ async fn run_build(
             }
             _ => unimplemented!(),
         }
-        Ok(())
+        Ok::<_, BuildError>(())
     })
     .await?;
     Ok(())
@@ -58,7 +78,7 @@ async fn install(
     output_paths: &RockLayout,
     lua: &LuaInstallation,
     build_dir: &Path,
-) -> Result<()> {
+) -> Result<(), BuildError> {
     with_spinner(
         progress,
         format!("💻 Installing {} {}", rockspec.package, rockspec.version),
@@ -96,7 +116,7 @@ async fn install(
                 std::fs::copy(build_dir.join(source), tree.bin().join(target))?;
                 bar.set_position(bar.position() + 1);
             }
-            Ok(())
+            Ok::<_, BuildError>(())
         },
     )
     .await?;
@@ -109,7 +129,7 @@ pub async fn build(
     pinned: bool,
     constraint: LockConstraint,
     config: &Config,
-) -> Result<LocalPackage> {
+) -> Result<LocalPackage, BuildError> {
     let lua_version = rockspec.lua_version().or_default_from(config)?;
 
     let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
@@ -145,7 +165,7 @@ pub async fn build(
 
     let output_paths = tree.rock(&package)?;
 
-    let lua = LuaInstallation::new(&lua_version, config)?;
+    let lua = LuaInstallation::new(&lua_version, config);
 
     let build_dir = match &rock_source.unpack_dir {
         Some(unpack_dir) => temp_dir.path().join(unpack_dir),

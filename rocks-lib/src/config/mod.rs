@@ -1,10 +1,10 @@
 use directories::ProjectDirs;
-use eyre::{eyre, OptionExt as _, Result};
-use std::{collections::HashMap, fmt::Display, path::PathBuf, str::FromStr, time::Duration};
+use std::{collections::HashMap, fmt::Display, io, path::PathBuf, str::FromStr, time::Duration};
+use thiserror::Error;
 
 use crate::{
     build::variables::{self, HasVariables},
-    project::Project,
+    project::{Project, ProjectError},
 };
 
 #[derive(Debug, Clone)]
@@ -20,11 +20,15 @@ pub enum LuaVersion {
 }
 
 pub trait DefaultFromConfig {
-    fn or_default_from(self, config: &Config) -> Result<LuaVersion>;
+    type Err: std::error::Error;
+
+    fn or_default_from(self, config: &Config) -> Result<LuaVersion, Self::Err>;
 }
 
 impl DefaultFromConfig for Option<LuaVersion> {
-    fn or_default_from(self, config: &Config) -> Result<LuaVersion> {
+    type Err = LuaVersionUnset;
+
+    fn or_default_from(self, config: &Config) -> Result<LuaVersion, Self::Err> {
         match self {
             Some(value) => Ok(value),
             None => LuaVersion::from(config),
@@ -32,14 +36,13 @@ impl DefaultFromConfig for Option<LuaVersion> {
     }
 }
 
+#[derive(Error, Debug)]
+#[error("lua version not set! Please provide a version through `--lua-version <ver>`")]
+pub struct LuaVersionUnset;
+
 impl LuaVersion {
-    pub fn from(config: &Config) -> Result<Self> {
-        config
-            .lua_version()
-            .ok_or_eyre(
-                "lua version not set! Please provide a version through `--lua-version <ver>`",
-            )
-            .cloned()
+    pub fn from(config: &Config) -> Result<Self, LuaVersionUnset> {
+        config.lua_version().ok_or(LuaVersionUnset).cloned()
     }
 }
 
@@ -75,6 +78,10 @@ impl Display for LuaVersion {
     }
 }
 
+#[derive(Error, Debug)]
+#[error("could not find a valid home directory")]
+pub struct NoValidHomeDirectory;
+
 // TODO: Make all fields private and add getters that return references to the data - they needn't be modified at runtime.
 pub struct Config {
     enable_development_rockspecs: bool,
@@ -96,17 +103,16 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn get_project_dirs() -> Result<ProjectDirs> {
-        directories::ProjectDirs::from("org", "neorocks", "rocks")
-            .ok_or(eyre!("Could not find a valid home directory"))
+    pub fn get_project_dirs() -> Result<ProjectDirs, NoValidHomeDirectory> {
+        directories::ProjectDirs::from("org", "neorocks", "rocks").ok_or(NoValidHomeDirectory)
     }
 
-    pub fn get_default_cache_path() -> Result<PathBuf> {
+    pub fn get_default_cache_path() -> Result<PathBuf, NoValidHomeDirectory> {
         let project_dirs = Config::get_project_dirs()?;
         Ok(project_dirs.cache_dir().to_path_buf())
     }
 
-    pub fn get_default_data_path() -> Result<PathBuf> {
+    pub fn get_default_data_path() -> Result<PathBuf, NoValidHomeDirectory> {
         let project_dirs = Config::get_project_dirs()?;
         Ok(project_dirs.data_local_dir().to_path_buf())
     }
@@ -179,6 +185,14 @@ impl HasVariables for Config {
     fn substitute_variables(&self, input: String) -> String {
         variables::substitute(|var_name| self.variables().get(var_name).cloned(), input)
     }
+}
+
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub enum ConfigError {
+    Io(#[from] io::Error),
+    NoValidHomeDirectory(#[from] NoValidHomeDirectory),
+    Project(#[from] ProjectError),
 }
 
 #[derive(Default)]
@@ -279,7 +293,7 @@ impl ConfigBuilder {
         Self { data_dir, ..self }
     }
 
-    pub fn build(self) -> Result<Config> {
+    pub fn build(self) -> Result<Config, ConfigError> {
         let data_dir = self.data_dir.unwrap_or(Config::get_default_data_path()?);
         let current_project = Project::current()?;
 

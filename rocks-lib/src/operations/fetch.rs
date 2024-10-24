@@ -1,28 +1,42 @@
-use eyre::eyre;
-use eyre::Result;
 use flate2::read::GzDecoder;
 use git2::build::RepoBuilder;
 use git2::FetchOptions;
 use indicatif::MultiProgress;
 use itertools::Itertools;
 use std::fs::File;
+use std::io;
 use std::io::BufReader;
 use std::io::Cursor;
 use std::io::Read;
 use std::io::Seek;
 use std::path::Path;
 use std::path::PathBuf;
+use thiserror::Error;
 
 use crate::config::Config;
 use crate::operations;
 use crate::package::RemotePackage;
 use crate::{progress::with_spinner, rockspec::RockSource, rockspec::RockSourceSpec};
 
+use super::DownloadSrcRockError;
+
+#[derive(Error, Debug)]
+pub enum FetchSrcError {
+    #[error("failed to clone rock source: {0}")]
+    GitClone(#[from] git2::Error),
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    Request(#[from] reqwest::Error),
+    #[error(transparent)]
+    Unpack(#[from] UnpackError),
+}
+
 pub async fn fetch_src(
     progress: &MultiProgress,
     dest_dir: &Path,
     rock_source: &RockSource,
-) -> Result<()> {
+) -> Result<(), FetchSrcError> {
     match &rock_source.source_spec {
         RockSourceSpec::Git(git) => {
             let url = &git.url.to_string();
@@ -33,7 +47,7 @@ pub async fn fetch_src(
                 };
                 let mut repo_builder = RepoBuilder::new();
                 repo_builder.fetch_options(fetch_options);
-                Ok(repo_builder.clone(url, dest_dir)?)
+                Ok::<_, FetchSrcError>(repo_builder.clone(url, dest_dir)?)
             })
             .await?;
 
@@ -46,7 +60,9 @@ pub async fn fetch_src(
             let response = with_spinner(
                 progress,
                 format!("📥 Downloading {}", url.to_owned()),
-                || async { Ok(reqwest::get(url.to_owned()).await?.bytes().await?) },
+                || async {
+                    Ok::<_, FetchSrcError>(reqwest::get(url.to_owned()).await?.bytes().await?)
+                },
             )
             .await?;
             let file_name = url
@@ -88,7 +104,7 @@ pub async fn fetch_src(
                                 std::fs::copy(filepath, target)?;
                             }
                         }
-                        Ok(())
+                        Ok::<_, FetchSrcError>(())
                     },
                 )
                 .await?;
@@ -121,12 +137,19 @@ pub async fn fetch_src(
     Ok(())
 }
 
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub enum FetchSrcRockError {
+    DownloadSrcRock(#[from] DownloadSrcRockError),
+    Unpack(#[from] UnpackError),
+}
+
 pub async fn fetch_src_rock(
     progress: &MultiProgress,
     package: &RemotePackage,
     dest_dir: &Path,
     config: &Config,
-) -> Result<()> {
+) -> Result<(), FetchSrcRockError> {
     let src_rock = operations::download_src_rock(progress, package, config).await?;
     let cursor = Cursor::new(src_rock.bytes);
     let mime_type = infer::get(cursor.get_ref()).map(|file_type| file_type.mime_type());
@@ -142,7 +165,7 @@ pub async fn fetch_src_rock(
     Ok(())
 }
 
-fn is_single_directory<R: Read + Seek + Send>(reader: R) -> Result<bool> {
+fn is_single_directory<R: Read + Seek + Send>(reader: R) -> io::Result<bool> {
     let tar = GzDecoder::new(reader);
     let mut archive = tar::Archive::new(tar);
 
@@ -175,6 +198,20 @@ fn is_single_directory<R: Read + Seek + Send>(reader: R) -> Result<bool> {
     }))
 }
 
+#[derive(Error, Debug)]
+pub enum UnpackError {
+    #[error(transparent)]
+    Zip(#[from] zip::result::ZipError),
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error("source returned HTML - it may have been moved or deleted")]
+    SourceMovedOrDeleted,
+    #[error("rockspec source has unsupported file type {0}")]
+    UnsupportedFileType(String),
+    #[error("could not determine mimetype of rockspec source")]
+    UnknownMimeType,
+}
+
 async fn unpack<R: Read + Seek + Send>(
     progress: &MultiProgress,
     mime_type: Option<&str>,
@@ -182,7 +219,7 @@ async fn unpack<R: Read + Seek + Send>(
     auto_find_lua_sources: bool,
     file_name: String,
     dest_dir: &Path,
-) -> Result<()> {
+) -> Result<(), UnpackError> {
     with_spinner(progress, format!("📦 Unpacking {}", file_name), || async {
         match mime_type {
             Some("application/zip") => {
@@ -214,25 +251,23 @@ async fn unpack<R: Read + Seek + Send>(
                             entry.unpack(dest)?;
                         }
 
-                        Ok::<_, eyre::Report>(())
+                        Ok::<_, io::Error>(())
                     })?;
                 } else {
                     archive.entries()?.try_for_each(|entry| {
                         entry?.unpack_in(dest_dir)?;
-                        Ok::<_, eyre::Report>(())
+                        Ok::<_, io::Error>(())
                     })?;
                 }
             }
             Some("text/html") => {
-                return Err(eyre!(
-                    "Source returned HTML - it may have been moved or deleted."
-                ));
+                return Err(UnpackError::SourceMovedOrDeleted);
             }
             Some(other) => {
-                return Err(eyre!("Rockspec source has unsupported file type {}", other));
+                return Err(UnpackError::UnsupportedFileType(other.to_string()));
             }
             None => {
-                return Err(eyre!("Could not determine mimetype of rockspec source."));
+                return Err(UnpackError::UnknownMimeType);
             }
         }
         Ok(())

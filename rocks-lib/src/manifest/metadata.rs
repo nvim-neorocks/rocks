@@ -1,12 +1,14 @@
-use eyre::Result;
 use itertools::Itertools;
 use mlua::{Lua, LuaSerdeExt};
 use std::collections::HashMap;
+use thiserror::Error;
 
 use crate::{
     config::Config,
     package::{PackageName, PackageReq, PackageVersion, RemotePackage},
 };
+
+use super::ManifestFromServerError;
 
 pub struct ManifestMetadata {
     pub repository: HashMap<PackageName, HashMap<PackageVersion, Vec<ManifestRockEntry>>>,
@@ -22,10 +24,21 @@ impl<'de> serde::Deserialize<'de> for ManifestMetadata {
     }
 }
 
+#[derive(Error, Debug)]
+#[error("failed to parse manifest: {0}")]
+pub struct ManifestLuaError(#[from] mlua::Error);
+
+#[derive(Error, Debug)]
+#[error("failed to parse manifest from configuration: {0}")]
+pub enum ManifestError {
+    Lua(#[from] ManifestLuaError),
+    Server(#[from] ManifestFromServerError),
+}
+
 impl ManifestMetadata {
     // TODO(vhyrro): Perhaps make these functions return a cached, in-memory version of the
     // manifest if it has already been parsed?
-    pub fn new(manifest: &String) -> Result<Self> {
+    pub fn new(manifest: &String) -> Result<Self, ManifestLuaError> {
         let lua = Lua::new();
 
         lua.load(manifest).exec()?;
@@ -38,11 +51,11 @@ impl ManifestMetadata {
         Ok(manifest)
     }
 
-    pub async fn from_config(config: &Config) -> Result<Self> {
+    pub async fn from_config(config: &Config) -> Result<Self, ManifestError> {
         let manifest =
             crate::manifest::manifest_from_server(config.server().clone(), config).await?;
 
-        Self::new(&manifest)
+        Ok(Self::new(&manifest)?)
     }
 
     pub fn has_rock(&self, rock_name: &PackageName) -> bool {

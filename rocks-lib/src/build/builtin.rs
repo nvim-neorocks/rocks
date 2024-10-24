@@ -9,12 +9,14 @@ use crate::{
     rockspec::{utils, Build, BuiltinBuildSpec, ModuleSpec},
     tree::RockLayout,
 };
-use eyre::{OptionExt as _, Result};
 use indicatif::{MultiProgress, ProgressBar};
-use itertools::Itertools as _;
 use walkdir::WalkDir;
 
+use super::BuildError;
+
 impl Build for BuiltinBuildSpec {
+    type Err = BuildError;
+
     async fn run(
         self,
         progress: &MultiProgress,
@@ -23,9 +25,9 @@ impl Build for BuiltinBuildSpec {
         lua: &LuaInstallation,
         _config: &Config,
         build_dir: &Path,
-    ) -> Result<()> {
+    ) -> Result<(), Self::Err> {
         // Detect all Lua modules
-        let modules = autodetect_modules(build_dir)?
+        let modules = autodetect_modules(build_dir)
             .into_iter()
             .chain(self.modules)
             .collect::<HashMap<_, _>>();
@@ -75,7 +77,7 @@ impl Build for BuiltinBuildSpec {
     }
 }
 
-fn autodetect_modules(build_dir: &Path) -> Result<HashMap<String, ModuleSpec>> {
+fn autodetect_modules(build_dir: &Path) -> HashMap<String, ModuleSpec> {
     WalkDir::new(build_dir.join("src"))
         .into_iter()
         .chain(WalkDir::new(build_dir.join("lua")))
@@ -99,7 +101,7 @@ fn autodetect_modules(build_dir: &Path) -> Result<HashMap<String, ModuleSpec>> {
         })
         .map(|file| {
             let diff: PathBuf = pathdiff::diff_paths(build_dir.join(file.into_path()), build_dir)
-                .ok_or_eyre("unable to autodetect modules")?;
+                .expect("failed to autodetect modules");
 
             // NOTE(vhyrro): You may ask why we convert all paths to Lua module paths
             // just to convert them back later in the `run()` stage.
@@ -115,7 +117,7 @@ fn autodetect_modules(build_dir: &Path) -> Result<HashMap<String, ModuleSpec>> {
                 .trim_end_matches(".lua")
                 .replace(std::path::MAIN_SEPARATOR_STR, ".");
 
-            Ok((lua_module_path, ModuleSpec::SourcePath(diff)))
+            (lua_module_path, ModuleSpec::SourcePath(diff))
         })
-        .try_collect()
+        .collect()
 }

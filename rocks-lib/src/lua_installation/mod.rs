@@ -1,4 +1,3 @@
-use eyre::Result;
 use std::path::PathBuf;
 use target_lexicon::Triple;
 
@@ -13,14 +12,14 @@ pub struct LuaInstallation {
 }
 
 impl LuaInstallation {
-    pub fn new(version: &LuaVersion, config: &Config) -> Result<Self> {
-        let output = Self::path(version, config)?;
+    pub fn new(version: &LuaVersion, config: &Config) -> Self {
+        let output = Self::path(version, config);
 
         if output.exists() {
-            Ok(LuaInstallation {
+            LuaInstallation {
                 include_dir: output.join("include"),
                 lib_dir: output.join("lib"),
-            })
+            }
         } else {
             let host = Triple::host();
             let target = &host.to_string();
@@ -60,15 +59,15 @@ impl LuaInstallation {
                 }
             };
 
-            Ok(LuaInstallation {
+            LuaInstallation {
                 include_dir,
                 lib_dir,
-            })
+            }
         }
     }
 
-    pub fn path(version: &LuaVersion, config: &Config) -> Result<PathBuf> {
-        Ok(config.lua_dir().join(version.to_string()))
+    pub fn path(version: &LuaVersion, config: &Config) -> PathBuf {
+        config.lua_dir().join(version.to_string())
     }
 }
 

@@ -1,7 +1,7 @@
-use eyre::{eyre, Result};
 use itertools::Itertools;
 use mlua::FromLua;
-use std::path::PathBuf;
+use std::{convert::Infallible, path::PathBuf};
+use thiserror::Error;
 
 use serde::Deserialize;
 
@@ -23,16 +23,24 @@ impl Default for TestSpec {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum TestSpecError {
+    #[error("'command' test type must specify 'command' or 'script' field")]
+    NoCommandOrScript,
+    #[error("'command' test type cannot have both 'command' and 'script' fields")]
+    CommandAndScript,
+}
+
 impl FromPlatformOverridable<TestSpecInternal, Self> for TestSpec {
-    fn from_platform_overridable(internal: TestSpecInternal) -> Result<Self> {
+    type Err = TestSpecError;
+
+    fn from_platform_overridable(internal: TestSpecInternal) -> Result<Self, Self::Err> {
         let test_spec = match internal.test_type {
             Some(TestType::Busted) => Ok(Self::Busted(BustedTestSpec {
                 flags: internal.flags.unwrap_or_default(),
             })),
             Some(TestType::Command) => match (internal.command, internal.script) {
-                (None, None) => Err(eyre!(
-                    "'command' test type must specify 'command' or 'script' field"
-                )),
+                (None, None) => Err(TestSpecError::NoCommandOrScript),
                 (None, Some(script)) => Ok(Self::Script(ScriptTestSpec {
                     script,
                     flags: internal.flags.unwrap_or_default(),
@@ -41,9 +49,7 @@ impl FromPlatformOverridable<TestSpecInternal, Self> for TestSpec {
                     command,
                     flags: internal.flags.unwrap_or_default(),
                 })),
-                (Some(_), Some(_)) => Err(eyre!(
-                    "'command' test type cannot have both 'command' and 'script' fields"
-                )),
+                (Some(_), Some(_)) => Err(TestSpecError::CommandAndScript),
             },
             None => Ok(Self::default()),
         }?;
@@ -98,7 +104,9 @@ struct TestSpecInternal {
 }
 
 impl PartialOverride for TestSpecInternal {
-    fn apply_overrides(&self, override_spec: &Self) -> Result<Self> {
+    type Err = Infallible;
+
+    fn apply_overrides(&self, override_spec: &Self) -> Result<Self, Self::Err> {
         Ok(TestSpecInternal {
             test_type: override_opt(&override_spec.test_type, &self.test_type),
             flags: match (override_spec.flags.clone(), self.flags.clone()) {
@@ -124,7 +132,9 @@ impl PartialOverride for TestSpecInternal {
 }
 
 impl PlatformOverridable for TestSpecInternal {
-    fn on_nil<T>() -> Result<PerPlatform<T>>
+    type Err = Infallible;
+
+    fn on_nil<T>() -> Result<PerPlatform<T>, <Self as PlatformOverridable>::Err>
     where
         T: PlatformOverridable,
         T: Default,

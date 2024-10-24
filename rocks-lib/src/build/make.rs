@@ -1,7 +1,11 @@
-use eyre::eyre;
 use indicatif::MultiProgress;
 use itertools::Itertools;
-use std::{path::Path, process::Command};
+use std::{
+    io,
+    path::Path,
+    process::{Command, ExitStatus},
+};
+use thiserror::Error;
 
 use crate::{
     build::variables::HasVariables,
@@ -11,7 +15,25 @@ use crate::{
     tree::RockLayout,
 };
 
+use super::BuildError;
+
+#[derive(Error, Debug)]
+pub enum MakeError {
+    #[error("make step failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
+    CommandFailure {
+        status: ExitStatus,
+        stdout: String,
+        stderr: String,
+    },
+    #[error("failed to run `make` step: {0}")]
+    Io(io::Error),
+    #[error("failed to run `make` step: `{0}` command not found!")]
+    CommandNotFound(String),
+}
+
 impl Build for MakeBuildSpec {
+    type Err = BuildError;
+
     async fn run(
         self,
         _progress: &MultiProgress,
@@ -20,7 +42,7 @@ impl Build for MakeBuildSpec {
         lua: &LuaInstallation,
         config: &Config,
         build_dir: &Path,
-    ) -> eyre::Result<()> {
+    ) -> Result<(), Self::Err> {
         // Build step
         if self.build_pass {
             let build_args = self
@@ -43,24 +65,16 @@ impl Build for MakeBuildSpec {
                 Ok(child) => match child.wait_with_output() {
                     Ok(output) if output.status.success() => {}
                     Ok(output) => {
-                        return Err(eyre!(
-                            "`make` build step failed.
-status: {}
-stdout: {}
-stderr: {}",
-                            output.status,
-                            String::from_utf8_lossy(&output.stdout),
-                            String::from_utf8_lossy(&output.stderr),
-                        ))
+                        return Err(MakeError::CommandFailure {
+                            status: output.status,
+                            stdout: String::from_utf8_lossy(&output.stdout).into(),
+                            stderr: String::from_utf8_lossy(&output.stderr).into(),
+                        }
+                        .into());
                     }
-                    Err(err) => return Err(eyre!("Failed to run `make` build step: {err}")),
+                    Err(err) => return Err(MakeError::Io(err).into()),
                 },
-                Err(_) => {
-                    return Err(eyre!(
-                        "Failed to run build step: `{}` command not found!",
-                        config.make_cmd()
-                    ))
-                }
+                Err(_) => return Err(MakeError::CommandNotFound(config.make_cmd().clone()).into()),
             }
         };
 
@@ -85,17 +99,14 @@ stderr: {}",
             {
                 Ok(output) if output.status.success() => {}
                 Ok(output) => {
-                    return Err(eyre!(
-                        "`make` install step failed.
-status: {}
-stdout: {}
-stderr: {}",
-                        output.status,
-                        String::from_utf8_lossy(&output.stdout),
-                        String::from_utf8_lossy(&output.stderr),
-                    ));
+                    return Err(MakeError::CommandFailure {
+                        status: output.status,
+                        stdout: String::from_utf8_lossy(&output.stdout).into(),
+                        stderr: String::from_utf8_lossy(&output.stderr).into(),
+                    }
+                    .into())
                 }
-                Err(err) => return Err(eyre!("Failed to run `make` install step: {err}")),
+                Err(err) => return Err(MakeError::Io(err).into()),
             }
         };
 

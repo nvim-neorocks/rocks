@@ -229,19 +229,21 @@ pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
 
             let lua_versions = lua_versions.map_or_else(
                 || {
-                    format!(
-                        "lua >= {}",
-                        Select::new(
-                            "What is the lowest Lua version you support?",
-                            vec!["5.1", "5.2", "5.3", "5.4"]
+                    Ok::<_, eyre::Report>(
+                        format!(
+                            "lua >= {}",
+                            Select::new(
+                                "What is the lowest Lua version you support?",
+                                vec!["5.1", "5.2", "5.3", "5.4"]
+                            )
+                            .without_filtering()
+                            .with_help_message(
+                                "This is equivalent to the 'lua >= {version}' constraint."
+                            )
+                            .prompt()?
                         )
-                        .without_filtering()
-                        .with_help_message(
-                            "This is equivalent to the 'lua >= {version}' constraint."
-                        )
-                        .prompt()?
+                        .parse()?,
                     )
-                    .parse()
                 },
                 Ok,
             )?;

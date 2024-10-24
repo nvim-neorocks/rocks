@@ -1,5 +1,8 @@
+use std::io;
+
 use crate::{
-    config::{Config, DefaultFromConfig},
+    build::BuildError,
+    config::{Config, DefaultFromConfig, LuaVersionUnset},
     lockfile::{LocalPackage, LockConstraint},
     package::{PackageName, PackageReq, PackageVersionReq},
     progress::with_spinner,
@@ -7,10 +10,21 @@ use crate::{
 };
 
 use async_recursion::async_recursion;
-use eyre::Result;
 use indicatif::{MultiProgress, ProgressBar};
 use itertools::Itertools;
 use semver::VersionReq;
+use thiserror::Error;
+
+use super::SearchAndDownloadError;
+
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub enum InstallError {
+    SearchAndDownloadError(#[from] SearchAndDownloadError),
+    LuaVersionUnset(#[from] LuaVersionUnset),
+    Io(#[from] io::Error),
+    BuildError(#[from] BuildError),
+}
 
 #[async_recursion]
 pub async fn install(
@@ -18,7 +32,7 @@ pub async fn install(
     package_req: PackageReq,
     pin: bool,
     config: &Config,
-) -> Result<LocalPackage> {
+) -> Result<LocalPackage, InstallError> {
     with_spinner(
         progress,
         format!("💻 Installing {}", package_req),
@@ -32,7 +46,7 @@ async fn install_impl(
     package_req: PackageReq,
     pin: bool,
     config: &Config,
-) -> Result<LocalPackage> {
+) -> Result<LocalPackage, InstallError> {
     let rockspec = super::download_rockspec(progress, &package_req, config).await?;
 
     let lua_version = rockspec.lua_version().or_default_from(config)?;
