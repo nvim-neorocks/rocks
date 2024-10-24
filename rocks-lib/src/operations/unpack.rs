@@ -1,16 +1,20 @@
 use crate::progress::with_spinner;
 
-use eyre::Result;
 use indicatif::MultiProgress;
 use std::io::Read;
 use std::io::Seek;
 use std::path::PathBuf;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+#[error("failed to unpack source rock: {0}")]
+pub struct UnpackError(#[from] zip::result::ZipError);
 
 pub async fn unpack_src_rock<R: Read + Seek + Send>(
     progress: &MultiProgress,
     rock_src: R,
     destination: PathBuf,
-) -> Result<PathBuf> {
+) -> Result<PathBuf, UnpackError> {
     with_spinner(
         progress,
         format!("📦 Unpacking src.rock into {}", destination.display()),
@@ -22,7 +26,7 @@ pub async fn unpack_src_rock<R: Read + Seek + Send>(
 async fn unpack_src_rock_impl<R: Read + Seek + Send>(
     rock_src: R,
     destination: PathBuf,
-) -> Result<PathBuf> {
+) -> Result<PathBuf, UnpackError> {
     let mut zip = zip::ZipArchive::new(rock_src)?;
     zip.extract(&destination)?;
     Ok(destination)

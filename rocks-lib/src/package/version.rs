@@ -1,11 +1,11 @@
 use std::{cmp::Ordering, fmt::Display, str::FromStr};
 
-use eyre::{eyre, Result};
 use html_escape::decode_html_entities;
 use itertools::Itertools;
 use mlua::FromLua;
 use semver::{Comparator, Error, Op, Version, VersionReq};
 use serde::{de, Deserialize, Deserializer, Serialize};
+use thiserror::Error;
 
 /// **SemVer version** as defined by <https://semver.org>.
 /// or a **Dev** version, which can be one of "dev", "scm", or "git"
@@ -16,7 +16,7 @@ pub enum PackageVersion {
 }
 
 impl PackageVersion {
-    pub fn parse(text: &str) -> Result<Self> {
+    pub fn parse(text: &str) -> Result<Self, PackageVersionParseError> {
         PackageVersion::from_str(text)
     }
     /// Note that this loses the specrev information.
@@ -39,6 +39,14 @@ impl PackageVersion {
             }
         }
     }
+}
+
+#[derive(Error, Debug)]
+pub enum PackageVersionParseError {
+    #[error(transparent)]
+    Specrev(#[from] SpecrevParseError),
+    #[error("failed to parse version: {0}")]
+    Version(#[from] Error),
 }
 
 impl Serialize for PackageVersion {
@@ -100,7 +108,7 @@ impl Ord for PackageVersion {
 }
 
 impl FromStr for PackageVersion {
-    type Err = eyre::Error;
+    type Err = PackageVersionParseError;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         let (modrev, specrev) = split_specrev(text)?;
@@ -205,6 +213,10 @@ impl PartialOrd for DevVer {
     }
 }
 
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub struct PackageVersionReqError(#[from] Error);
+
 /// **SemVer version** requirement as defined by <https://semver.org>.
 /// or a **Dev** version requirement, which can be one of "dev", "scm", or "git"
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -214,7 +226,7 @@ pub enum PackageVersionReq {
 }
 
 impl PackageVersionReq {
-    pub fn parse(text: &str) -> Result<Self> {
+    pub fn parse(text: &str) -> Result<Self, PackageVersionReqError> {
         PackageVersionReq::from_str(text)
     }
     pub fn matches(&self, version: &PackageVersion) -> bool {
@@ -247,7 +259,7 @@ impl Default for PackageVersionReq {
 }
 
 impl FromStr for PackageVersionReq {
-    type Err = eyre::Error;
+    type Err = PackageVersionReqError;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         let text = text
@@ -269,21 +281,37 @@ impl FromStr for PackageVersionReq {
     }
 }
 
-fn split_specrev(version_str: &str) -> Result<(&str, u16)> {
+#[derive(Error, Debug)]
+pub enum SpecrevParseError {
+    #[error("specrev {specrev} in version {full_version} contains non-numeric characters")]
+    InvalidSpecrev {
+        specrev: String,
+        full_version: String,
+    },
+    #[error("could not parse specrev in version {0}")]
+    InvalidVersion(String),
+}
+
+fn split_specrev(version_str: &str) -> Result<(&str, u16), SpecrevParseError> {
     if let Some(pos) = version_str.rfind('-') {
         if let Some(specrev_str) = version_str.get(pos + 1..) {
             if specrev_str.chars().all(|c| c.is_ascii_digit()) {
-                let specrev = specrev_str.parse::<u16>()?;
+                let specrev =
+                    specrev_str
+                        .parse::<u16>()
+                        .map_err(|_| SpecrevParseError::InvalidSpecrev {
+                            specrev: specrev_str.into(),
+                            full_version: version_str.into(),
+                        })?;
                 Ok((&version_str[..pos], specrev))
             } else {
-                Err(eyre!(
-                    "Specrev {} in version {} contains non-numeric characters",
-                    specrev_str,
-                    version_str
-                ))
+                Err(SpecrevParseError::InvalidSpecrev {
+                    specrev: specrev_str.into(),
+                    full_version: version_str.into(),
+                })
             }
         } else {
-            Err(eyre!("Could not parse specrev in version {}", version_str))
+            Err(SpecrevParseError::InvalidVersion(version_str.into()))
         }
     } else {
         // We assume a specrev of 1 if none can be found.

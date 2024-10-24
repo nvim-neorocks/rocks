@@ -1,3 +1,5 @@
+#![allow(ambiguous_glob_reexports)]
+
 mod download;
 mod fetch;
 mod install;

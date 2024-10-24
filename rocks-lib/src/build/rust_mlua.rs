@@ -1,11 +1,12 @@
-use eyre::{eyre, Result};
 use indicatif::MultiProgress;
 use itertools::Itertools;
 use std::collections::HashMap;
-use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, ExitStatus};
+use std::{fs, io};
+use thiserror::Error;
 
+use crate::config::LuaVersionUnset;
 use crate::progress::with_spinner;
 use crate::rockspec::utils::lua_lib_extension;
 use crate::{
@@ -15,7 +16,23 @@ use crate::{
     tree::RockLayout,
 };
 
+#[derive(Error, Debug)]
+pub enum RustError {
+    #[error("`cargo build` failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
+    CargoBuild {
+        status: ExitStatus,
+        stdout: String,
+        stderr: String,
+    },
+    #[error("failed to run `cargo build`: {0}")]
+    RustBuild(#[from] io::Error),
+    #[error(transparent)]
+    LuaVersionUnset(#[from] LuaVersionUnset),
+}
+
 impl Build for RustMluaBuildSpec {
+    type Err = RustError;
+
     async fn run(
         self,
         progress: &MultiProgress,
@@ -24,7 +41,7 @@ impl Build for RustMluaBuildSpec {
         _lua: &LuaInstallation,
         config: &Config,
         build_dir: &Path,
-    ) -> Result<()> {
+    ) -> Result<(), Self::Err> {
         let lua_version = LuaVersion::from(config)?;
         let lua_feature = match lua_version {
             LuaVersion::Lua51 => "lua51",
@@ -53,29 +70,25 @@ impl Build for RustMluaBuildSpec {
         {
             Ok(output) if output.status.success() => {}
             Ok(output) => {
-                return Err(eyre!(
-                    "`cargo build` failed.
-status: {}
-stdout: {}
-stderr: {}",
-                    output.status,
-                    String::from_utf8_lossy(&output.stdout),
-                    String::from_utf8_lossy(&output.stderr),
-                ))
+                return Err(RustError::CargoBuild {
+                    status: output.status,
+                    stdout: String::from_utf8_lossy(&output.stdout).into(),
+                    stderr: String::from_utf8_lossy(&output.stderr).into(),
+                });
             }
-            Err(err) => return Err(eyre!("Failed to run `cargo build`: {err}")),
+            Err(err) => return Err(RustError::RustBuild(err)),
         }
         fs::create_dir_all(&output_paths.lib)?;
         if let Err(err) =
             install_rust_libs(self.modules, &self.target_path, build_dir, output_paths)
         {
             cleanup(progress, output_paths).await?;
-            return Err(err);
+            return Err(err.into());
         }
         fs::create_dir_all(&output_paths.src)?;
         if let Err(err) = install_lua_libs(self.include, build_dir, output_paths) {
             cleanup(progress, output_paths).await?;
-            return Err(err);
+            return Err(err.into());
         }
         Ok(())
     }
@@ -86,7 +99,7 @@ fn install_rust_libs(
     target_path: &Path,
     build_dir: &Path,
     output_paths: &RockLayout,
-) -> Result<()> {
+) -> io::Result<()> {
     for (module, rust_lib) in modules {
         let src = build_dir.join(target_path).join("release").join(rust_lib);
         let mut dst: PathBuf = output_paths.lib.join(module);
@@ -100,7 +113,7 @@ fn install_lua_libs(
     include: HashMap<PathBuf, PathBuf>,
     build_dir: &Path,
     output_paths: &RockLayout,
-) -> Result<()> {
+) -> io::Result<()> {
     for (from, to) in include {
         let src = build_dir.join(from);
         let dst = output_paths.src.join(to);
@@ -109,7 +122,7 @@ fn install_lua_libs(
     Ok(())
 }
 
-async fn cleanup(progress: &MultiProgress, output_paths: &RockLayout) -> Result<()> {
+async fn cleanup(progress: &MultiProgress, output_paths: &RockLayout) -> io::Result<()> {
     let root_dir = &output_paths.rock_path;
     with_spinner(
         progress,
@@ -123,7 +136,7 @@ async fn cleanup(progress: &MultiProgress, output_paths: &RockLayout) -> Result<
                     err
                 ))?,
             };
-            Ok(())
+            Ok::<_, io::Error>(())
         },
     )
     .await?;

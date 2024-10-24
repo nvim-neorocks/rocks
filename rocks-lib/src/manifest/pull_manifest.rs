@@ -1,11 +1,25 @@
-use eyre::Result;
-use reqwest::Client;
-use std::{fs, time::SystemTime};
+use reqwest::{header::ToStrError, Client};
+use std::{fs, io, time::SystemTime};
+use thiserror::Error;
 
 use crate::config::Config;
 
-// TODO(vhyrro): Perhaps cache the manifest somewhere on disk?
-pub async fn manifest_from_server(url: String, config: &Config) -> Result<String> {
+#[derive(Error, Debug)]
+pub enum ManifestFromServerError {
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error("failed to pull manifest: {0}")]
+    Request(#[from] reqwest::Error),
+    #[error("invalidate date received from server: {0}")]
+    InvalidDate(#[from] httpdate::Error),
+    #[error("non-ASCII characters returned in response header: {0}")]
+    InvalidHeader(#[from] ToStrError),
+}
+
+pub async fn manifest_from_server(
+    url: String,
+    config: &Config,
+) -> Result<String, ManifestFromServerError> {
     let manifest_filename = "manifest".to_string()
         + &config
             .lua_version()
@@ -43,7 +57,7 @@ pub async fn manifest_from_server(url: String, config: &Config) -> Result<String
             }
 
             // Else return the cached manifest.
-            return Ok(String::from_utf8(fs::read(&cache)?)?);
+            return Ok(fs::read_to_string(&cache)?);
         }
     }
 

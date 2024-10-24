@@ -1,10 +1,10 @@
-use eyre::{eyre, Result};
-use git_url_parse::GitUrl;
+use git_url_parse::{GitUrl, GitUrlParseError};
 use mlua::{FromLua, Lua, Value};
 use reqwest::Url;
 use serde::{de, Deserialize, Deserializer};
 use ssri::Integrity;
-use std::{borrow::Cow, fs, path::PathBuf, str::FromStr};
+use std::{borrow::Cow, convert::Infallible, fs, io, path::PathBuf, str::FromStr};
+use thiserror::Error;
 
 use super::{
     FromPlatformOverridable, PartialOverride, PerPlatform, PerPlatformWrapper, PlatformOverridable,
@@ -18,11 +18,21 @@ pub struct RockSource {
     pub unpack_dir: Option<PathBuf>,
 }
 
+#[derive(Error, Debug)]
+pub enum RockSourceError {
+    #[error("source URL missing")]
+    SourceUrlMissing,
+    #[error("invalid rockspec source field combination")]
+    InvalidCombination,
+}
+
 impl FromPlatformOverridable<RockSourceInternal, Self> for RockSource {
-    fn from_platform_overridable(internal: RockSourceInternal) -> Result<Self> {
+    type Err = RockSourceError;
+
+    fn from_platform_overridable(internal: RockSourceInternal) -> Result<Self, Self::Err> {
         // The rockspec.source table allows invalid combinations
         // This ensures that invalid combinations are caught while parsing.
-        let url = internal.url.ok_or(eyre!("source URL missing"))?;
+        let url = internal.url.ok_or(RockSourceError::SourceUrlMissing)?;
 
         let source_spec = match (url, internal.tag, internal.branch, internal.module) {
             (source, None, None, None) => Ok(RockSourceSpec::default_from_source_url(source)),
@@ -55,7 +65,7 @@ impl FromPlatformOverridable<RockSourceInternal, Self> for RockSource {
             (SourceUrl::Svn(url), tag, None, module) => {
                 Ok(RockSourceSpec::Svn(SvnSource { url, tag, module }))
             }
-            _ => Err(eyre!("invalid rockspec source field combination.")),
+            _ => Err(RockSourceError::InvalidCombination),
         }?;
 
         Ok(RockSource {
@@ -163,7 +173,9 @@ struct RockSourceInternal {
 }
 
 impl PartialOverride for RockSourceInternal {
-    fn apply_overrides(&self, override_spec: &Self) -> Result<Self> {
+    type Err = Infallible;
+
+    fn apply_overrides(&self, override_spec: &Self) -> Result<Self, Self::Err> {
         Ok(Self {
             url: override_opt(override_spec.url.as_ref(), self.url.as_ref()),
             hash: override_opt(override_spec.hash.as_ref(), self.hash.as_ref()),
@@ -185,12 +197,18 @@ impl PartialOverride for RockSourceInternal {
     }
 }
 
+#[derive(Error, Debug)]
+#[error("missing source")]
+pub struct RockSourceMissingSource;
+
 impl PlatformOverridable for RockSourceInternal {
-    fn on_nil<T>() -> Result<PerPlatform<T>>
+    type Err = RockSourceMissingSource;
+
+    fn on_nil<T>() -> Result<PerPlatform<T>, <Self as PlatformOverridable>::Err>
     where
         T: PlatformOverridable,
     {
-        Err(eyre!("Missing source."))
+        Err(RockSourceMissingSource)
     }
 }
 
@@ -217,10 +235,20 @@ enum SourceUrl {
     Svn(String),
 }
 
-impl FromStr for SourceUrl {
-    type Err = eyre::Error;
+#[derive(Error, Debug)]
+#[error("failed to parse source url: {0}")]
+pub enum SourceUrlError {
+    Io(#[from] io::Error),
+    Git(#[from] GitUrlParseError),
+    Url(#[source] <Url as FromStr>::Err),
+    #[error("unsupported source url: {0}")]
+    Unsupported(String),
+}
 
-    fn from_str(str: &str) -> Result<Self> {
+impl FromStr for SourceUrl {
+    type Err = SourceUrlError;
+
+    fn from_str(str: &str) -> Result<Self, Self::Err> {
         match str {
             s if s.starts_with("cvs://") => Ok(Self::Cvs(s.to_string())),
             s if s.starts_with("file://") => {
@@ -237,7 +265,7 @@ impl FromStr for SourceUrl {
                 Ok(Self::Git(s.trim_start_matches("git+").parse()?))
             }
             s if starts_with_any(s, ["https://", "http://", "ftp://"].into()) => {
-                Ok(Self::Url(s.parse()?))
+                Ok(Self::Url(s.parse().map_err(SourceUrlError::Url)?))
             }
             s if starts_with_any(
                 s,
@@ -248,7 +276,7 @@ impl FromStr for SourceUrl {
             }
             s if s.starts_with("sscm://") => Ok(Self::Sscm(s.to_string())),
             s if s.starts_with("svn://") => Ok(Self::Svn(s.to_string())),
-            s => Err(eyre!("Unsupported source URL: {}", s)),
+            s => Err(SourceUrlError::Unsupported(s.to_string())),
         }
     }
 }

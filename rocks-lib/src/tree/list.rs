@@ -1,6 +1,5 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, io};
 
-use eyre::Result;
 use itertools::Itertools;
 
 use crate::{lockfile::LocalPackage, package::PackageName};
@@ -13,7 +12,7 @@ use super::Tree;
 // Cloning isn't destructive, but it's sure expensive.
 
 impl Tree {
-    pub fn list(&self) -> Result<HashMap<PackageName, Vec<LocalPackage>>> {
+    pub fn list(&self) -> io::Result<HashMap<PackageName, Vec<LocalPackage>>> {
         Ok(self
             .lockfile()?
             .rocks()
@@ -23,7 +22,7 @@ impl Tree {
             .into_group_map())
     }
 
-    pub fn as_rock_list(&self) -> Result<Vec<LocalPackage>> {
+    pub fn as_rock_list(&self) -> io::Result<Vec<LocalPackage>> {
         let rock_list = self.list()?;
 
         Ok(rock_list.values().flatten().cloned().collect())

@@ -32,7 +32,7 @@ pub async fn remove(remove_args: Remove, config: Config) -> Result<()> {
         &RemotePackage::new(remove_args.name.clone(), target_version.clone()).into_package_req(),
     ) {
         Some(package) => {
-            rocks_lib::operations::remove(&MultiProgress::new(), package, &config).await
+            Ok(rocks_lib::operations::remove(&MultiProgress::new(), package, &config).await?)
         }
         None => {
             eprintln!("Could not find {}@{}", remove_args.name, target_version);

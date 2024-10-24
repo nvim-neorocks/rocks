@@ -1,9 +1,9 @@
-use eyre::{eyre, Result};
 use itertools::Itertools;
 use mlua::{FromLua, Lua, LuaSerdeExt as _, Value};
-use std::{cmp::Ordering, collections::HashMap, marker::PhantomData};
+use std::{cmp::Ordering, collections::HashMap, convert::Infallible, marker::PhantomData};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
+use thiserror::Error;
 
 use serde::{
     de::{self, DeserializeOwned},
@@ -126,8 +126,19 @@ impl<'de> Deserialize<'de> for PlatformSupport {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum PlatformValidationError {
+    #[error("error when parsing platform identifier: {0}")]
+    ParseError(String),
+
+    #[error("conflicting supported platform entries")]
+    ConflictingEntries,
+}
+
 impl PlatformSupport {
-    fn validate_platforms(platforms: &[String]) -> Result<HashMap<PlatformIdentifier, bool>> {
+    fn validate_platforms(
+        platforms: &[String],
+    ) -> Result<HashMap<PlatformIdentifier, bool>, PlatformValidationError> {
         platforms
             .iter()
             .try_fold(HashMap::new(), |mut platforms, platform| {
@@ -139,7 +150,9 @@ impl PlatformSupport {
                     .map(|str| (false, str))
                     .unwrap_or((true, platform));
 
-                let platform_identifier: PlatformIdentifier = platform.parse()?;
+                let platform_identifier = platform
+                    .parse::<PlatformIdentifier>()
+                    .map_err(|err| PlatformValidationError::ParseError(err.to_string()))?;
 
                 // If a platform with the same name exists already and is contradictory
                 // then throw an error. An example of such a contradiction is e.g.:
@@ -149,7 +162,7 @@ impl PlatformSupport {
                     .unwrap_or(&is_positive_assertion)
                     != &is_positive_assertion
                 {
-                    return Err(eyre!("Conflicting supported platform entries!"));
+                    return Err(PlatformValidationError::ConflictingEntries);
                 }
 
                 platforms.insert(platform_identifier.clone(), is_positive_assertion);
@@ -167,7 +180,7 @@ impl PlatformSupport {
                         != &is_positive_assertion
                     {
                         // TODO(vhyrro): More detailed errors
-                        return Err(eyre!("Conflicting supported platform entries!"));
+                        return Err(PlatformValidationError::ConflictingEntries);
                     }
 
                     platforms.insert(sub_platform, is_positive_assertion);
@@ -177,7 +190,7 @@ impl PlatformSupport {
             })
     }
 
-    pub fn parse(platforms: &[String]) -> Result<Self> {
+    pub fn parse(platforms: &[String]) -> Result<Self, PlatformValidationError> {
         match platforms {
             [] => Ok(Self::default()),
             platforms if platforms.iter().all(|platform| platform.starts_with('!')) => {
@@ -205,14 +218,18 @@ impl PlatformSupport {
 }
 
 pub trait PartialOverride: Sized {
-    fn apply_overrides(&self, override_val: &Self) -> Result<Self>;
+    type Err: std::error::Error;
+
+    fn apply_overrides(&self, override_val: &Self) -> Result<Self, Self::Err>;
 }
 
 /// Override `base_deps` with `override_deps`
 /// - Adds missing dependencies
 /// - Replaces dependencies with the same name
 impl PartialOverride for Vec<PackageReq> {
-    fn apply_overrides(&self, override_vec: &Self) -> Result<Self> {
+    type Err = Infallible;
+
+    fn apply_overrides(&self, override_vec: &Self) -> Result<Self, Self::Err> {
         let mut result_map: HashMap<String, PackageReq> = self
             .iter()
             .map(|dep| (dep.name().clone().to_string(), dep.clone()))
@@ -228,14 +245,18 @@ impl PartialOverride for Vec<PackageReq> {
 }
 
 pub trait PlatformOverridable: PartialOverride {
-    fn on_nil<T>() -> Result<PerPlatform<T>>
+    type Err: std::error::Error;
+
+    fn on_nil<T>() -> Result<PerPlatform<T>, <Self as PlatformOverridable>::Err>
     where
         T: PlatformOverridable,
         T: Default;
 }
 
 impl PlatformOverridable for Vec<PackageReq> {
-    fn on_nil<T>() -> Result<super::PerPlatform<T>>
+    type Err = Infallible;
+
+    fn on_nil<T>() -> Result<super::PerPlatform<T>, <Self as PlatformOverridable>::Err>
     where
         T: PlatformOverridable,
         T: Default,
@@ -245,7 +266,9 @@ impl PlatformOverridable for Vec<PackageReq> {
 }
 
 pub trait FromPlatformOverridable<T: PlatformOverridable, G: FromPlatformOverridable<T, G>> {
-    fn from_platform_overridable(internal: T) -> Result<G>;
+    type Err: std::error::Error;
+
+    fn from_platform_overridable(internal: T) -> Result<G, Self::Err>;
 }
 
 /// Data that that can vary per platform
@@ -290,6 +313,7 @@ impl<T: Default> Default for PerPlatform<T> {
 impl<'lua, T> FromLua<'lua> for PerPlatform<T>
 where
     T: PlatformOverridable,
+    T: PartialOverride,
     T: DeserializeOwned,
     T: Default,
     T: Clone,
@@ -307,8 +331,11 @@ where
                 }?;
                 let _ = tbl.raw_remove("platforms");
                 let default = lua.from_value(list.to_owned())?;
-                apply_per_platform_overrides(&mut per_platform, &default)
-                    .map_err(|err| mlua::Error::DeserializeError(err.to_string()))?;
+                apply_per_platform_overrides(&mut per_platform, &default).map_err(
+                    |err: <T as PartialOverride>::Err| {
+                        mlua::Error::DeserializeError(err.to_string())
+                    },
+                )?;
                 Ok(PerPlatform {
                     default,
                     per_platform,
@@ -332,8 +359,8 @@ pub struct PerPlatformWrapper<T, G> {
 
 impl<'lua, T, G> FromLua<'lua> for PerPlatformWrapper<T, G>
 where
-    T: FromPlatformOverridable<G, T>,
-    G: PlatformOverridable,
+    T: FromPlatformOverridable<G, T, Err: ToString>,
+    G: PlatformOverridable<Err: ToString>,
     G: DeserializeOwned,
     G: Default,
     G: Clone,
@@ -365,7 +392,7 @@ where
 fn apply_per_platform_overrides<T>(
     per_platform: &mut HashMap<PlatformIdentifier, T>,
     base: &T,
-) -> Result<()>
+) -> Result<(), T::Err>
 where
     T: PartialOverride,
     T: Default,

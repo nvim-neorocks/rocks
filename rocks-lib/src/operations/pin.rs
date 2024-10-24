@@ -1,14 +1,26 @@
-use eyre::{bail, Result};
+use std::io;
+
 use fs_extra::dir::CopyOptions;
 use itertools::Itertools;
+use thiserror::Error;
 
-use crate::{lockfile::LocalPackage, tree::Tree};
+use crate::{lockfile::LocalPackage, package::RemotePackage, tree::Tree};
 
 // TODO(vhyrro): Differentiate pinned LocalPackages at the type level?
 
-pub fn pin(package: &mut LocalPackage, tree: &Tree) -> Result<()> {
+#[derive(Error, Debug)]
+pub enum PinError {
+    #[error("rock {0} is already pinned!")]
+    PinStateUnchanged(RemotePackage),
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error("failed to move old package: {0}")]
+    MoveItemsFailure(#[from] fs_extra::error::Error),
+}
+
+pub fn pin(package: &mut LocalPackage, tree: &Tree) -> Result<(), PinError> {
     if package.pinned() {
-        bail!("Rock {} is already pinned!", package.to_package());
+        return Err(PinError::PinStateUnchanged(package.to_package()));
     }
 
     let mut lockfile = tree.lockfile()?;
