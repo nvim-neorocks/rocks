@@ -16,7 +16,7 @@ jobs:
           - { os: macos-14, target: aarch64-darwin }
     steps:
     - uses: actions/checkout@v4
-    - uses: DeterminateSystems/nix-installer-action@v9
+    - uses: DeterminateSystems/nix-installer-action@v14
     - uses: cachix/cachix-action@v14
       with:
         name: neorocks
