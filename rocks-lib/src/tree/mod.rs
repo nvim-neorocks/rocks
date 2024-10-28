@@ -139,9 +139,9 @@ impl Tree {
             .cloned()
     }
 
-    pub fn rock(&self, package: &LocalPackage) -> io::Result<RockLayout> {
+    /// Create a `RockLayout` for a package, without creating the directories.
+    pub fn rock_layout(&self, package: &LocalPackage) -> RockLayout {
         let rock_path = self.root_for(package);
-
         let etc = rock_path.join("etc");
         let lib = rock_path.join("lib");
         let src = rock_path.join("src");
@@ -149,14 +149,7 @@ impl Tree {
         let conf = etc.join("conf");
         let doc = etc.join("doc");
 
-        std::fs::create_dir_all(&etc)?;
-        std::fs::create_dir_all(&lib)?;
-        std::fs::create_dir_all(&src)?;
-        std::fs::create_dir_all(&bin)?;
-        std::fs::create_dir_all(&conf)?;
-        std::fs::create_dir_all(&doc)?;
-
-        Ok(RockLayout {
+        RockLayout {
             rock_path,
             etc,
             lib,
@@ -164,7 +157,19 @@ impl Tree {
             bin,
             conf,
             doc,
-        })
+        }
+    }
+
+    /// Create a `RockLayout` for a package, creating the directories.
+    pub fn rock(&self, package: &LocalPackage) -> io::Result<RockLayout> {
+        let rock_layout = self.rock_layout(package);
+        std::fs::create_dir_all(&rock_layout.etc)?;
+        std::fs::create_dir_all(&rock_layout.lib)?;
+        std::fs::create_dir_all(&rock_layout.src)?;
+        std::fs::create_dir_all(&rock_layout.bin)?;
+        std::fs::create_dir_all(&rock_layout.conf)?;
+        std::fs::create_dir_all(&rock_layout.doc)?;
+        Ok(rock_layout)
     }
 
     pub fn lockfile(&self) -> io::Result<Lockfile> {
