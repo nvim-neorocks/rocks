@@ -181,10 +181,10 @@ impl From<&str> for RockspecFormat {
     }
 }
 
-impl<'lua> FromLua<'lua> for RockspecFormat {
+impl FromLua for RockspecFormat {
     fn from_lua(
-        value: mlua::prelude::LuaValue<'lua>,
-        lua: &'lua mlua::prelude::Lua,
+        value: mlua::prelude::LuaValue,
+        lua: &mlua::prelude::Lua,
     ) -> mlua::prelude::LuaResult<Self> {
         let s = String::from_lua(value, lua)?;
         Self::from_str(&s).map_err(|err| mlua::Error::DeserializeError(err.to_string()))

@@ -77,8 +77,8 @@ impl FromPlatformOverridable<RockSourceInternal, Self> for RockSource {
     }
 }
 
-impl<'lua> FromLua<'lua> for PerPlatform<RockSource> {
-    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
+impl FromLua for PerPlatform<RockSource> {
+    fn from_lua(value: Value, lua: &Lua) -> mlua::Result<Self> {
         let wrapper = PerPlatformWrapper::from_lua(value, lua)?;
         Ok(wrapper.un_per_platform)
     }

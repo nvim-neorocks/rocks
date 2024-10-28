@@ -310,7 +310,7 @@ impl<T: Default> Default for PerPlatform<T> {
     }
 }
 
-impl<'lua, T> FromLua<'lua> for PerPlatform<T>
+impl<T> FromLua for PerPlatform<T>
 where
     T: PlatformOverridable,
     T: PartialOverride,
@@ -318,7 +318,7 @@ where
     T: Default,
     T: Clone,
 {
-    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
+    fn from_lua(value: Value, lua: &Lua) -> mlua::Result<Self> {
         match &value {
             list @ Value::Table(tbl) => {
                 let mut per_platform = match tbl.get("platforms")? {
@@ -357,7 +357,7 @@ pub struct PerPlatformWrapper<T, G> {
     phantom: PhantomData<G>,
 }
 
-impl<'lua, T, G> FromLua<'lua> for PerPlatformWrapper<T, G>
+impl<T, G> FromLua for PerPlatformWrapper<T, G>
 where
     T: FromPlatformOverridable<G, T, Err: ToString>,
     G: PlatformOverridable<Err: ToString>,
@@ -365,7 +365,7 @@ where
     G: Default,
     G: Clone,
 {
-    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
+    fn from_lua(value: Value, lua: &Lua) -> mlua::Result<Self> {
         let internal = PerPlatform::from_lua(value, lua)?;
         let per_platform: HashMap<_, _> = internal
             .per_platform

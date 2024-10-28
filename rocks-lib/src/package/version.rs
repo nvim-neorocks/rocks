@@ -71,10 +71,10 @@ impl<'de> Deserialize<'de> for PackageVersion {
     }
 }
 
-impl<'lua> FromLua<'lua> for PackageVersion {
+impl FromLua for PackageVersion {
     fn from_lua(
-        value: mlua::prelude::LuaValue<'lua>,
-        lua: &'lua mlua::prelude::Lua,
+        value: mlua::prelude::LuaValue,
+        lua: &mlua::prelude::Lua,
     ) -> mlua::prelude::LuaResult<Self> {
         let s = String::from_lua(value, lua)?;
         Self::from_str(&s).map_err(|err| mlua::Error::DeserializeError(err.to_string()))

@@ -165,8 +165,8 @@ impl BuildSpec {
     }
 }
 
-impl<'lua> FromLua<'lua> for PerPlatform<BuildSpec> {
-    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
+impl FromLua for PerPlatform<BuildSpec> {
+    fn from_lua(value: Value, lua: &Lua) -> mlua::Result<Self> {
         let internal = PerPlatform::from_lua(value, lua)?;
         let mut per_platform = HashMap::new();
         for (platform, internal_override) in internal.per_platform {
@@ -307,8 +307,8 @@ struct BuildSpecInternal {
     features: Option<Vec<String>>,
 }
 
-impl<'lua> FromLua<'lua> for PerPlatform<BuildSpecInternal> {
-    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
+impl FromLua for PerPlatform<BuildSpecInternal> {
+    fn from_lua(value: Value, lua: &Lua) -> mlua::Result<Self> {
         match &value {
             list @ Value::Table(tbl) => {
                 let mut per_platform = match tbl.get("platforms")? {

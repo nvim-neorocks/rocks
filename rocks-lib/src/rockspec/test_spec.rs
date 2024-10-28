@@ -57,10 +57,10 @@ impl FromPlatformOverridable<TestSpecInternal, Self> for TestSpec {
     }
 }
 
-impl<'lua> FromLua<'lua> for PerPlatform<TestSpec> {
+impl FromLua for PerPlatform<TestSpec> {
     fn from_lua(
-        value: mlua::prelude::LuaValue<'lua>,
-        lua: &'lua mlua::prelude::Lua,
+        value: mlua::prelude::LuaValue,
+        lua: &mlua::prelude::Lua,
     ) -> mlua::prelude::LuaResult<Self> {
         let wrapper = PerPlatformWrapper::from_lua(value, lua)?;
         Ok(wrapper.un_per_platform)
