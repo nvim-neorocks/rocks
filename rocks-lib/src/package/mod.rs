@@ -195,10 +195,10 @@ impl<'de> Deserialize<'de> for PackageName {
     }
 }
 
-impl<'lua> FromLua<'lua> for PackageName {
+impl FromLua for PackageName {
     fn from_lua(
-        value: mlua::prelude::LuaValue<'lua>,
-        lua: &'lua mlua::prelude::Lua,
+        value: mlua::prelude::LuaValue,
+        lua: &mlua::prelude::Lua,
     ) -> mlua::prelude::LuaResult<Self> {
         Ok(Self::new(String::from_lua(value, lua)?))
     }
