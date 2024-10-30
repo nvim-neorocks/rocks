@@ -211,6 +211,12 @@ impl Lockfile {
         self.rocks
             .entry(target_id)
             .and_modify(|rock| rock.dependencies.push(dependency_id));
+
+        // Since rocks entries are mutable, we only add the dependency if it
+        // has not already been added.
+        if !self.rocks.contains_key(&dependency.id()) {
+            self.add(dependency);
+        }
     }
 
     pub fn remove(&mut self, target: &LocalPackage) {
