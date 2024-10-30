@@ -9,6 +9,7 @@ use info::Info;
 use install::Install;
 use list::ListCmd;
 use outdated::Outdated;
+use path::Path;
 use pin::ChangePin;
 use remove::Remove;
 use rocks_lib::{
@@ -28,6 +29,7 @@ mod install;
 mod install_lua;
 mod list;
 mod outdated;
+mod path;
 mod pin;
 mod project;
 mod purge;
@@ -133,7 +135,7 @@ enum Commands {
     /// Create a rock, packing sources or binaries.
     Pack,
     /// Return the currently configured package path.
-    Path,
+    Path(Path),
     /// Pin an existing rock, preventing any updates to the package.
     Pin(ChangePin),
     /// Remove all installed rocks from a tree.
@@ -206,6 +208,7 @@ async fn main() {
         Commands::Remove(remove_args) => remove::remove(remove_args, config).await.unwrap(),
         Commands::Update(_update_args) => update::update(config).await.unwrap(),
         Commands::Info(info_data) => info::info(info_data, config).await.unwrap(),
+        Commands::Path(path_data) => path::path(path_data, config).await.unwrap(),
         Commands::Pin(pin_data) => pin::set_pinned_state(pin_data, config, Pinned).unwrap(),
         Commands::Unpin(pin_data) => pin::set_pinned_state(pin_data, config, Unpinned).unwrap(),
         _ => unimplemented!(),

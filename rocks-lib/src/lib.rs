@@ -6,6 +6,7 @@ pub mod lua_installation;
 pub mod manifest;
 pub mod operations;
 pub mod package;
+pub mod path;
 pub mod progress;
 pub mod project;
 pub mod rockspec;

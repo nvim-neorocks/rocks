@@ -2615,6 +2615,8 @@ dependencies = [
  "serde_json",
  "spdx",
  "spinners",
+ "strum 0.26.3",
+ "strum_macros 0.26.4",
  "stylua",
  "termcolor",
  "text_trees",
