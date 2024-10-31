@@ -8,7 +8,7 @@ use clap::Args;
 use eyre::Result;
 use rocks_lib::{
     build::BuildBehaviour,
-    config::{Config, DefaultFromConfig as _},
+    config::Config,
     lockfile::{LockConstraint::Unconstrained, PinnedState},
     package::{PackageName, PackageReq},
     rockspec::Rockspec,
@@ -67,7 +67,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
 
     let progress = MultiProgress::new();
 
-    let lua_version = rockspec.lua_version().or_default_from(&config)?;
+    let lua_version = rockspec.lua_version_from_config(&config)?;
 
     let tree = Tree::new(config.tree().clone(), lua_version)?;
 

@@ -1,14 +1,14 @@
 use std::{io, path::Path};
 
 use crate::{
-    config::{Config, DefaultFromConfig, LuaVersionUnset},
+    config::Config,
     hash::HasIntegrity,
     lockfile::{LocalPackage, LocalPackageHashes, LockConstraint, PinnedState},
     lua_installation::LuaInstallation,
     operations::{self, FetchSrcRockError},
     package::RemotePackage,
     progress::with_spinner,
-    rockspec::{utils, Build as _, BuildBackendSpec, Rockspec},
+    rockspec::{utils, Build as _, BuildBackendSpec, LuaVersionError, Rockspec},
     tree::{RockLayout, Tree},
 };
 use indicatif::{style::TemplateError, MultiProgress, ProgressBar};
@@ -33,7 +33,7 @@ pub enum BuildError {
     #[error(transparent)]
     RustError(#[from] RustError),
     #[error(transparent)]
-    LuaVersionUnset(#[from] LuaVersionUnset),
+    LuaVersionError(#[from] LuaVersionError),
     #[error("failed to fetch rock source: {0}")]
     FetchSrcRockError(#[from] FetchSrcRockError),
 }
@@ -147,7 +147,7 @@ pub async fn build(
     behaviour: BuildBehaviour,
     config: &Config,
 ) -> Result<LocalPackage, BuildError> {
-    let lua_version = rockspec.lua_version().or_default_from(config)?;
+    let lua_version = rockspec.lua_version_from_config(config)?;
 
     let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
 
