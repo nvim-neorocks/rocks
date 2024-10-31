@@ -80,6 +80,9 @@
             ++ self.checks.${system}.git-hooks-check.enabledPackages
             ++ pkgs.rocks.buildInputs
             ++ pkgs.rocks.nativeBuildInputs;
+          env = {
+            RUST_BACKTRACE = 1;
+          };
         };
 
         checks = rec {
