@@ -111,7 +111,8 @@ pub async fn path(path_data: Path, config: Config) -> Result<()> {
 fn mk_package_path(paths: &Paths, append: bool) -> Result<PackagePath> {
     let mut result = PackagePath::default();
     if append {
-        let lua_path = PackagePath::from_str(env::var("LUA_PATH")?.as_str()).unwrap_or_default();
+        let lua_path = PackagePath::from_str(env::var("LUA_PATH").unwrap_or_default().as_str())
+            .unwrap_or_default();
         result.append(&lua_path);
     }
     result.append(paths.package_path());
@@ -121,7 +122,8 @@ fn mk_package_path(paths: &Paths, append: bool) -> Result<PackagePath> {
 fn mk_package_cpath(paths: &Paths, append: bool) -> Result<PackagePath> {
     let mut result = PackagePath::default();
     if append {
-        let lua_path = PackagePath::from_str(env::var("LUA_CPATH")?.as_str()).unwrap_or_default();
+        let lua_path = PackagePath::from_str(env::var("LUA_CPATH").unwrap_or_default().as_str())
+            .unwrap_or_default();
         result.append(&lua_path);
     }
     result.append(paths.package_cpath());
@@ -131,7 +133,8 @@ fn mk_package_cpath(paths: &Paths, append: bool) -> Result<PackagePath> {
 fn mk_bin_path(paths: &Paths, append: bool) -> Result<BinPath> {
     let mut result = BinPath::default();
     if append {
-        let lua_path = BinPath::from_str(env::var("PATH")?.as_str()).unwrap_or_default();
+        let lua_path =
+            BinPath::from_str(env::var("PATH").unwrap_or_default().as_str()).unwrap_or_default();
         result.append(&lua_path);
     }
     result.append(paths.path());
@@ -143,8 +146,8 @@ where
     D: std::fmt::Display,
 {
     match shell {
-        Shell::Posix => format!("export {}='{}'", var_name, var),
-        Shell::Fish => format!("set {} \"{}\"", var_name, var),
-        Shell::Nu => format!("$env.{} = \"{}\"", var_name, var),
+        Shell::Posix => format!("export {}='{}';", var_name, var),
+        Shell::Fish => format!("set -x {} \"{}\";", var_name, var),
+        Shell::Nu => format!("$env.{} = \"{}\";", var_name, var),
     }
 }
