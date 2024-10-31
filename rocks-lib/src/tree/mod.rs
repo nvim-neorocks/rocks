@@ -47,6 +47,7 @@ pub struct RockLayout {
     /// The `bin` directory, containing executables.
     /// Can be substituted in a rockspec's `build.build_variables` and `build.install_variables`
     /// using `$(BINDIR)`.
+    /// This points to a global binary path at the root of the current tree by default.
     pub bin: PathBuf,
     /// The `etc/conf` directory, containing configuration files.
     /// Can be substituted in a rockspec's `build.build_variables` and `build.install_variables`
@@ -142,10 +143,10 @@ impl Tree {
     /// Create a `RockLayout` for a package, without creating the directories.
     pub fn rock_layout(&self, package: &LocalPackage) -> RockLayout {
         let rock_path = self.root_for(package);
+        let bin = self.bin();
         let etc = rock_path.join("etc");
         let lib = rock_path.join("lib");
         let src = rock_path.join("src");
-        let bin = rock_path.join("bin");
         let conf = etc.join("conf");
         let doc = etc.join("doc");
 
@@ -166,7 +167,6 @@ impl Tree {
         std::fs::create_dir_all(&rock_layout.etc)?;
         std::fs::create_dir_all(&rock_layout.lib)?;
         std::fs::create_dir_all(&rock_layout.src)?;
-        std::fs::create_dir_all(&rock_layout.bin)?;
         std::fs::create_dir_all(&rock_layout.conf)?;
         std::fs::create_dir_all(&rock_layout.doc)?;
         Ok(rock_layout)
@@ -223,11 +223,11 @@ mod tests {
         assert_eq!(
             neorg,
             RockLayout {
+                bin: tree_path.join("bin"),
                 rock_path: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1")),
                 etc: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1/etc")),
                 lib: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1/lib")),
                 src: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1/src")),
-                bin: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1/bin")),
                 conf: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1/etc/conf")),
                 doc: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1/etc/doc")),
             }
@@ -246,11 +246,11 @@ mod tests {
         assert_eq!(
             lua_cjson,
             RockLayout {
+                bin: tree_path.join("bin"),
                 rock_path: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1")),
                 etc: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1/etc")),
                 lib: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1/lib")),
                 src: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1/src")),
-                bin: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1/bin")),
                 conf: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1/etc/conf")),
                 doc: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1/etc/doc")),
             }
