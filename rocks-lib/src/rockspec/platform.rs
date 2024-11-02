@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use serde::{
     de::{self, DeserializeOwned},
-    Deserialize, Deserializer,
+    Deserialize, Deserializer, Serialize,
 };
 use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
 
