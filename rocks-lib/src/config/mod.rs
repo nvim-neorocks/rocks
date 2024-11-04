@@ -23,12 +23,10 @@ pub enum LuaVersion {
 impl LuaVersion {
     pub fn as_version(&self) -> PackageVersion {
         match self {
-            LuaVersion::Lua51 => "5.1.0".parse().unwrap(),
-            LuaVersion::Lua52 => "5.2.0".parse().unwrap(),
+            LuaVersion::Lua51 | LuaVersion::LuaJIT => "5.1.0".parse().unwrap(),
+            LuaVersion::Lua52 | LuaVersion::LuaJIT52 => "5.2.0".parse().unwrap(),
             LuaVersion::Lua53 => "5.3.0".parse().unwrap(),
-            LuaVersion::Lua54 => "5.4.0".parse().unwrap(),
-            LuaVersion::LuaJIT => "5.1.0".parse().unwrap(),
-            LuaVersion::LuaJIT52 => "5.2.0".parse().unwrap(),
+            LuaVersion::Lua54 => "5.4.0".parse().unwrap(),,
         }
     }
 }
