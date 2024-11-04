@@ -2,10 +2,11 @@ use std::io;
 
 use crate::{
     build::{BuildBehaviour, BuildError},
-    config::{Config, DefaultFromConfig as _, LuaVersionUnset},
+    config::Config,
     lockfile::{LocalPackage, LockConstraint, PinnedState},
     package::{PackageName, PackageReq, PackageVersionReq},
     progress::with_spinner,
+    rockspec::LuaVersionError,
     tree::Tree,
 };
 
@@ -21,7 +22,7 @@ use super::SearchAndDownloadError;
 #[error(transparent)]
 pub enum InstallError {
     SearchAndDownloadError(#[from] SearchAndDownloadError),
-    LuaVersionUnset(#[from] LuaVersionUnset),
+    LuaVersionError(#[from] LuaVersionError),
     Io(#[from] io::Error),
     BuildError(#[from] BuildError),
 }
@@ -51,7 +52,7 @@ async fn install_impl(
 ) -> Result<LocalPackage, InstallError> {
     let rockspec = super::download_rockspec(progress, &package_req, config).await?;
 
-    let lua_version = rockspec.lua_version().or_default_from(config)?;
+    let lua_version = rockspec.lua_version_from_config(config)?;
 
     let tree = Tree::new(config.tree().clone(), lua_version)?;
     let mut lockfile = tree.lockfile()?;

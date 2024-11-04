@@ -7,6 +7,7 @@ mod test_spec;
 
 use std::{collections::HashMap, io, path::PathBuf, str::FromStr};
 
+use itertools::Itertools;
 use mlua::{FromLua, Lua, LuaSerdeExt, Value};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -20,7 +21,7 @@ pub use test_spec::*;
 use thiserror::Error;
 
 use crate::{
-    config::LuaVersion,
+    config::{Config, LuaVersion, LuaVersionUnset},
     hash::HasIntegrity,
     package::{PackageName, PackageReq, PackageVersion},
 };
@@ -101,6 +102,33 @@ impl Rockspec {
         Ok(rockspec)
     }
 
+    pub fn lua_version_from_config(&self, config: &Config) -> Result<LuaVersion, LuaVersionError> {
+        let version = LuaVersion::from(config)?;
+        if self.supports_lua_version(&version) {
+            Ok(version)
+        } else {
+            Err(LuaVersionError::LuaVersionUnsupported(
+                version,
+                self.package.to_owned(),
+                self.version.to_owned(),
+            ))
+        }
+    }
+
+    fn supports_lua_version(&self, lua_version: &LuaVersion) -> bool {
+        let lua_version_reqs = self
+            .dependencies
+            .current_platform()
+            .iter()
+            .filter(|val| *val.name() == "lua".into())
+            .collect_vec();
+        let lua_pkg_version = lua_version.as_version();
+        lua_version_reqs.is_empty()
+            || lua_version_reqs
+                .into_iter()
+                .any(|lua| lua.version_req().matches(&lua_pkg_version))
+    }
+
     pub fn lua_version(&self) -> Option<LuaVersion> {
         self.dependencies
             .current_platform()
@@ -121,6 +149,14 @@ impl Rockspec {
                 None
             })
     }
+}
+
+#[derive(Error, Debug)]
+pub enum LuaVersionError {
+    #[error("The lua version {0} is not supported by {1} version {1}!")]
+    LuaVersionUnsupported(LuaVersion, PackageName, PackageVersion),
+    #[error(transparent)]
+    LuaVersionUnset(#[from] LuaVersionUnset),
 }
 
 impl HasIntegrity for Rockspec {
