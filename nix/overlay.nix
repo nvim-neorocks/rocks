@@ -21,6 +21,9 @@
             luajit
             openssl
             libgit2
+            gnupg
+            libgpg-error
+            gpgme
           ]
           ++ lib.optionals stdenv.isDarwin [
             darwin.apple_sdk.frameworks.Security

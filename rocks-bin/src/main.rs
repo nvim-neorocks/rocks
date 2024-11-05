@@ -18,6 +18,7 @@ use rocks_lib::{
 };
 use search::Search;
 use update::Update;
+use upload::Upload;
 
 mod build;
 mod debug;
@@ -37,6 +38,7 @@ mod remove;
 mod search;
 mod unpack;
 mod update;
+mod upload;
 mod utils;
 
 /// A fast and efficient Lua package manager.
@@ -154,7 +156,7 @@ enum Commands {
     /// Updates all rocks in a project.
     Update(Update),
     /// Upload a rockspec to the public rocks repository.
-    Upload,
+    Upload(Upload),
     /// Tell which file corresponds to a given module name.
     Which,
 }
@@ -211,6 +213,7 @@ async fn main() {
         Commands::Path(path_data) => path::path(path_data, config).await.unwrap(),
         Commands::Pin(pin_data) => pin::set_pinned_state(pin_data, config, Pinned).unwrap(),
         Commands::Unpin(pin_data) => pin::set_pinned_state(pin_data, config, Unpinned).unwrap(),
+        Commands::Upload(upload_data) => upload::upload(upload_data, config).await.unwrap(),
         _ => unimplemented!(),
     }
 }

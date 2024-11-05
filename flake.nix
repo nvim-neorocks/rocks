@@ -57,11 +57,7 @@
             };
             cargo-check.enable = true;
           };
-          settings = {
-            rust.check.cargoDeps = pkgs.rustPlatform.importCargoLock {
-              lockFile = ./Cargo.lock;
-            };
-          };
+          settings.rust.check.cargoDeps = pkgs.rocks.cargoDeps;
         };
       in {
         packages = with pkgs; {
