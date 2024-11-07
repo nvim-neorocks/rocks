@@ -58,7 +58,10 @@ pub fn compile_c_files(
 
     // TODO: Use `target-lexicon` data here instead, it's more reliable.
 
-    cc::Build::new()
+    // See https://github.com/rust-lang/cc-rs/issues/594#issuecomment-2110551057
+
+    let mut build = cc::Build::new();
+    let build = build
         .cargo_metadata(false)
         .debug(false)
         .files(files)
@@ -66,10 +69,15 @@ pub fn compile_c_files(
         .includes(&lua.include_dir)
         .opt_level(3)
         .out_dir(parent)
-        .shared_flag(true)
-        .target(std::env::consts::ARCH)
-        .try_compile(file.to_str().unwrap())?;
-
+        .target(std::env::consts::ARCH);
+    let objects = build.compile_intermediates();
+    build
+        .get_compiler()
+        .to_command()
+        .args(["-shared", "-o"])
+        .arg(parent.join(file))
+        .args(&objects)
+        .status()?;
     Ok(())
 }
 
