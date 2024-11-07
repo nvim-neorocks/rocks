@@ -2,6 +2,8 @@
 members = [
     "rocks-lib",
     "rocks-bin",
-    # "rocks-lua",
 ]
 resolver = "2"
+exclude = [
+    "rocks-lua"
+]

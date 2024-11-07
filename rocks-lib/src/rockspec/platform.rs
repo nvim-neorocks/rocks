@@ -1,6 +1,8 @@
 use itertools::Itertools;
-use mlua::{FromLua, Lua, LuaSerdeExt as _, Value};
-use std::{cmp::Ordering, collections::HashMap, convert::Infallible, marker::PhantomData};
+use mlua::{ExternalResult, FromLua, Lua, LuaSerdeExt as _, Value};
+use std::{
+    cmp::Ordering, collections::HashMap, convert::Infallible, marker::PhantomData, str::FromStr,
+};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use thiserror::Error;

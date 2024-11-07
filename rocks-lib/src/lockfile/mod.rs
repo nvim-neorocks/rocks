@@ -3,6 +3,7 @@ use std::io::{self, Write};
 use std::{collections::HashMap, fs::File, io::ErrorKind, path::PathBuf};
 
 use itertools::Itertools;
+use mlua::{ExternalResult as _, LuaSerdeExt, Value};
 use serde::{de, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use ssri::Integrity;
@@ -38,6 +39,25 @@ impl PinnedState {
             Self::Unpinned => false,
             Self::Pinned => true,
         }
+    }
+}
+
+impl mlua::FromLua for PinnedState {
+    fn from_lua(value: Value, _lua: &mlua::prelude::Lua) -> mlua::prelude::LuaResult<Self> {
+        if let Value::Boolean(b) = value {
+            Ok(Self::from(b))
+        } else {
+            Err(mlua::Error::FromLuaConversionError { from: value.type_name(), to: "PinnedState".into(), message: None })
+        }
+    }
+}
+
+impl mlua::IntoLua for PinnedState {
+    fn into_lua(
+        self,
+        lua: &mlua::prelude::Lua,
+    ) -> mlua::prelude::LuaResult<mlua::prelude::LuaValue> {
+        lua.to_value(&self)
     }
 }
 
@@ -364,6 +384,25 @@ impl LockConstraint {
             LockConstraint::Unconstrained => None,
             LockConstraint::Constrained(req) => Some(req.to_string()),
         }
+    }
+}
+
+impl mlua::FromLua for LockConstraint {
+    fn from_lua(value: mlua::prelude::LuaValue, _lua: &mlua::prelude::Lua) -> mlua::prelude::LuaResult<Self> {
+        match value {
+            Value::Nil => Ok(LockConstraint::Unconstrained),
+            Value::String(str) => Ok(LockConstraint::Constrained(str.to_str().into_lua_err()?.parse().into_lua_err()?)),
+            _ => Err(mlua::Error::FromLuaConversionError { from: value.type_name(), to: "LockConstraint".into(), message: None })
+        }
+    }
+}
+
+impl mlua::IntoLua for LockConstraint {
+    fn into_lua(
+        self,
+        lua: &mlua::prelude::Lua,
+    ) -> mlua::prelude::LuaResult<mlua::prelude::LuaValue> {
+        lua.to_value(&self.to_string_opt())
     }
 }
 

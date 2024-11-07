@@ -1,0 +1,13 @@
+[package]
+name = "rocks-lua"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mlua = { version = "0.10.1", features = ["serialize", "module", "async"] }
+rocks-lib = { path = "../rocks-lib/", features = ["lua"] }
+tokio = { version = "1.41.1", features = ["rt-multi-thread"] }
+
+[lib]
+name = "rocks"
+crate-type = ["cdylib"]
