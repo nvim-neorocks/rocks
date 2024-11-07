@@ -3,7 +3,6 @@ use std::io::Read;
 
 use crate::TOOL_VERSION;
 use crate::{config::Config, project::Project};
-use clap::ValueEnum;
 use gpgme::{Context, Data};
 use reqwest::{
     multipart::{Form, Part},
@@ -93,8 +92,9 @@ impl ApiKey {
     }
 }
 
-#[derive(Serialize_enum_str, ValueEnum, Default, Clone)]
-#[clap(rename_all = "lowercase")]
+#[derive(Serialize_enum_str, Default, Clone)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[cfg_attr(feature = "clap", clap(rename_all = "lowercase"))]
 #[serde(rename_all = "lowercase")]
 pub enum SignatureProtocol {
     Assuan,
