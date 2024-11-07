@@ -2,8 +2,8 @@ use std::io;
 
 use crate::{
     build::{BuildBehaviour, BuildError},
-    config::Config,
-    lockfile::{LocalPackage, LockConstraint, PinnedState},
+    config::{Config, LuaVersion, LuaVersionUnset},
+    lockfile::{LocalPackage, LockConstraint, Lockfile, PinnedState},
     package::{PackageName, PackageReq, PackageVersionReq},
     progress::with_spinner,
     rockspec::LuaVersionError,
@@ -23,11 +23,11 @@ use super::SearchAndDownloadError;
 pub enum InstallError {
     SearchAndDownloadError(#[from] SearchAndDownloadError),
     LuaVersionError(#[from] LuaVersionError),
+    LuaVersionUnset(#[from] LuaVersionUnset),
     Io(#[from] io::Error),
     BuildError(#[from] BuildError),
 }
 
-#[async_recursion]
 pub async fn install(
     progress: &MultiProgress,
     package_req: PackageReq,
@@ -35,27 +35,62 @@ pub async fn install(
     build_behaviour: BuildBehaviour,
     config: &Config,
 ) -> Result<LocalPackage, InstallError> {
-    with_spinner(
+    let lua_version = LuaVersion::from(config)?;
+    let tree = Tree::new(config.tree().clone(), lua_version)?;
+    let mut lockfile = tree.lockfile()?;
+    let result = install_impl(
         progress,
-        format!("💻 Installing {}", package_req),
-        || async { install_impl(progress, package_req, pin, build_behaviour, config).await },
+        package_req,
+        pin,
+        build_behaviour,
+        config,
+        &mut lockfile,
     )
-    .await
+    .await;
+    lockfile.flush()?;
+    result
 }
 
+#[async_recursion]
 async fn install_impl(
     progress: &MultiProgress,
     package_req: PackageReq,
     pin: PinnedState,
     build_behaviour: BuildBehaviour,
     config: &Config,
+    lockfile: &mut Lockfile,
+) -> Result<LocalPackage, InstallError> {
+    with_spinner(
+        progress,
+        format!("💻 Installing {}", package_req),
+        || async {
+            go(
+                progress,
+                package_req,
+                pin,
+                build_behaviour,
+                config,
+                lockfile,
+            )
+            .await
+        },
+    )
+    .await
+}
+
+async fn go(
+    progress: &MultiProgress,
+    package_req: PackageReq,
+    pin: PinnedState,
+    build_behaviour: BuildBehaviour,
+    config: &Config,
+    lockfile: &mut Lockfile,
 ) -> Result<LocalPackage, InstallError> {
     let rockspec = super::download_rockspec(progress, &package_req, config).await?;
 
     let lua_version = rockspec.lua_version_from_config(config)?;
 
     let tree = Tree::new(config.tree().clone(), lua_version)?;
-    let mut lockfile = tree.lockfile()?;
 
     let constraint = if *package_req.version_req() == PackageVersionReq::SemVer(VersionReq::STAR) {
         LockConstraint::Unconstrained
@@ -79,12 +114,13 @@ async fn install_impl(
         .filter(|req| tree.has_rock(req).is_none())
         .enumerate()
     {
-        let dependency = crate::operations::install(
+        let dependency = install_impl(
             progress,
             dependency_req.clone(),
             pin,
             build_behaviour,
             config,
+            lockfile,
         )
         .await?;
 
@@ -99,8 +135,6 @@ async fn install_impl(
     for dependency in installed_dependencies {
         lockfile.add_dependency(&package, &dependency);
     }
-
-    lockfile.flush()?;
 
     Ok(package)
 }
