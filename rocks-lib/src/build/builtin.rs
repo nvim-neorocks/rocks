@@ -36,17 +36,32 @@ impl Build for BuiltinBuildSpec {
         for (counter, (destination_path, module_type)) in modules.iter().enumerate() {
             match module_type {
                 ModuleSpec::SourcePath(source) => {
-                    bar.set_message(format!(
-                        "Copying {} to {}...",
-                        &source.to_string_lossy(),
-                        &destination_path
-                    ));
-                    let absolute_source_path = build_dir.join(source);
-                    utils::copy_lua_to_module_path(
-                        &absolute_source_path,
-                        destination_path,
-                        &output_paths.src,
-                    )?
+                    if source.extension().map(|ext| ext == "c").unwrap_or(false) {
+                        bar.set_message(format!(
+                            "Compiling {} -> {}...",
+                            &source.to_string_lossy(),
+                            &destination_path
+                        ));
+                        let absolute_source_paths = vec![build_dir.join(source)];
+                        utils::compile_c_files(
+                            &absolute_source_paths,
+                            destination_path,
+                            &output_paths.lib,
+                            lua,
+                        )?
+                    } else {
+                        bar.set_message(format!(
+                            "Copying {} to {}...",
+                            &source.to_string_lossy(),
+                            &destination_path
+                        ));
+                        let absolute_source_path = build_dir.join(source);
+                        utils::copy_lua_to_module_path(
+                            &absolute_source_path,
+                            destination_path,
+                            &output_paths.src,
+                        )?
+                    }
                 }
                 ModuleSpec::SourcePaths(files) => {
                     bar.set_message("Compiling C files...");
