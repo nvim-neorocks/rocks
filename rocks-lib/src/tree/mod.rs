@@ -1,3 +1,5 @@
+use mlua::{ExternalResult as _, Function};
+
 use crate::{
     build::variables::{self, HasVariables},
     config::LuaVersion,
@@ -78,6 +80,19 @@ impl HasVariables for RockLayout {
             },
             input,
         )
+    }
+}
+
+#[cfg(feature = "lua")]
+impl mlua::UserData for RockLayout {
+    fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("rock_path", |_, this| Ok(this.rock_path.clone()));
+        fields.add_field_method_get("etc", |_, this| Ok(this.etc.clone()));
+        fields.add_field_method_get("lib", |_, this| Ok(this.lib.clone()));
+        fields.add_field_method_get("src", |_, this| Ok(this.src.clone()));
+        fields.add_field_method_get("bin", |_, this| Ok(this.bin.clone()));
+        fields.add_field_method_get("conf", |_, this| Ok(this.conf.clone()));
+        fields.add_field_method_get("doc", |_, this| Ok(this.doc.clone()));
     }
 }
 
@@ -174,6 +189,37 @@ impl Tree {
 
     pub fn lockfile(&self) -> io::Result<Lockfile> {
         Lockfile::new(self.root().join("lock.json"))
+    }
+}
+
+#[cfg(feature = "lua")]
+impl mlua::UserData for Tree {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("root", |_, this, ()| Ok(this.root()));
+        methods.add_method("root_for", |_, this, package: LocalPackage| {
+            Ok(this.root_for(&package))
+        });
+        methods.add_method("bin", |_, this, ()| Ok(this.bin()));
+        methods.add_method("has_rock", |_, this, req: PackageReq| {
+            Ok(this.has_rock(&req))
+        });
+        methods.add_method(
+            "has_rock_and",
+            |_, this, (req, callback): (PackageReq, Function)| {
+                Ok(this.has_rock_and(&req, |package| {
+                    callback
+                        .call(package.clone())
+                        .expect("failed to invoke Lua callback in `Tree::has_rock_and()`")
+                }))
+            },
+        );
+        methods.add_method("rock_layout", |_, this, package: LocalPackage| {
+            Ok(this.rock_layout(&package))
+        });
+        methods.add_method("rock", |_, this, package: LocalPackage| {
+            this.rock(&package).into_lua_err()
+        });
+        methods.add_method("lockfile", |_, this, ()| this.lockfile().into_lua_err());
     }
 }
 

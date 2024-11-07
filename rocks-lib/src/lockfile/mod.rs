@@ -2,6 +2,7 @@ use std::io::{self, Write};
 use std::{collections::HashMap, fs::File, io::ErrorKind, path::PathBuf};
 
 use itertools::Itertools;
+use mlua::ExternalResult;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use ssri::Integrity;
@@ -56,6 +57,7 @@ impl<'de> Deserialize<'de> for PinnedState {
 
 // TODO(vhyrro): Move to `package/local.rs`
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "lua", derive(mlua::FromLua))]
 pub struct LocalPackage {
     pub name: PackageName,
     pub version: PackageVersion,
@@ -136,6 +138,25 @@ impl LocalPackage {
     }
 }
 
+#[cfg(feature = "lua")]
+impl mlua::UserData for LocalPackage {
+    fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("name", |_, this| Ok(this.name.to_string()));
+        fields.add_field_method_get("version", |_, this| Ok(this.version.to_string()));
+        fields.add_field_method_get("pinned", |_, this| Ok(this.pinned.as_bool()));
+        fields.add_field_method_get("dependencies", |_, this| Ok(this.dependencies.clone()));
+        fields.add_field_method_get("constraint", |_, this| Ok(this.constraint.clone()));
+        fields.add_field_method_get("id", |_, this| Ok(this.id()));
+    }
+
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("to_package", |_, this, ()| Ok(this.to_package()));
+        methods.add_method("to_package_req", |_, this, ()| {
+            Ok(this.clone().into_package_req())
+        });
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct LocalPackageHashes {
     pub rockspec: Integrity,
@@ -153,6 +174,14 @@ impl Ord for LocalPackageHashes {
 impl PartialOrd for LocalPackageHashes {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+#[cfg(feature = "lua")]
+impl mlua::UserData for LocalPackageHashes {
+    fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("rockspec", |_, this| Ok(this.rockspec.to_string()));
+        fields.add_field_method_get("source", |_, this| Ok(this.source.to_string()));
     }
 }
 
@@ -266,6 +295,33 @@ impl Lockfile {
 impl Drop for Lockfile {
     fn drop(&mut self) {
         let _ = self.flush();
+    }
+}
+
+#[cfg(feature = "lua")]
+impl mlua::UserData for Lockfile {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method_mut("add", |_, this, package: LocalPackage| {
+            this.add(&package);
+            Ok(())
+        });
+        methods.add_method_mut(
+            "add_dependency",
+            |_, this, (target, dependency): (LocalPackage, LocalPackage)| {
+                this.add_dependency(&target, &dependency);
+                Ok(())
+            },
+        );
+        methods.add_method_mut("remove", |_, this, target: LocalPackage| {
+            this.remove(&target);
+            Ok(())
+        });
+
+        methods.add_method("version", |_, this, ()| Ok(this.version().to_owned()));
+        methods.add_method("rocks", |_, this, ()| Ok(this.rocks().to_owned()));
+
+        methods.add_method("get", |_, this, id: String| Ok(this.get(&id).cloned()));
+        methods.add_method_mut("flush", |_, this, ()| this.flush().into_lua_err());
     }
 }
 
