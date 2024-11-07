@@ -13,6 +13,7 @@ pub use version::{PackageVersion, PackageVersionReq};
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]
+#[cfg_attr(feature = "lua", derive(mlua::FromLua))]
 pub struct RemotePackage {
     name: PackageName,
     version: PackageVersion,
@@ -39,6 +40,20 @@ impl RemotePackage {
             name: self.name,
             version_req: self.version.into_version_req(),
         }
+    }
+}
+
+#[cfg(feature = "lua")]
+impl mlua::UserData for RemotePackage {
+    fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("name", |_, this| Ok(this.name.to_string()));
+        fields.add_field_method_get("version", |_, this| Ok(this.version.to_string()));
+    }
+
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("to_package_req", |_, this, ()| {
+            Ok(this.clone().into_package_req())
+        })
     }
 }
 
@@ -74,6 +89,7 @@ impl FromStr for RemotePackage {
 /// A lua package requirement with a name and an optional version requirement.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]
+#[cfg_attr(feature = "lua", derive(mlua::FromLua))]
 pub struct PackageReq {
     /// The name of the package.
     name: PackageName,
@@ -121,6 +137,15 @@ impl Display for PackageReq {
 impl From<RemotePackage> for PackageReq {
     fn from(value: RemotePackage) -> Self {
         value.into_package_req()
+    }
+}
+
+#[cfg(feature = "lua")]
+impl mlua::UserData for PackageReq {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("matches", |_, this, package: RemotePackage| {
+            Ok(this.matches(&package))
+        });
     }
 }
 
