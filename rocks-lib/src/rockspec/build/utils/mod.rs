@@ -7,21 +7,16 @@ use target_lexicon::Triple;
 
 use crate::{build::BuildError, lua_installation::LuaInstallation};
 
-use super::ModulePaths;
-
-fn lua_module_to_pathbuf(path: &str, extension: &str) -> PathBuf {
-    PathBuf::from(path.replace('.', std::path::MAIN_SEPARATOR_STR) + extension)
-}
+use super::{LuaModule, ModulePaths};
 
 /// Copies a lua source file to a specific destination. The destination is described by a
 /// `module.path` syntax (equivalent to the syntax provided to Lua's `require()` function).
 pub fn copy_lua_to_module_path(
     source: &PathBuf,
-    target_module_name: &str,
+    target_module: &LuaModule,
     target_dir: &Path,
 ) -> io::Result<()> {
-    let target = lua_module_to_pathbuf(target_module_name, ".lua");
-    let target = target_dir.join(target);
+    let target = target_dir.join(target_module.to_lua_path());
 
     std::fs::create_dir_all(target.parent().unwrap())?;
 
@@ -35,12 +30,11 @@ pub fn copy_lua_to_module_path(
 /// Panics if no parent or no filename can be determined for the target path.
 pub fn compile_c_files(
     files: &Vec<PathBuf>,
-    target_file: &str,
+    target_module: &LuaModule,
     target_dir: &Path,
     lua: &LuaInstallation,
 ) -> Result<(), BuildError> {
-    let target = lua_module_to_pathbuf(target_file, std::env::consts::DLL_SUFFIX);
-    let target = target_dir.join(target);
+    let target = target_dir.join(target_module.to_lib_path());
 
     let parent = target.parent().unwrap_or_else(|| {
         panic!(
@@ -62,6 +56,7 @@ pub fn compile_c_files(
     // See https://github.com/rust-lang/cc-rs/issues/594#issuecomment-2110551057
 
     let mut build = cc::Build::new();
+    let intermediate_dir = tempdir::TempDir::new(target_module.as_str())?;
     let build = build
         .cargo_metadata(false)
         .debug(false)
@@ -69,7 +64,7 @@ pub fn compile_c_files(
         .host(std::env::consts::OS)
         .includes(&lua.include_dir)
         .opt_level(3)
-        .out_dir(parent)
+        .out_dir(intermediate_dir)
         .target(&host.to_string());
     let objects = build.compile_intermediates();
     build
@@ -97,14 +92,19 @@ pub fn lua_lib_extension() -> &'static str {
 pub fn compile_c_modules(
     data: &ModulePaths,
     source_dir: &Path,
-    target_file: &str,
+    target_module: &LuaModule,
     target_dir: &Path,
     lua: &LuaInstallation,
 ) -> Result<(), BuildError> {
-    let target = lua_module_to_pathbuf(target_file, std::env::consts::DLL_SUFFIX);
-    let target = target_dir.join(target);
+    let target = target_dir.join(target_module.to_lib_path());
 
-    std::fs::create_dir_all(target.parent().unwrap())?;
+    let parent = target.parent().unwrap_or_else(|| {
+        panic!(
+            "Couldn't determine parent for path {}",
+            target.to_str().unwrap_or("")
+        )
+    });
+    std::fs::create_dir_all(parent)?;
 
     let host = Triple::host();
 
@@ -119,6 +119,8 @@ pub fn compile_c_modules(
         .iter()
         .map(|dir| source_dir.join(dir))
         .collect_vec();
+
+    let intermediate_dir = tempdir::TempDir::new(target_module.as_str())?;
     let build = build
         .cargo_metadata(false)
         .debug(false)
@@ -127,7 +129,7 @@ pub fn compile_c_modules(
         .includes(&include_dirs)
         .includes(&lua.include_dir)
         .opt_level(3)
-        .out_dir(target_dir)
+        .out_dir(intermediate_dir)
         .shared_flag(true)
         .target(&host.to_string());
 
@@ -137,22 +139,34 @@ pub fn compile_c_modules(
         build.define(name, value.as_deref());
     }
 
-    for libdir in &data.libdirs {
-        build.flag(&("-L".to_string() + source_dir.join(libdir).to_str().unwrap()));
-    }
-
-    for library in &data.libraries {
-        build.flag(&("-l".to_string() + source_dir.join(library).to_str().unwrap()));
-    }
-
     let file = target.file_name().unwrap_or_else(|| {
         panic!(
             "Couldn't determine filename for path {}",
             target.to_str().unwrap_or("")
         )
     });
+    // See https://github.com/rust-lang/cc-rs/issues/594#issuecomment-2110551057
+    let objects = build.compile_intermediates();
 
-    build.try_compile(file.to_str().unwrap())?;
+    let libdir_args = data
+        .libdirs
+        .iter()
+        .map(|libdir| format!("-L{}", source_dir.join(libdir).to_str().unwrap()));
+
+    let library_args = data
+        .libraries
+        .iter()
+        .map(|library| format!("-l{}", library.to_str().unwrap()));
+
+    build
+        .get_compiler()
+        .to_command()
+        .args(["-shared", "-o"])
+        .arg(parent.join(file))
+        .args(&objects)
+        .args(libdir_args)
+        .args(library_args)
+        .status()?;
 
     Ok(())
 }

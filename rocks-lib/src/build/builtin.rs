@@ -6,7 +6,7 @@ use std::{
 use crate::{
     config::Config,
     lua_installation::LuaInstallation,
-    rockspec::{utils, Build, BuiltinBuildSpec, ModuleSpec},
+    rockspec::{utils, Build, BuiltinBuildSpec, LuaModule, ModuleSpec},
     tree::RockLayout,
 };
 use indicatif::{MultiProgress, ProgressBar};
@@ -92,7 +92,7 @@ impl Build for BuiltinBuildSpec {
     }
 }
 
-fn autodetect_modules(build_dir: &Path) -> HashMap<String, ModuleSpec> {
+fn autodetect_modules(build_dir: &Path) -> HashMap<LuaModule, ModuleSpec> {
     WalkDir::new(build_dir.join("src"))
         .into_iter()
         .chain(WalkDir::new(build_dir.join("lua")))
@@ -124,15 +124,10 @@ fn autodetect_modules(build_dir: &Path) -> HashMap<String, ModuleSpec> {
             // The rockspec requires the format to be like this, and representing our
             // data in this form allows us to respect any overrides made by the user (which follow
             // the `module.name` format, not our internal one).
-            let lua_module_path = diff
-                .components()
-                .skip(1)
-                .collect::<PathBuf>()
-                .to_string_lossy()
-                .trim_end_matches(".lua")
-                .replace(std::path::MAIN_SEPARATOR_STR, ".");
+            let pathbuf = diff.components().skip(1).collect::<PathBuf>();
+            let lua_module = LuaModule::from_pathbuf(pathbuf);
 
-            (lua_module_path, ModuleSpec::SourcePath(diff))
+            (lua_module, ModuleSpec::SourcePath(diff))
         })
         .collect()
 }

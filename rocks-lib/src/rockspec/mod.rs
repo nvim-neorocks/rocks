@@ -533,7 +533,13 @@ mod tests {
             rockspec.build.default.build_backend,
             Some(BuildBackendSpec::Builtin { .. })
         ));
-        let foo_bar_path = rockspec.build.default.install.lua.get("foo.bar").unwrap();
+        let foo_bar_path = rockspec
+            .build
+            .default
+            .install
+            .lua
+            .get(&LuaModule::from_str("foo.bar").unwrap())
+            .unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("src/bar.lua"));
         let foo_bar_path = rockspec.build.default.install.bin.get("foo.bar").unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("bin/bar"));
@@ -608,7 +614,13 @@ mod tests {
             rockspec.build.default.build_backend,
             Some(BuildBackendSpec::Make(MakeBuildSpec::default()))
         );
-        let foo_bar_path = rockspec.build.default.install.lib.get("foo.bar").unwrap();
+        let foo_bar_path = rockspec
+            .build
+            .default
+            .install
+            .lib
+            .get(&LuaModule::from_str("foo.bar").unwrap())
+            .unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("lib/bar.so"));
         let copy_directories = rockspec.build.default.copy_directories;
         assert_eq!(
@@ -924,7 +936,7 @@ mod tests {
             win32.build_backend,
             Some(BuildBackendSpec::Builtin(BuiltinBuildSpec {
                 modules: vec![(
-                    "cjson".into(),
+                    LuaModule::from_str("cjson").unwrap(),
                     ModuleSpec::ModulePaths(ModulePaths {
                         sources: vec!["lua_cjson.c".into(), "strbuf.c".into(), "fpconv.c".into()],
                         libraries: Vec::default(),
@@ -1058,11 +1070,11 @@ build = {
             &build_spec.build_backend
         {
             assert_eq!(
-                modules.get("system.init"),
+                modules.get(&LuaModule::from_str("system.init").unwrap()),
                 Some(&ModuleSpec::SourcePath("system/init.lua".into()))
             );
             assert_eq!(
-                modules.get("system.core"),
+                modules.get(&LuaModule::from_str("system.core").unwrap()),
                 Some(&ModuleSpec::ModulePaths(ModulePaths {
                     sources: vec![
                         "src/core.c".into(),
