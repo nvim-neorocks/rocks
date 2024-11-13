@@ -3,6 +3,7 @@ use std::{
     io,
     path::{Path, PathBuf},
 };
+use target_lexicon::Triple;
 
 use crate::{build::BuildError, lua_installation::LuaInstallation};
 
@@ -56,7 +57,7 @@ pub fn compile_c_files(
 
     std::fs::create_dir_all(parent)?;
 
-    // TODO: Use `target-lexicon` data here instead, it's more reliable.
+    let host = Triple::host();
 
     // See https://github.com/rust-lang/cc-rs/issues/594#issuecomment-2110551057
 
@@ -69,7 +70,7 @@ pub fn compile_c_files(
         .includes(&lua.include_dir)
         .opt_level(3)
         .out_dir(parent)
-        .target(std::env::consts::ARCH);
+        .target(&host.to_string());
     let objects = build.compile_intermediates();
     build
         .get_compiler()
@@ -105,6 +106,8 @@ pub fn compile_c_modules(
 
     std::fs::create_dir_all(target.parent().unwrap())?;
 
+    let host = Triple::host();
+
     let mut build = cc::Build::new();
     let source_files = data
         .sources
@@ -126,7 +129,7 @@ pub fn compile_c_modules(
         .opt_level(3)
         .out_dir(target_dir)
         .shared_flag(true)
-        .target(std::env::consts::ARCH);
+        .target(&host.to_string());
 
     // `cc::Build` has no `defines()` function, so we manually feed in the
     // definitions in a verbose loop
