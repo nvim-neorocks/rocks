@@ -1048,7 +1048,68 @@ build = {
 }
 "
         .into();
-        Rockspec::new(&rockspec_content).unwrap();
+        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+        let build_spec = rockspec.build.current_platform();
+        assert!(matches!(
+            build_spec.build_backend,
+            Some(BuildBackendSpec::Builtin { .. })
+        ));
+        if let Some(BuildBackendSpec::Builtin(BuiltinBuildSpec { modules })) =
+            &build_spec.build_backend
+        {
+            assert_eq!(
+                modules.get("system.init"),
+                Some(&ModuleSpec::SourcePath("system/init.lua".into()))
+            );
+            assert_eq!(
+                modules.get("system.core"),
+                Some(&ModuleSpec::ModulePaths(ModulePaths {
+                    sources: vec![
+                        "src/core.c".into(),
+                        "src/compat.c".into(),
+                        "src/time.c".into(),
+                        "src/environment.c".into(),
+                        "src/random.c".into(),
+                        "src/term.c".into(),
+                        "src/bitflags.c".into(),
+                        "src/wcwidth.c".into(),
+                    ],
+                    defines: luasystem_expected_defines(),
+                    libraries: luasystem_expected_libraries(),
+                    incdirs: luasystem_expected_incdirs(),
+                    libdirs: luasystem_expected_libdirs(),
+                }))
+            );
+        }
+    }
+
+    fn luasystem_expected_defines() -> Vec<(String, Option<String>)> {
+        if cfg!(target_os = "windows") {
+            vec![
+                ("WINVER".into(), Some("0x0600".into())),
+                ("_WIN32_WINNT".into(), Some("0x0600".into())),
+            ]
+        } else {
+            Vec::default()
+        }
+    }
+
+    fn luasystem_expected_libraries() -> Vec<PathBuf> {
+        if cfg!(target_os = "linux") {
+            vec!["rt".into()]
+        } else if cfg!(target_os = "windows") {
+            vec!["advapi32".into(), "winmm".into()]
+        } else {
+            Vec::default()
+        }
+    }
+
+    fn luasystem_expected_incdirs() -> Vec<PathBuf> {
+        Vec::default()
+    }
+
+    fn luasystem_expected_libdirs() -> Vec<PathBuf> {
+        Vec::default()
     }
 
     #[tokio::test]
