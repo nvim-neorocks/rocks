@@ -63,7 +63,7 @@ async fn run_build(
     build_dir: &Path,
 ) -> Result<(), BuildError> {
     with_spinner(progress, "🛠️ Building...".into(), || async {
-        match rockspec.build.default.build_backend.to_owned() {
+        match rockspec.build.current_platform().build_backend.to_owned() {
             Some(BuildBackendSpec::Builtin(build_spec)) => {
                 build_spec
                     .run(progress, output_paths, false, lua, config, build_dir)

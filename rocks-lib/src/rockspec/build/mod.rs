@@ -4,13 +4,16 @@ mod make;
 mod rust_mlua;
 
 pub mod utils; // Make build utilities available as a submodule
-pub use builtin::{BuiltinBuildSpec, ModulePaths, ModuleSpec};
+pub use builtin::{BuiltinBuildSpec, LuaModule, ModulePaths, ModuleSpec};
 pub use cmake::*;
 use indicatif::MultiProgress;
 pub use make::*;
 pub use rust_mlua::*;
 
-use builtin::{ModulePathsMissingSources, ModuleSpecAmbiguousPlatformOverride, ModuleSpecInternal};
+use builtin::{
+    ModulePathsMissingSources, ModuleSpecAmbiguousPlatformOverride, ModuleSpecInternal,
+    ParseLuaModuleError,
+};
 
 use itertools::Itertools as _;
 
@@ -20,6 +23,7 @@ use std::{
     env::consts::DLL_EXTENSION,
     future::Future,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 use thiserror::Error;
 
@@ -63,6 +67,8 @@ pub enum BuildSpecInternalError {
     InvalidRustMLuaFormat,
     #[error(transparent)]
     ModulePathsMissingSources(#[from] ModulePathsMissingSources),
+    #[error(transparent)]
+    ParseLuaModuleError(#[from] ParseLuaModuleError),
 }
 
 impl BuildSpec {
@@ -78,14 +84,14 @@ impl BuildSpec {
                             LuaTableKey::IntKey(_) => {
                                 Err(BuildSpecInternalError::ModulesHaveListElements)
                             }
-                            LuaTableKey::StringKey(str) => Ok(str),
+                            LuaTableKey::StringKey(str) => Ok(LuaModule::from_str(str.as_str())?),
                         }?;
                         match ModuleSpec::from_internal(module_spec_internal) {
                             Ok(module_spec) => Ok((key_str, module_spec)),
                             Err(err) => Err(err.into()),
                         }
                     })
-                    .collect::<Result<HashMap<String, ModuleSpec>, BuildSpecInternalError>>()?,
+                    .collect::<Result<HashMap<LuaModule, ModuleSpec>, BuildSpecInternalError>>()?,
             })),
             BuildType::Make => {
                 let default = MakeBuildSpec::default();
@@ -223,10 +229,10 @@ pub struct CommandBuildSpec {
 pub struct InstallSpec {
     /// Lua modules written in Lua.
     #[serde(default)]
-    pub lua: HashMap<String, PathBuf>,
+    pub lua: HashMap<LuaModule, PathBuf>,
     /// Dynamic libraries implemented compiled Lua modules.
     #[serde(default)]
-    pub lib: HashMap<String, PathBuf>,
+    pub lib: HashMap<LuaModule, PathBuf>,
     /// Configuration files.
     #[serde(default)]
     pub conf: HashMap<String, PathBuf>,

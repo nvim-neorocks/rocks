@@ -1,6 +1,6 @@
 use itertools::Itertools as _;
 use serde::{de, Deserialize, Deserializer};
-use std::{collections::HashMap, convert::Infallible, path::PathBuf};
+use std::{collections::HashMap, convert::Infallible, fmt::Display, path::PathBuf, str::FromStr};
 use thiserror::Error;
 
 use crate::rockspec::{
@@ -11,7 +11,59 @@ use crate::rockspec::{
 #[derive(Debug, PartialEq, Deserialize, Default, Clone)]
 pub struct BuiltinBuildSpec {
     /// Keys are module names in the format normally used by the `require()` function
-    pub modules: HashMap<String, ModuleSpec>,
+    pub modules: HashMap<LuaModule, ModuleSpec>,
+}
+
+#[derive(Debug, PartialEq, Eq, Deserialize, Default, Clone, Hash)]
+pub struct LuaModule(String);
+
+impl LuaModule {
+    pub fn to_lua_path(&self) -> PathBuf {
+        self.to_pathbuf(".lua")
+    }
+
+    pub fn to_lib_path(&self) -> PathBuf {
+        self.to_pathbuf(std::env::consts::DLL_SUFFIX)
+    }
+
+    fn to_pathbuf(&self, extension: &str) -> PathBuf {
+        PathBuf::from(self.0.replace('.', std::path::MAIN_SEPARATOR_STR) + extension)
+    }
+
+    pub fn from_pathbuf(path: PathBuf) -> Self {
+        let extension = path
+            .extension()
+            .map(|ext| ext.to_string_lossy().to_string())
+            .unwrap_or("".into());
+        let module = path
+            .to_string_lossy()
+            .trim_end_matches(extension.as_str())
+            .replace(std::path::MAIN_SEPARATOR_STR, ".");
+        LuaModule(module)
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+#[derive(Error, Debug)]
+#[error("could not parse lua module from {0}.")]
+pub struct ParseLuaModuleError(String);
+
+impl FromStr for LuaModule {
+    type Err = ParseLuaModuleError;
+
+    // NOTE: We may want to add some validations
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(LuaModule(s.into()))
+    }
+}
+
+impl Display for LuaModule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -260,14 +312,23 @@ mod tests {
         lua.load(lua_content).exec().unwrap();
         let build_spec: BuiltinBuildSpec =
             lua.from_value(lua.globals().get("build").unwrap()).unwrap();
-        let foo = build_spec.modules.get("foo").unwrap();
+        let foo = build_spec
+            .modules
+            .get(&LuaModule::from_str("foo").unwrap())
+            .unwrap();
         assert_eq!(*foo, ModuleSpec::SourcePath("lua/foo/init.lua".into()));
-        let bar = build_spec.modules.get("bar").unwrap();
+        let bar = build_spec
+            .modules
+            .get(&LuaModule::from_str("bar").unwrap())
+            .unwrap();
         assert_eq!(
             *bar,
             ModuleSpec::SourcePaths(vec!["lua/bar.lua".into(), "lua/bar/internal.lua".into()])
         );
-        let baz = build_spec.modules.get("baz").unwrap();
+        let baz = build_spec
+            .modules
+            .get(&LuaModule::from_str("baz").unwrap())
+            .unwrap();
         assert!(matches!(baz, ModuleSpec::ModulePaths { .. }));
         let lua_content_no_sources = "
         build = {\n
@@ -297,7 +358,10 @@ mod tests {
         lua.load(lua_content_complex_defines).exec().unwrap();
         let build_spec: BuiltinBuildSpec =
             lua.from_value(lua.globals().get("build").unwrap()).unwrap();
-        let baz = build_spec.modules.get("baz").unwrap();
+        let baz = build_spec
+            .modules
+            .get(&LuaModule::from_str("baz").unwrap())
+            .unwrap();
         match baz {
             ModuleSpec::ModulePaths(paths) => assert_eq!(
                 paths.defines,
