@@ -66,6 +66,12 @@ impl PackagePath {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+    pub fn joined(&self) -> String {
+        self.0
+            .iter()
+            .map(|path| path.to_string_lossy())
+            .join(LUA_PATH_SEPARATOR)
+    }
 }
 
 impl FromStr for PackagePath {
@@ -84,11 +90,7 @@ impl FromStr for PackagePath {
 
 impl Display for PackagePath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0
-            .iter()
-            .map(|path| path.to_string_lossy())
-            .join(LUA_PATH_SEPARATOR)
-            .fmt(f)
+        self.joined().fmt(f)
     }
 }
 
@@ -96,11 +98,20 @@ impl Display for PackagePath {
 pub struct BinPath(Vec<PathBuf>);
 
 impl BinPath {
+    pub fn from_env() -> Self {
+        Self::from_str(env::var("PATH").unwrap_or_default().as_str()).unwrap_or_default()
+    }
     pub fn append(&mut self, other: &Self) {
         self.0.extend(other.0.to_owned())
     }
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+    pub fn joined(&self) -> String {
+        env::join_paths(self.0.iter())
+            .expect("Failed to join bin paths.")
+            .to_string_lossy()
+            .to_string()
     }
 }
 
@@ -115,11 +126,7 @@ impl FromStr for BinPath {
 
 impl Display for BinPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        env::join_paths(self.0.iter())
-            .expect("Failed to join bin paths.")
-            .to_string_lossy()
-            .to_string()
-            .fmt(f)
+        self.joined().fmt(f)
     }
 }
 

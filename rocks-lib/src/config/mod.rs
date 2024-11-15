@@ -94,6 +94,7 @@ impl Display for LuaVersion {
 #[error("could not find a valid home directory")]
 pub struct NoValidHomeDirectory;
 
+#[derive(Debug, Clone)]
 pub struct Config {
     enable_development_rockspecs: bool,
     server: String,
@@ -126,6 +127,13 @@ impl Config {
     pub fn get_default_data_path() -> Result<PathBuf, NoValidHomeDirectory> {
         let project_dirs = Config::get_project_dirs()?;
         Ok(project_dirs.data_local_dir().to_path_buf())
+    }
+
+    pub fn with_lua_version(self, lua_version: LuaVersion) -> Self {
+        Self {
+            lua_version: Some(lua_version),
+            ..self
+        }
     }
 }
 

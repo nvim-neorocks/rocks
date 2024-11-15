@@ -17,6 +17,7 @@ use rocks_lib::{
     lockfile::PinnedState::{Pinned, Unpinned},
 };
 use search::Search;
+use test::Test;
 use update::Update;
 use upload::Upload;
 
@@ -36,6 +37,7 @@ mod project;
 mod purge;
 mod remove;
 mod search;
+mod test;
 mod unpack;
 mod update;
 mod upload;
@@ -148,7 +150,7 @@ enum Commands {
     #[command(arg_required_else_help = true)]
     Search(Search),
     /// Run the test suite in the current directory.
-    Test,
+    Test(Test),
     /// Uninstall a rock from the system.
     Uninstall,
     /// Unpins an existing rock, allowing updates to alter the package.
@@ -208,6 +210,7 @@ async fn main() {
         Commands::Fmt => format::format().unwrap(),
         Commands::Purge => purge::purge(config).await.unwrap(),
         Commands::Remove(remove_args) => remove::remove(remove_args, config).await.unwrap(),
+        Commands::Test(test) => test::test(test, config).await.unwrap(),
         Commands::Update(_update_args) => update::update(config).await.unwrap(),
         Commands::Info(info_data) => info::info(info_data, config).await.unwrap(),
         Commands::Path(path_data) => path::path(path_data, config).await.unwrap(),

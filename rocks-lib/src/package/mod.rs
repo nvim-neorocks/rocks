@@ -3,13 +3,14 @@ use mlua::FromLua;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{fmt::Display, str::FromStr};
 use thiserror::Error;
-use version::{PackageVersionParseError, PackageVersionReqError};
 
 mod outdated;
 mod version;
 
 pub use outdated::*;
-pub use version::{PackageVersion, PackageVersionReq};
+pub use version::{
+    PackageVersion, PackageVersionParseError, PackageVersionReq, PackageVersionReqError,
+};
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]

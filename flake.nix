@@ -72,6 +72,7 @@
             (with pkgs; [
               rust-analyzer
               cargo-nextest
+              lua5_1
             ])
             ++ self.checks.${system}.git-hooks-check.enabledPackages
             ++ pkgs.rocks.buildInputs
