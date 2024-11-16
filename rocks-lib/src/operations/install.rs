@@ -11,7 +11,7 @@ use crate::{
 };
 
 use async_recursion::async_recursion;
-use indicatif::{MultiProgress, ProgressBar};
+use indicatif::MultiProgress;
 use itertools::Itertools;
 use semver::VersionReq;
 use thiserror::Error;
@@ -30,23 +30,16 @@ pub enum InstallError {
 
 pub async fn install(
     progress: &MultiProgress,
-    package_req: PackageReq,
+    packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
-    build_behaviour: BuildBehaviour,
     config: &Config,
-) -> Result<LocalPackage, InstallError> {
+) -> Result<Vec<LocalPackage>, InstallError>
+where
+{
     let lua_version = LuaVersion::from(config)?;
     let tree = Tree::new(config.tree().clone(), lua_version)?;
     let mut lockfile = tree.lockfile()?;
-    let result = install_impl(
-        progress,
-        package_req,
-        pin,
-        build_behaviour,
-        config,
-        &mut lockfile,
-    )
-    .await;
+    let result = install_impl(progress, packages, pin, config, &mut lockfile).await;
     lockfile.flush()?;
     result
 }
@@ -54,28 +47,32 @@ pub async fn install(
 #[async_recursion]
 async fn install_impl(
     progress: &MultiProgress,
-    package_req: PackageReq,
+    packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
-    build_behaviour: BuildBehaviour,
     config: &Config,
     lockfile: &mut Lockfile,
-) -> Result<LocalPackage, InstallError> {
-    with_spinner(
-        progress,
-        format!("💻 Installing {}", package_req),
-        || async {
-            go(
-                progress,
-                package_req,
-                pin,
-                build_behaviour,
-                config,
-                lockfile,
-            )
-            .await
-        },
-    )
-    .await
+) -> Result<Vec<LocalPackage>, InstallError> {
+    let mut result = Vec::new();
+    for (build_behaviour, package_req) in packages {
+        let package = with_spinner(
+            progress,
+            format!("💻 Installing {}", package_req),
+            || async {
+                go(
+                    progress,
+                    package_req,
+                    pin,
+                    build_behaviour,
+                    config,
+                    lockfile,
+                )
+                .await
+            },
+        )
+        .await?;
+        result.push(package);
+    }
+    Ok(result)
 }
 
 async fn go(
@@ -105,28 +102,13 @@ async fn go(
         .iter()
         .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
         .collect_vec();
-    let bar = progress
-        .add(ProgressBar::new(dependencies.len() as u64))
-        .with_message("Installing dependencies...");
-    let mut installed_dependencies = Vec::new();
-    for (index, dependency_req) in dependencies
+    let missing_dependencies = dependencies
         .into_iter()
         .filter(|req| tree.has_rock(req).is_none())
-        .enumerate()
-    {
-        let dependency = install_impl(
-            progress,
-            dependency_req.clone(),
-            pin,
-            build_behaviour,
-            config,
-            lockfile,
-        )
-        .await?;
-
-        installed_dependencies.push(dependency);
-        bar.set_position(index as u64);
-    }
+        .map(|req| (build_behaviour, req.to_owned()))
+        .collect_vec();
+    let installed_dependencies =
+        install_impl(progress, missing_dependencies, pin, config, lockfile).await?;
 
     let package =
         crate::build::build(progress, rockspec, pin, constraint, build_behaviour, config).await?;

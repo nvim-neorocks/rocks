@@ -49,9 +49,8 @@ pub async fn update(
                 // Install the newest package.
                 install(
                     progress,
-                    constraint,
+                    vec![(BuildBehaviour::NoForce, constraint)],
                     PinnedState::Unpinned,
-                    BuildBehaviour::NoForce,
                     config,
                 )
                 .await

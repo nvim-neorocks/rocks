@@ -111,9 +111,8 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     {
         rocks_lib::operations::install(
             &progress,
-            dependency_req.clone(),
+            vec![(build_behaviour, dependency_req.clone())],
             pin,
-            build_behaviour,
             &config,
         )
         .await?;
