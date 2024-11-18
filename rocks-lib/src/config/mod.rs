@@ -94,7 +94,6 @@ impl Display for LuaVersion {
 #[error("could not find a valid home directory")]
 pub struct NoValidHomeDirectory;
 
-// TODO: Make all fields private and add getters that return references to the data - they needn't be modified at runtime.
 pub struct Config {
     enable_development_rockspecs: bool,
     server: String,
