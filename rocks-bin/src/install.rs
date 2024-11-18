@@ -12,10 +12,10 @@ use rocks_lib::{
 
 #[derive(clap::Args)]
 pub struct Install {
-    /// Package or list of packages to install
+    /// Package or list of packages to install.
     package_req: Vec<PackageReq>,
 
-    /// Pin the package so that it doesn't get updated
+    /// Pin the package so that it doesn't get updated.
     #[arg(long)]
     pin: bool,
 

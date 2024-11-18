@@ -5,6 +5,7 @@ mod fetch;
 mod install;
 mod pin;
 mod remove;
+mod test;
 mod unpack;
 mod update;
 
@@ -13,5 +14,6 @@ pub use fetch::*;
 pub use install::*;
 pub use pin::*;
 pub use remove::*;
+pub use test::*;
 pub use unpack::*;
 pub use update::*;

@@ -130,25 +130,33 @@ impl Rockspec {
     }
 
     pub fn lua_version(&self) -> Option<LuaVersion> {
-        self.dependencies
-            .current_platform()
-            .iter()
-            .find(|val| *val.name() == "lua".into())
-            .and_then(|lua| {
-                for (possibility, version) in [
-                    ("5.4.0", LuaVersion::Lua54),
-                    ("5.3.0", LuaVersion::Lua53),
-                    ("5.2.0", LuaVersion::Lua52),
-                    ("5.1.0", LuaVersion::Lua51),
-                ] {
-                    if lua.version_req().matches(&possibility.parse().unwrap()) {
-                        return Some(version);
-                    }
-                }
-
-                None
-            })
+        latest_lua_version(&self.dependencies)
     }
+
+    pub fn test_lua_version(&self) -> Option<LuaVersion> {
+        latest_lua_version(&self.test_dependencies).or(self.lua_version())
+    }
+}
+
+fn latest_lua_version(dependencies: &PerPlatform<Vec<PackageReq>>) -> Option<LuaVersion> {
+    dependencies
+        .current_platform()
+        .iter()
+        .find(|val| *val.name() == "lua".into())
+        .and_then(|lua| {
+            for (possibility, version) in [
+                ("5.4.0", LuaVersion::Lua54),
+                ("5.3.0", LuaVersion::Lua53),
+                ("5.2.0", LuaVersion::Lua52),
+                ("5.1.0", LuaVersion::Lua51),
+            ] {
+                if lua.version_req().matches(&possibility.parse().unwrap()) {
+                    return Some(version);
+                }
+            }
+
+            None
+        })
 }
 
 #[derive(Error, Debug)]

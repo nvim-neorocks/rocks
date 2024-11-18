@@ -109,34 +109,32 @@ pub async fn path(path_data: Path, config: Config) -> Result<()> {
 }
 
 fn mk_package_path(paths: &Paths, append: bool) -> Result<PackagePath> {
-    let mut result = PackagePath::default();
-    if append {
-        let lua_path = PackagePath::from_str(env::var("LUA_PATH").unwrap_or_default().as_str())
-            .unwrap_or_default();
-        result.append(&lua_path);
-    }
+    let mut result = if append {
+        PackagePath::from_str(env::var("LUA_PATH").unwrap_or_default().as_str()).unwrap_or_default()
+    } else {
+        PackagePath::default()
+    };
     result.append(paths.package_path());
     Ok(result)
 }
 
 fn mk_package_cpath(paths: &Paths, append: bool) -> Result<PackagePath> {
-    let mut result = PackagePath::default();
-    if append {
-        let lua_path = PackagePath::from_str(env::var("LUA_CPATH").unwrap_or_default().as_str())
-            .unwrap_or_default();
-        result.append(&lua_path);
-    }
+    let mut result = if append {
+        PackagePath::from_str(env::var("LUA_CPATH").unwrap_or_default().as_str())
+            .unwrap_or_default()
+    } else {
+        PackagePath::default()
+    };
     result.append(paths.package_cpath());
     Ok(result)
 }
 
 fn mk_bin_path(paths: &Paths, append: bool) -> Result<BinPath> {
-    let mut result = BinPath::default();
-    if append {
-        let lua_path =
-            BinPath::from_str(env::var("PATH").unwrap_or_default().as_str()).unwrap_or_default();
-        result.append(&lua_path);
-    }
+    let mut result = if append {
+        BinPath::from_env()
+    } else {
+        BinPath::default()
+    };
     result.append(paths.path());
     Ok(result)
 }
