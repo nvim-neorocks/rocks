@@ -5,13 +5,12 @@ use crate::{
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{LocalPackage, LockConstraint, Lockfile, PinnedState},
     package::{PackageName, PackageReq, PackageVersionReq},
-    progress::with_spinner,
+    progress::{MultiProgress, ProgressBar},
     rockspec::LuaVersionError,
     tree::Tree,
 };
 
 use async_recursion::async_recursion;
-use indicatif::MultiProgress;
 use itertools::Itertools;
 use semver::VersionReq;
 use thiserror::Error;
@@ -54,29 +53,27 @@ async fn install_impl(
 ) -> Result<Vec<LocalPackage>, InstallError> {
     let mut result = Vec::new();
     for (build_behaviour, package_req) in packages {
-        let package = with_spinner(
+        let bar = progress.add(ProgressBar::from(format!("💻 Installing {}", package_req)));
+
+        let package = go(
             progress,
-            format!("💻 Installing {}", package_req),
-            || async {
-                go(
-                    progress,
-                    package_req,
-                    pin,
-                    build_behaviour,
-                    config,
-                    lockfile,
-                )
-                .await
-            },
+            &bar,
+            package_req,
+            pin,
+            build_behaviour,
+            config,
+            lockfile,
         )
         .await?;
+
         result.push(package);
     }
     Ok(result)
 }
 
 async fn go(
-    progress: &MultiProgress,
+    multiprogress: &MultiProgress,
+    progress: &ProgressBar,
     package_req: PackageReq,
     pin: PinnedState,
     build_behaviour: BuildBehaviour,
@@ -108,7 +105,7 @@ async fn go(
         .map(|req| (build_behaviour, req.to_owned()))
         .collect_vec();
     let installed_dependencies =
-        install_impl(progress, missing_dependencies, pin, config, lockfile).await?;
+        install_impl(multiprogress, missing_dependencies, pin, config, lockfile).await?;
 
     let package =
         crate::build::build(progress, rockspec, pin, constraint, build_behaviour, config).await?;

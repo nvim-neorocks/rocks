@@ -1,7 +1,6 @@
 use flate2::read::GzDecoder;
 use git2::build::RepoBuilder;
 use git2::FetchOptions;
-use indicatif::MultiProgress;
 use itertools::Itertools;
 use std::fs::File;
 use std::io;
@@ -16,7 +15,8 @@ use thiserror::Error;
 use crate::config::Config;
 use crate::operations;
 use crate::package::RemotePackage;
-use crate::{progress::with_spinner, rockspec::RockSource, rockspec::RockSourceSpec};
+use crate::progress::ProgressBar;
+use crate::{rockspec::RockSource, rockspec::RockSourceSpec};
 
 use super::DownloadSrcRockError;
 
@@ -33,23 +33,22 @@ pub enum FetchSrcError {
 }
 
 pub async fn fetch_src(
-    progress: &MultiProgress,
+    progress: &ProgressBar,
     dest_dir: &Path,
     rock_source: &RockSource,
 ) -> Result<(), FetchSrcError> {
     match &rock_source.source_spec {
         RockSourceSpec::Git(git) => {
             let url = &git.url.to_string();
-            let repo = with_spinner(progress, format!("🦠 Cloning {}", url), || async {
-                let mut fetch_options = FetchOptions::new();
-                if git.checkout_ref.is_none() {
-                    fetch_options.depth(1);
-                };
-                let mut repo_builder = RepoBuilder::new();
-                repo_builder.fetch_options(fetch_options);
-                Ok::<_, FetchSrcError>(repo_builder.clone(url, dest_dir)?)
-            })
-            .await?;
+            progress.set_message(format!("🦠 Cloning {}", url));
+
+            let mut fetch_options = FetchOptions::new();
+            if git.checkout_ref.is_none() {
+                fetch_options.depth(1);
+            };
+            let mut repo_builder = RepoBuilder::new();
+            repo_builder.fetch_options(fetch_options);
+            let repo = repo_builder.clone(url, dest_dir)?;
 
             if let Some(commit_hash) = &git.checkout_ref {
                 let (object, _) = repo.revparse_ext(commit_hash)?;
@@ -57,14 +56,9 @@ pub async fn fetch_src(
             }
         }
         RockSourceSpec::Url(url) => {
-            let response = with_spinner(
-                progress,
-                format!("📥 Downloading {}", url.to_owned()),
-                || async {
-                    Ok::<_, FetchSrcError>(reqwest::get(url.to_owned()).await?.bytes().await?)
-                },
-            )
-            .await?;
+            progress.set_message(format!("📥 Downloading {}", url.to_owned()));
+
+            let response = reqwest::get(url.to_owned()).await?.bytes().await?;
             let file_name = url
                 .path_segments()
                 .and_then(|segments| segments.last())
@@ -90,24 +84,18 @@ pub async fn fetch_src(
         }
         RockSourceSpec::File(path) => {
             if path.is_dir() {
-                with_spinner(
-                    progress,
-                    format!("📋 Copying {}", path.display()),
-                    || async {
-                        for file in walkdir::WalkDir::new(path).into_iter().flatten() {
-                            if file.file_type().is_file() {
-                                let filepath = file.path();
-                                let relative_path = filepath.strip_prefix(path).unwrap();
-                                let target = dest_dir.join(relative_path);
-                                let parent = target.parent().unwrap();
-                                std::fs::create_dir_all(parent)?;
-                                std::fs::copy(filepath, target)?;
-                            }
-                        }
-                        Ok::<_, FetchSrcError>(())
-                    },
-                )
-                .await?;
+                progress.set_message(format!("📋 Copying {}", path.display()));
+
+                for file in walkdir::WalkDir::new(path).into_iter().flatten() {
+                    if file.file_type().is_file() {
+                        let filepath = file.path();
+                        let relative_path = filepath.strip_prefix(path).unwrap();
+                        let target = dest_dir.join(relative_path);
+                        let parent = target.parent().unwrap();
+                        std::fs::create_dir_all(parent)?;
+                        std::fs::copy(filepath, target)?;
+                    }
+                }
             } else {
                 let mut file = File::open(path)?;
                 let mut buffer = Vec::new();
@@ -145,7 +133,7 @@ pub enum FetchSrcRockError {
 }
 
 pub async fn fetch_src_rock(
-    progress: &MultiProgress,
+    progress: &ProgressBar,
     package: &RemotePackage,
     dest_dir: &Path,
     config: &Config,
@@ -213,64 +201,64 @@ pub enum UnpackError {
 }
 
 async fn unpack<R: Read + Seek + Send>(
-    progress: &MultiProgress,
+    progress: &ProgressBar,
     mime_type: Option<&str>,
     reader: R,
     auto_find_lua_sources: bool,
     file_name: String,
     dest_dir: &Path,
 ) -> Result<(), UnpackError> {
-    with_spinner(progress, format!("📦 Unpacking {}", file_name), || async {
-        match mime_type {
-            Some("application/zip") => {
-                let mut archive = zip::ZipArchive::new(reader)?;
-                archive.extract(dest_dir)?;
-            }
-            Some("application/x-tar") => {
-                let mut archive = tar::Archive::new(reader);
-                archive.unpack(dest_dir)?;
-            }
-            Some("application/gzip") => {
-                let mut bufreader = BufReader::new(reader);
+    progress.set_message(format!("📦 Unpacking {}", file_name));
 
-                let extract_subdirectory =
-                    auto_find_lua_sources && is_single_directory(&mut bufreader)?;
+    match mime_type {
+        Some("application/zip") => {
+            let mut archive = zip::ZipArchive::new(reader)?;
+            archive.extract(dest_dir)?;
+        }
+        Some("application/x-tar") => {
+            let mut archive = tar::Archive::new(reader);
+            archive.unpack(dest_dir)?;
+        }
+        Some("application/gzip") => {
+            let mut bufreader = BufReader::new(reader);
 
-                bufreader.rewind()?;
-                let tar = GzDecoder::new(bufreader);
-                let mut archive = tar::Archive::new(tar);
+            let extract_subdirectory =
+                auto_find_lua_sources && is_single_directory(&mut bufreader)?;
 
-                if extract_subdirectory {
-                    archive.entries()?.try_for_each(|entry| {
-                        let mut entry = entry?;
+            bufreader.rewind()?;
+            let tar = GzDecoder::new(bufreader);
+            let mut archive = tar::Archive::new(tar);
 
-                        let path: PathBuf = entry.path()?.components().skip(1).collect();
-                        if path.components().count() > 0 {
-                            let dest = dest_dir.join(path);
-                            std::fs::create_dir_all(dest.parent().unwrap())?;
-                            entry.unpack(dest)?;
-                        }
+            if extract_subdirectory {
+                archive.entries()?.try_for_each(|entry| {
+                    let mut entry = entry?;
 
-                        Ok::<_, io::Error>(())
-                    })?;
-                } else {
-                    archive.entries()?.try_for_each(|entry| {
-                        entry?.unpack_in(dest_dir)?;
-                        Ok::<_, io::Error>(())
-                    })?;
-                }
-            }
-            Some("text/html") => {
-                return Err(UnpackError::SourceMovedOrDeleted);
-            }
-            Some(other) => {
-                return Err(UnpackError::UnsupportedFileType(other.to_string()));
-            }
-            None => {
-                return Err(UnpackError::UnknownMimeType);
+                    let path: PathBuf = entry.path()?.components().skip(1).collect();
+                    if path.components().count() > 0 {
+                        let dest = dest_dir.join(path);
+                        std::fs::create_dir_all(dest.parent().unwrap())?;
+                        entry.unpack(dest)?;
+                    }
+
+                    Ok::<_, io::Error>(())
+                })?;
+            } else {
+                archive.entries()?.try_for_each(|entry| {
+                    entry?.unpack_in(dest_dir)?;
+                    Ok::<_, io::Error>(())
+                })?;
             }
         }
-        Ok(())
-    })
-    .await
+        Some("text/html") => {
+            return Err(UnpackError::SourceMovedOrDeleted);
+        }
+        Some(other) => {
+            return Err(UnpackError::UnsupportedFileType(other.to_string()));
+        }
+        None => {
+            return Err(UnpackError::UnknownMimeType);
+        }
+    }
+
+    Ok(())
 }

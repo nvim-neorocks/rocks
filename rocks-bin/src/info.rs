@@ -1,10 +1,10 @@
 use clap::Args;
 use eyre::Result;
-use indicatif::MultiProgress;
 use rocks_lib::{
     config::{Config, LuaVersion},
     operations::download_rockspec,
     package::PackageReq,
+    progress::MultiProgress,
     tree::Tree,
 };
 
@@ -17,7 +17,12 @@ pub async fn info(data: Info, config: Config) -> Result<()> {
     // TODO(vhyrro): Add `Tree::from(&Config)`
     let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
 
-    let rockspec = download_rockspec(&MultiProgress::new(), &data.package, &config).await?;
+    let progress = MultiProgress::new();
+    let bar = progress.new_bar();
+
+    let rockspec = download_rockspec(&bar, &data.package, &config).await?;
+
+    bar.finish_and_clear();
 
     if tree.has_rock(&data.package).is_some() {
         println!("Currently installed in {}", tree.root().display());

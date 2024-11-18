@@ -1,5 +1,4 @@
 use eyre::eyre;
-use indicatif::MultiProgress;
 use inquire::Confirm;
 use itertools::Itertools;
 use std::path::PathBuf;
@@ -11,6 +10,7 @@ use rocks_lib::{
     config::Config,
     lockfile::{LockConstraint::Unconstrained, PinnedState},
     package::{PackageName, PackageReq},
+    progress::MultiProgress,
     rockspec::Rockspec,
     tree::Tree,
 };
@@ -65,8 +65,6 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     let rockspec = std::fs::read_to_string(rockspec_path)?;
     let rockspec = Rockspec::new(&rockspec)?;
 
-    let progress = MultiProgress::new();
-
     let lua_version = rockspec.lua_version_from_config(&config)?;
 
     let tree = Tree::new(config.tree().clone(), lua_version)?;
@@ -101,14 +99,19 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         .iter()
         .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
         .collect_vec();
+
+    let progress = MultiProgress::new();
+
     let dependencies_to_install = dependencies
         .into_iter()
         .filter(|req| tree.has_rock(req).is_none())
         .map(|dep| (build_behaviour, dep.to_owned()))
         .collect_vec();
+
     rocks_lib::operations::install(&progress, dependencies_to_install, pin, &config).await?;
+
     rocks_lib::build::build(
-        &progress,
+        &progress.new_bar(),
         rockspec,
         pin,
         Unconstrained,

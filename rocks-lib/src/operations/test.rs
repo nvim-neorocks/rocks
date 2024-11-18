@@ -6,11 +6,11 @@ use crate::{
     lockfile::PinnedState,
     package::{PackageName, PackageReq, PackageVersionReqError},
     path::Paths,
+    progress::MultiProgress,
     project::Project,
     rockspec::Rockspec,
     tree::Tree,
 };
-use indicatif::MultiProgress;
 use itertools::Itertools;
 use thiserror::Error;
 

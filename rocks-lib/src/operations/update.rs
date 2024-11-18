@@ -1,4 +1,3 @@
-use indicatif::MultiProgress;
 use thiserror::Error;
 
 use crate::{
@@ -7,7 +6,7 @@ use crate::{
     lockfile::{LocalPackage, PinnedState},
     manifest::ManifestMetadata,
     package::{PackageReq, RemotePackage, RockConstraintUnsatisfied},
-    progress::with_spinner,
+    progress::{MultiProgress, ProgressBar},
 };
 
 use super::{install, remove, InstallError, RemoveError};
@@ -37,41 +36,41 @@ pub async fn update(
     manifest: &ManifestMetadata,
     config: &Config,
 ) -> Result<(), UpdateError> {
-    with_spinner(
-        progress,
-        format!("Updating {}...", package.name),
-        || async move {
-            let latest_version = package
-                .to_package()
-                .has_update_with(&constraint, manifest)?;
+    let bar = progress.add(ProgressBar::from(format!("Updating {}...", package.name)));
 
-            if latest_version.is_some() && package.pinned() == PinnedState::Unpinned {
-                // Install the newest package.
-                install(
-                    progress,
-                    vec![(BuildBehaviour::NoForce, constraint)],
-                    PinnedState::Unpinned,
-                    config,
-                )
-                .await
-                .map_err(|error| UpdateError::Install {
-                    error,
-                    package: package.to_package(),
-                })?;
+    let latest_version = package
+        .to_package()
+        .has_update_with(&constraint, manifest)?;
 
-                // Remove the old package
-                remove(progress, package.clone(), config)
-                    .await
-                    .map_err(|error| UpdateError::Remove {
-                        error,
-                        package: package.to_package(),
-                    })?;
-            } else {
-                // TODO: Print "nothing to update" progress update
-            }
+    if latest_version.is_some() && package.pinned() == PinnedState::Unpinned {
+        // TODO(vhyrro): There's a slight dissonance in the API here.
+        // `install` expects a MultiProgress, since it assumes you'll be installing
+        // many rocks. We might want to have a function for installing a single package, too,
+        // which would then allow us to just pass a `ProgressBar` instead.
 
-            Ok(())
-        },
-    )
-    .await
+        // Install the newest package.
+        install(
+            progress,
+            vec![(BuildBehaviour::NoForce, constraint)],
+            PinnedState::Unpinned,
+            config,
+        )
+        .await
+        .map_err(|error| UpdateError::Install {
+            error,
+            package: package.to_package(),
+        })?;
+
+        // Remove the old package
+        remove(&bar, package.clone(), config)
+            .await
+            .map_err(|error| UpdateError::Remove {
+                error,
+                package: package.to_package(),
+            })?;
+    } else {
+        // TODO: Print "nothing to update" progress update
+    }
+
+    Ok(())
 }

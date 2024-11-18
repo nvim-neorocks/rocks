@@ -2,8 +2,8 @@ use std::io;
 
 use crate::config::{LuaVersion, LuaVersionUnset};
 use crate::lockfile::LocalPackage;
-use crate::{config::Config, progress::with_spinner, tree::Tree};
-use indicatif::MultiProgress;
+use crate::progress::ProgressBar;
+use crate::{config::Config, tree::Tree};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -15,16 +15,13 @@ pub enum RemoveError {
 
 // TODO: Remove dependencies recursively too!
 pub async fn remove(
-    progress: &MultiProgress,
+    progress: &ProgressBar,
     package: LocalPackage,
     config: &Config,
 ) -> Result<(), RemoveError> {
-    with_spinner(
-        progress,
-        format!("🗑️ Removing {}@{}", package.name, package.version),
-        || async { remove_impl(package, config).await },
-    )
-    .await
+    progress.set_message(format!("🗑️ Removing {}@{}", package.name, package.version));
+
+    remove_impl(package, config).await
 }
 
 async fn remove_impl(package: LocalPackage, config: &Config) -> Result<(), RemoveError> {

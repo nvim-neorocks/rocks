@@ -7,11 +7,11 @@ use crate::{
     lua_installation::LuaInstallation,
     operations::{self, FetchSrcRockError},
     package::RemotePackage,
-    progress::with_spinner,
+    progress::ProgressBar,
     rockspec::{utils, Build as _, BuildBackendSpec, LuaVersionError, Rockspec},
     tree::{RockLayout, Tree},
 };
-use indicatif::{style::TemplateError, MultiProgress, ProgressBar};
+use indicatif::style::TemplateError;
 use make::MakeError;
 use rust_mlua::RustError;
 use thiserror::Error;
@@ -55,98 +55,100 @@ impl From<bool> for BuildBehaviour {
 }
 
 async fn run_build(
-    progress: &MultiProgress,
+    progress: &ProgressBar,
     rockspec: &Rockspec,
     output_paths: &RockLayout,
     lua: &LuaInstallation,
     config: &Config,
     build_dir: &Path,
 ) -> Result<(), BuildError> {
-    with_spinner(progress, "🛠️ Building...".into(), || async {
-        match rockspec.build.current_platform().build_backend.to_owned() {
-            Some(BuildBackendSpec::Builtin(build_spec)) => {
-                build_spec
-                    .run(progress, output_paths, false, lua, config, build_dir)
-                    .await?
-            }
-            Some(BuildBackendSpec::Make(make_spec)) => {
-                make_spec
-                    .run(progress, output_paths, false, lua, config, build_dir)
-                    .await?
-            }
-            Some(BuildBackendSpec::RustMlua(rust_mlua_spec)) => {
-                rust_mlua_spec
-                    .run(progress, output_paths, false, lua, config, build_dir)
-                    .await?
-            }
-            _ => unimplemented!(),
+    progress.set_message("🛠️ Building...");
+
+    match rockspec.build.current_platform().build_backend.to_owned() {
+        Some(BuildBackendSpec::Builtin(build_spec)) => {
+            build_spec
+                .run(progress, output_paths, false, lua, config, build_dir)
+                .await?
         }
-        Ok::<_, BuildError>(())
-    })
-    .await?;
+        Some(BuildBackendSpec::Make(make_spec)) => {
+            make_spec
+                .run(progress, output_paths, false, lua, config, build_dir)
+                .await?
+        }
+        Some(BuildBackendSpec::RustMlua(rust_mlua_spec)) => {
+            rust_mlua_spec
+                .run(progress, output_paths, false, lua, config, build_dir)
+                .await?
+        }
+        _ => unimplemented!(),
+    }
+
     Ok(())
 }
 
 async fn install(
-    progress: &MultiProgress,
+    progress: &ProgressBar,
     rockspec: &Rockspec,
     tree: &Tree,
     output_paths: &RockLayout,
     lua: &LuaInstallation,
     build_dir: &Path,
 ) -> Result<(), BuildError> {
-    with_spinner(
-        progress,
-        format!("💻 Installing {} {}", rockspec.package, rockspec.version),
-        || async {
-            let install_spec = &rockspec.build.current_platform().install;
-            let lua_len = install_spec.lua.len();
-            let lib_len = install_spec.lib.len();
-            let bin_len = install_spec.bin.len();
-            let total_len = lua_len + lib_len + bin_len;
-            let bar = progress.add(ProgressBar::new(total_len as u64));
-            if lua_len > 0 {
-                bar.set_message("Copying Lua modules...");
-            }
-            for (target, source) in &install_spec.lua {
-                let absolute_source = build_dir.join(source);
-                utils::copy_lua_to_module_path(&absolute_source, target, &output_paths.src)?;
-                bar.set_position(bar.position() + 1);
-            }
-            if lib_len > 0 {
-                bar.set_message("Compiling C libraries...");
-            }
-            for (target, source) in &install_spec.lib {
-                utils::compile_c_files(
-                    &vec![build_dir.join(source)],
-                    target,
-                    &output_paths.lib,
-                    lua,
-                )?;
-                bar.set_position(bar.position() + 1);
-            }
-            if lib_len > 0 {
-                bar.set_message("Copying binaries...");
-            }
-            for (target, source) in &install_spec.bin {
-                std::fs::copy(build_dir.join(source), tree.bin().join(target))?;
-                bar.set_position(bar.position() + 1);
-            }
-            Ok::<_, BuildError>(())
-        },
-    )
-    .await?;
+    progress.set_message(format!(
+        "💻 Installing {} {}",
+        rockspec.package, rockspec.version
+    ));
+
+    let install_spec = &rockspec.build.current_platform().install;
+    let lua_len = install_spec.lua.len();
+    let lib_len = install_spec.lib.len();
+    let bin_len = install_spec.bin.len();
+    let total_len = lua_len + lib_len + bin_len;
+    progress.set_position(total_len as u64);
+
+    if lua_len > 0 {
+        progress.set_message("Copying Lua modules...");
+    }
+    for (target, source) in &install_spec.lua {
+        let absolute_source = build_dir.join(source);
+        utils::copy_lua_to_module_path(&absolute_source, target, &output_paths.src)?;
+        progress.set_position(progress.position() + 1);
+    }
+    if lib_len > 0 {
+        progress.set_message("Compiling C libraries...");
+    }
+    for (target, source) in &install_spec.lib {
+        utils::compile_c_files(
+            &vec![build_dir.join(source)],
+            target,
+            &output_paths.lib,
+            lua,
+        )?;
+        progress.set_position(progress.position() + 1);
+    }
+    if lib_len > 0 {
+        progress.set_message("Copying binaries...");
+    }
+    for (target, source) in &install_spec.bin {
+        std::fs::copy(build_dir.join(source), tree.bin().join(target))?;
+        progress.set_position(progress.position() + 1);
+    }
     Ok(())
 }
 
 pub async fn build(
-    progress: &MultiProgress,
+    progress: &ProgressBar,
     rockspec: Rockspec,
     pinned: PinnedState,
     constraint: LockConstraint,
     behaviour: BuildBehaviour,
     config: &Config,
 ) -> Result<LocalPackage, BuildError> {
+    progress.set_message(format!(
+        "Building {}@{}...",
+        rockspec.package, rockspec.version
+    ));
+
     let lua_version = rockspec.lua_version_from_config(config)?;
 
     let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
@@ -160,11 +162,11 @@ pub async fn build(
         progress.println(format!(
             "⚠️ WARNING: Failed to fetch source for {}: {}",
             &package, err
-        ))?;
+        ));
         progress.println(format!(
             "⚠️ Falling back to .src.rock archive from {}",
             &config.server()
-        ))?;
+        ));
         operations::fetch_src_rock(progress, &package, temp_dir.path(), config).await?;
     }
 

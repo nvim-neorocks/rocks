@@ -1,8 +1,8 @@
 use clap::Args;
 use eyre::Result;
-use indicatif::MultiProgress;
 use rocks_lib::config::LuaVersion;
 use rocks_lib::lockfile::PinnedState;
+use rocks_lib::progress::{MultiProgress, ProgressBar};
 use rocks_lib::{
     config::Config,
     manifest::{manifest_from_server, ManifestMetadata},
@@ -15,14 +15,15 @@ use rocks_lib::{
 pub struct Update {}
 
 pub async fn update(config: Config) -> Result<()> {
+    let progress = MultiProgress::new();
+    progress.add(ProgressBar::from("🔎 Looking for updates...".to_string()));
+
     let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
 
     let lockfile = tree.lockfile()?;
     let rocks = lockfile.rocks();
     let manifest =
         ManifestMetadata::new(&manifest_from_server(config.server().clone(), &config).await?)?;
-
-    let progress = MultiProgress::new();
 
     for package in rocks.values() {
         if package.pinned == PinnedState::Unpinned {

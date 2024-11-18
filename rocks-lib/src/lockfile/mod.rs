@@ -2,12 +2,14 @@ use std::io::{self, Write};
 use std::{collections::HashMap, fs::File, io::ErrorKind, path::PathBuf};
 
 use itertools::Itertools;
-use mlua::ExternalResult;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use ssri::Integrity;
 
 use crate::package::{PackageName, PackageReq, PackageVersion, PackageVersionReq, RemotePackage};
+
+#[cfg(feature = "lua")]
+use mlua::ExternalResult as _;
 
 #[derive(Copy, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub enum PinnedState {

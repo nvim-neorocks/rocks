@@ -1,14 +1,13 @@
 use std::{io, path::PathBuf, string::FromUtf8Error};
 
 use bytes::Bytes;
-use indicatif::MultiProgress;
 use thiserror::Error;
 
 use crate::{
     config::Config,
     manifest::ManifestError,
     package::{PackageName, PackageReq, PackageVersion, RemotePackage},
-    progress::with_spinner,
+    progress::ProgressBar,
     rockspec::{Rockspec, RockspecError},
 };
 
@@ -34,17 +33,15 @@ pub enum DownloadRockspecError {
 }
 
 pub async fn download_rockspec(
-    progress: &MultiProgress,
+    progress: &ProgressBar,
     package_req: &PackageReq,
     config: &Config,
 ) -> Result<Rockspec, SearchAndDownloadError> {
     let package = search_manifest(progress, package_req, config).await?;
-    with_spinner(
-        progress,
-        format!("📥 Downloading RockSpec for {}", package),
-        || async { download_rockspec_impl(package, config).await },
-    )
-    .await
+
+    progress.set_message(format!("📥 Downloading rockspec for {}", package_req));
+
+    download_rockspec_impl(package, config).await
 }
 
 #[derive(Error, Debug)]
@@ -64,7 +61,7 @@ pub enum SearchAndDownloadError {
 }
 
 pub async fn search_and_download_src_rock(
-    progress: &MultiProgress,
+    progress: &ProgressBar,
     package_req: &PackageReq,
     config: &Config,
 ) -> Result<DownloadedSrcRockBytes, SearchAndDownloadError> {
@@ -77,22 +74,23 @@ pub async fn search_and_download_src_rock(
 pub struct DownloadSrcRockError(#[from] reqwest::Error);
 
 pub async fn download_src_rock(
-    progress: &MultiProgress,
+    progress: &ProgressBar,
     package: &RemotePackage,
     config: &Config,
 ) -> Result<DownloadedSrcRockBytes, DownloadSrcRockError> {
-    with_spinner(progress, format!("📥 Downloading {}", package), || async {
-        download_src_rock_impl(package, config).await
-    })
-    .await
+    progress.set_message(format!("📥 Downloading {}", package));
+
+    download_src_rock_impl(package, config).await
 }
 
 pub async fn download_to_file(
-    progress: &MultiProgress,
+    progress: &ProgressBar,
     package_req: &PackageReq,
     destination_dir: Option<PathBuf>,
     config: &Config,
 ) -> Result<DownloadedSrcRock, SearchAndDownloadError> {
+    progress.set_message(format!("📥 Downloading {}", package_req));
+
     let rock = search_and_download_src_rock(progress, package_req, config).await?;
     let full_rock_name = full_rock_name(&rock.name, &rock.version);
     std::fs::write(
@@ -120,14 +118,13 @@ pub enum SearchManifestError {
 }
 
 async fn search_manifest(
-    progress: &MultiProgress,
+    progress: &ProgressBar,
     package_req: &PackageReq,
     config: &Config,
 ) -> Result<RemotePackage, SearchManifestError> {
-    with_spinner(progress, "🔎 Searching manifest...".into(), || async {
-        search_manifest_impl(package_req, config).await
-    })
-    .await
+    progress.set_message("🔎 Searching manifest...");
+
+    search_manifest_impl(package_req, config).await
 }
 
 async fn search_manifest_impl(

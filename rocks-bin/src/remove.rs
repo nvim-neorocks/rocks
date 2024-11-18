@@ -1,10 +1,10 @@
 use clap::Args;
 use eyre::Result;
-use indicatif::MultiProgress;
 use rocks_lib::{
     config::{Config, LuaVersion},
     manifest::{manifest_from_server, ManifestMetadata},
     package::{PackageName, PackageVersion, RemotePackage},
+    progress::MultiProgress,
     tree::Tree,
 };
 
@@ -32,7 +32,10 @@ pub async fn remove(remove_args: Remove, config: Config) -> Result<()> {
         &RemotePackage::new(remove_args.name.clone(), target_version.clone()).into_package_req(),
     ) {
         Some(package) => {
-            Ok(rocks_lib::operations::remove(&MultiProgress::new(), package, &config).await?)
+            Ok(
+                rocks_lib::operations::remove(&MultiProgress::new().new_bar(), package, &config)
+                    .await?,
+            )
         }
         None => {
             eprintln!("Could not find {}@{}", remove_args.name, target_version);

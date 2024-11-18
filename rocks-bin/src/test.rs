@@ -1,9 +1,9 @@
 use clap::Args;
 use eyre::{OptionExt, Result};
-use indicatif::MultiProgress;
 use rocks_lib::{
     config::Config,
     operations::{ensure_busted, ensure_dependencies, run_tests, TestEnv},
+    progress::MultiProgress,
     project::Project,
     tree::Tree,
 };

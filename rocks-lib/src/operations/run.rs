@@ -6,9 +6,9 @@ use crate::{
     lockfile::PinnedState,
     package::{PackageReq, PackageVersionReqError},
     path::Paths,
+    progress::MultiProgress,
     tree::Tree,
 };
-use indicatif::MultiProgress;
 use thiserror::Error;
 
 use super::InstallError;

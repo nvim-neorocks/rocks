@@ -2,8 +2,7 @@ use std::{fs::File, io::Cursor, path::PathBuf};
 
 use clap::Args;
 use eyre::Result;
-use indicatif::MultiProgress;
-use rocks_lib::{config::Config, package::PackageReq};
+use rocks_lib::{config::Config, package::PackageReq, progress::MultiProgress};
 
 #[derive(Args)]
 pub struct Unpack {
@@ -25,13 +24,18 @@ pub async fn unpack(data: Unpack) -> Result<()> {
         PathBuf::from(data.path.to_string_lossy().trim_end_matches(".src.rock"))
     });
     let src_file = File::open(data.path)?;
-    let unpack_path =
-        rocks_lib::operations::unpack_src_rock(&MultiProgress::new(), src_file, destination)
-            .await?;
+    let progress = MultiProgress::new();
+    let bar = progress.new_bar();
 
-    println!("You may now enter the following directory:");
-    println!("{}", unpack_path.display());
-    println!("and type `rocks make` to build.");
+    let unpack_path = rocks_lib::operations::unpack_src_rock(&bar, src_file, destination).await?;
+
+    bar.finish_with_message(format!(
+        "
+You may now enter the following directory:
+{}
+and type `rocks make` to build.",
+        unpack_path.display()
+    ));
 
     Ok(())
 }
@@ -39,20 +43,23 @@ pub async fn unpack(data: Unpack) -> Result<()> {
 pub async fn unpack_remote(data: UnpackRemote, config: Config) -> Result<()> {
     let package_req = data.package_req;
     let progress = MultiProgress::new();
+    let bar = progress.new_bar();
     let rock =
-        rocks_lib::operations::search_and_download_src_rock(&progress, &package_req, &config)
-            .await?;
+        rocks_lib::operations::search_and_download_src_rock(&bar, &package_req, &config).await?;
     let cursor = Cursor::new(rock.bytes);
 
     let destination = data
         .path
         .unwrap_or_else(|| PathBuf::from(format!("{}-{}", &rock.name, &rock.version)));
-    let unpack_path =
-        rocks_lib::operations::unpack_src_rock(&progress, cursor, destination).await?;
+    let unpack_path = rocks_lib::operations::unpack_src_rock(&bar, cursor, destination).await?;
 
-    println!("You may now enter the following directory:");
-    println!("{}", unpack_path.display());
-    println!("and type `rocks build` to build.");
+    bar.finish_with_message(format!(
+        "
+You may now enter the following directory:
+{}
+and type `rocks make` to build.",
+        unpack_path.display()
+    ));
 
     Ok(())
 }
