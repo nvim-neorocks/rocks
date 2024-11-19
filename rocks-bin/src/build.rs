@@ -1,5 +1,5 @@
 use eyre::eyre;
-use indicatif::{MultiProgress, ProgressBar};
+use indicatif::MultiProgress;
 use inquire::Confirm;
 use itertools::Itertools;
 use std::path::PathBuf;
@@ -101,26 +101,14 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         .iter()
         .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
         .collect_vec();
-    let bar = progress
-        .add(ProgressBar::new(dependencies.len() as u64))
-        .with_message("Installing dependencies...");
-    for (index, dependency_req) in dependencies
+    let dependencies_to_install = dependencies
         .into_iter()
         .filter(|req| tree.has_rock(req).is_none())
-        .enumerate()
-    {
-        rocks_lib::operations::install(
-            &progress,
-            vec![(build_behaviour, dependency_req.clone())],
-            pin,
-            &config,
-        )
-        .await?;
-        bar.set_position(index as u64);
-    }
-
+        .map(|dep| (build_behaviour, dep.to_owned()))
+        .collect_vec();
+    rocks_lib::operations::install(&progress, dependencies_to_install, pin, &config).await?;
     rocks_lib::build::build(
-        &MultiProgress::new(),
+        &progress,
         rockspec,
         pin,
         Unconstrained,
