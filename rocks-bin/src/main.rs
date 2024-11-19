@@ -16,6 +16,7 @@ use rocks_lib::{
     config::{ConfigBuilder, LuaVersion},
     lockfile::PinnedState::{Pinned, Unpinned},
 };
+use run::Run;
 use search::Search;
 use test::Test;
 use update::Update;
@@ -36,6 +37,7 @@ mod pin;
 mod project;
 mod purge;
 mod remove;
+mod run;
 mod search;
 mod test;
 mod unpack;
@@ -146,6 +148,11 @@ enum Commands {
     Purge,
     /// Uninstall a rock.
     Remove(Remove),
+    /// Run a command that has been installed with rocks.
+    /// If the command is not found:
+    /// When run from within a rocks project, this command will build the project.
+    /// Otherwise, it will try to install a package named after the command.
+    Run(Run),
     /// Query the Luarocks servers.
     #[command(arg_required_else_help = true)]
     Search(Search),
@@ -210,6 +217,7 @@ async fn main() {
         Commands::Fmt => format::format().unwrap(),
         Commands::Purge => purge::purge(config).await.unwrap(),
         Commands::Remove(remove_args) => remove::remove(remove_args, config).await.unwrap(),
+        Commands::Run(run_args) => run::run(run_args, config).await.unwrap(),
         Commands::Test(test) => test::test(test, config).await.unwrap(),
         Commands::Update(_update_args) => update::update(config).await.unwrap(),
         Commands::Info(info_data) => info::info(info_data, config).await.unwrap(),

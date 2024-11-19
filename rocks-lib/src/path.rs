@@ -40,19 +40,26 @@ impl Paths {
         Ok(paths)
     }
 
-    /// Display the `package.path`
+    /// Get the `package.path`
     pub fn package_path(&self) -> &PackagePath {
         &self.src
     }
 
-    /// Display the `package.cpath`
+    /// Get the `package.cpath`
     pub fn package_cpath(&self) -> &PackagePath {
         &self.lib
     }
 
-    /// Display the `$PATH`
+    /// Get the `$PATH`
     pub fn path(&self) -> &BinPath {
         &self.bin
+    }
+
+    /// Get the `$PATH`, appended to the existing `$PATH` environment.
+    pub fn path_appended(&self) -> BinPath {
+        let mut path = BinPath::from_env();
+        path.append(self.path());
+        path
     }
 }
 

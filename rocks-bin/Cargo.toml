@@ -24,6 +24,7 @@ tokio = { version = "1.41.0", features = ["macros", "rt-multi-thread"] }
 toml = "0.8.19"
 uzers = "0.12.1"
 walkdir = "2.5.0"
+which = "7.0.0"
 indicatif = "0.17.8"
 
 [dependencies.rocks-lib]
