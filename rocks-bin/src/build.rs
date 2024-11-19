@@ -15,7 +15,7 @@ use rocks_lib::{
     tree::Tree,
 };
 
-#[derive(Args)]
+#[derive(Args, Default)]
 pub struct Build {
     rockspec_path: Option<PathBuf>,
 

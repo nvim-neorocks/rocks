@@ -5,7 +5,7 @@ use crate::{
     config::Config,
     lockfile::PinnedState,
     package::{PackageName, PackageReq, PackageVersionReqError},
-    path::{BinPath, Paths},
+    path::Paths,
     project::Project,
     rockspec::Rockspec,
     tree::Tree,
@@ -52,13 +52,11 @@ where
     let tree = Tree::new(config.tree().clone(), lua_version)?;
     let tree_root = &tree.root().clone();
     let paths = Paths::from_tree(tree)?;
-    let mut path = BinPath::from_env();
-    path.append(paths.path());
     let mut command = Command::new("busted");
     let mut command = command
         .current_dir(project.root())
         .args(test_args)
-        .env("PATH", path.joined())
+        .env("PATH", paths.path_appended().joined())
         .env("LUA_PATH", paths.package_path().joined())
         .env("LUA_CPATH", paths.package_cpath().joined());
     if let TestEnv::Pure = env {
