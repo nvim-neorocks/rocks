@@ -26,13 +26,13 @@ pub async fn update(config: Config) -> Result<()> {
         ManifestMetadata::new(&manifest_from_server(config.server().clone(), &config).await?)?;
 
     for package in rocks.values() {
-        if package.pinned == PinnedState::Unpinned {
+        if package.pinned() == PinnedState::Unpinned {
             operations::update(
                 &progress,
                 package.clone(),
                 PackageReq::new(
-                    package.name.to_string(),
-                    package.constraint.as_ref().map(|str| str.to_string()),
+                    package.name().to_string(),
+                    package.constraint().to_string_opt(),
                 )?,
                 &manifest,
                 &config,

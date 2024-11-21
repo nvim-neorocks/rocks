@@ -49,7 +49,7 @@ pub fn set_pinned_state(
         .map(|dir| dir.path())
         .collect_vec();
 
-    package.pinned = pin;
+    package.spec.pinned = pin;
 
     if lockfile.get(&package.id()).is_some() {
         return Err(PinError::PinStateConflict {

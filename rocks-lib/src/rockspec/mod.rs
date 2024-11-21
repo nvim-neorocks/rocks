@@ -102,6 +102,11 @@ impl Rockspec {
         Ok(rockspec)
     }
 
+    pub fn validate_lua_version(&self, config: &Config) -> Result<(), LuaVersionError> {
+        let _ = self.lua_version_from_config(config)?;
+        Ok(())
+    }
+
     pub fn lua_version_from_config(&self, config: &Config) -> Result<LuaVersion, LuaVersionError> {
         let version = LuaVersion::from(config)?;
         if self.supports_lua_version(&version) {

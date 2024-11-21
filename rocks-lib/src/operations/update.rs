@@ -36,7 +36,7 @@ pub async fn update(
     manifest: &ManifestMetadata,
     config: &Config,
 ) -> Result<(), UpdateError> {
-    let bar = progress.add(ProgressBar::from(format!("Updating {}...", package.name)));
+    let bar = progress.add(ProgressBar::from(format!("Updating {}...", package.name())));
 
     let latest_version = package
         .to_package()

@@ -19,7 +19,11 @@ pub async fn remove(
     package: LocalPackage,
     config: &Config,
 ) -> Result<(), RemoveError> {
-    progress.set_message(format!("🗑️ Removing {}@{}", package.name, package.version));
+    progress.set_message(format!(
+        "🗑️ Removing {}@{}",
+        package.name(),
+        package.version()
+    ));
 
     remove_impl(package, config).await
 }

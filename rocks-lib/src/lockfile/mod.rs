@@ -1,17 +1,22 @@
+use std::fmt::Display;
 use std::io::{self, Write};
 use std::{collections::HashMap, fs::File, io::ErrorKind, path::PathBuf};
 
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use ssri::Integrity;
+use thiserror::Error;
 
-use crate::package::{PackageName, PackageReq, PackageVersion, PackageVersionReq, RemotePackage};
+use crate::package::{
+    PackageName, PackageReq, PackageVersion, PackageVersionReq, PackageVersionReqError,
+    RemotePackage,
+};
 
 #[cfg(feature = "lua")]
-use mlua::ExternalResult as _;
+use mlua::{ExternalResult as _, FromLua};
 
-#[derive(Copy, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
+#[derive(Copy, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub enum PinnedState {
     Unpinned,
     Pinned,
@@ -57,39 +62,46 @@ impl<'de> Deserialize<'de> for PinnedState {
     }
 }
 
-// TODO(vhyrro): Move to `package/local.rs`
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "lua", derive(mlua::FromLua))]
-pub struct LocalPackage {
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub(crate) struct LocalPackageSpec {
     pub name: PackageName,
     pub version: PackageVersion,
     pub pinned: PinnedState,
-    pub dependencies: Vec<String>,
+    pub dependencies: Vec<LocalPackageId>,
     // TODO: Deserialize this directly into a `LuaPackageReq`
     pub constraint: Option<String>,
-    pub hashes: LocalPackageHashes,
 }
 
-impl LocalPackage {
-    pub fn from(
-        package: &RemotePackage,
+#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, Clone)]
+pub struct LocalPackageId(String);
+
+impl Display for LocalPackageId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl LocalPackageSpec {
+    pub fn new(
+        name: &PackageName,
+        version: &PackageVersion,
         constraint: LockConstraint,
-        hashes: LocalPackageHashes,
+        dependencies: Vec<LocalPackageId>,
+        pinned: &PinnedState,
     ) -> Self {
         Self {
-            name: package.name().clone(),
-            version: package.version().clone(),
-            pinned: PinnedState::Unpinned,
-            dependencies: Vec::default(),
+            name: name.clone(),
+            version: version.clone(),
+            pinned: *pinned,
+            dependencies,
             constraint: match constraint {
                 LockConstraint::Unconstrained => None,
                 LockConstraint::Constrained(version_req) => Some(version_req.to_string()),
             },
-            hashes,
         }
     }
 
-    pub fn id(&self) -> String {
+    pub fn id(&self) -> LocalPackageId {
         let mut hasher = Sha256::new();
 
         hasher.update(format!(
@@ -100,7 +112,12 @@ impl LocalPackage {
             self.constraint.clone().unwrap_or_default()
         ));
 
-        hex::encode(hasher.finalize())
+        LocalPackageId(hex::encode(hasher.finalize()))
+    }
+
+    pub fn constraint(&self) -> LockConstraint {
+        // Safe to unwrap as the data can only end up in the struct as a valid constraint
+        LockConstraint::try_from(&self.constraint).unwrap()
     }
 
     pub fn name(&self) -> &PackageName {
@@ -115,20 +132,8 @@ impl LocalPackage {
         self.pinned
     }
 
-    pub fn dependencies(&self) -> Vec<&String> {
+    pub fn dependencies(&self) -> Vec<&LocalPackageId> {
         self.dependencies.iter().collect()
-    }
-
-    pub fn constraint(&self) -> LockConstraint {
-        match &self.constraint {
-            // Safe to unwrap as the data can only end up in the struct as a valid constraint
-            Some(constraint) => LockConstraint::Constrained(
-                constraint
-                    .parse()
-                    .expect("invalid constraint in LuaPackage"),
-            ),
-            None => LockConstraint::Unconstrained,
-        }
     }
 
     pub fn to_package(&self) -> RemotePackage {
@@ -140,15 +145,153 @@ impl LocalPackage {
     }
 }
 
+// TODO(vhyrro): Move to `package/local.rs`
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct LocalPackage {
+    pub(crate) spec: LocalPackageSpec,
+    hashes: LocalPackageHashes,
+}
+
+#[cfg_attr(feature = "lua", derive(FromLua,))]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct LocalPackageIntermediate {
+    name: PackageName,
+    version: PackageVersion,
+    pinned: PinnedState,
+    dependencies: Vec<LocalPackageId>,
+    constraint: Option<String>,
+    hashes: LocalPackageHashes,
+}
+
+impl TryFrom<LocalPackageIntermediate> for LocalPackage {
+    type Error = LockConstraintParseError;
+
+    fn try_from(value: LocalPackageIntermediate) -> Result<Self, Self::Error> {
+        let constraint = LockConstraint::try_from(&value.constraint)?;
+        Ok(Self {
+            spec: LocalPackageSpec::new(
+                &value.name,
+                &value.version,
+                constraint,
+                value.dependencies,
+                &value.pinned,
+            ),
+            hashes: value.hashes,
+        })
+    }
+}
+
+impl From<&LocalPackage> for LocalPackageIntermediate {
+    fn from(value: &LocalPackage) -> Self {
+        Self {
+            name: value.spec.name.clone(),
+            version: value.spec.version.clone(),
+            pinned: value.spec.pinned,
+            dependencies: value.spec.dependencies.clone(),
+            constraint: value.spec.constraint.clone(),
+            hashes: value.hashes.clone(),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for LocalPackage {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        LocalPackage::try_from(LocalPackageIntermediate::deserialize(deserializer)?)
+            .map_err(de::Error::custom)
+    }
+}
+
+impl Serialize for LocalPackage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        LocalPackageIntermediate::from(self).serialize(serializer)
+    }
+}
+
+#[cfg(feature = "lua")]
+impl FromLua for LocalPackage {
+    fn from_lua(value: mlua::Value, lua: &mlua::Lua) -> mlua::Result<Self> {
+        LocalPackage::try_from(LocalPackageIntermediate::from_lua(value, lua)?)
+            .map_err(|err| mlua::Error::DeserializeError(format!("{}", err)))
+    }
+}
+
+impl LocalPackage {
+    pub fn from(
+        package: &RemotePackage,
+        constraint: LockConstraint,
+        hashes: LocalPackageHashes,
+    ) -> Self {
+        Self {
+            spec: LocalPackageSpec::new(
+                package.name(),
+                package.version(),
+                constraint,
+                Vec::default(),
+                &PinnedState::Unpinned,
+            ),
+            hashes,
+        }
+    }
+
+    pub fn id(&self) -> LocalPackageId {
+        self.spec.id()
+    }
+
+    pub fn name(&self) -> &PackageName {
+        self.spec.name()
+    }
+
+    pub fn version(&self) -> &PackageVersion {
+        self.spec.version()
+    }
+
+    pub fn pinned(&self) -> PinnedState {
+        self.spec.pinned()
+    }
+
+    pub fn dependencies(&self) -> Vec<&LocalPackageId> {
+        self.spec.dependencies()
+    }
+
+    pub fn constraint(&self) -> LockConstraint {
+        self.spec.constraint()
+    }
+
+    pub fn hashes(&self) -> &LocalPackageHashes {
+        &self.hashes
+    }
+
+    pub fn to_package(&self) -> RemotePackage {
+        self.spec.to_package()
+    }
+
+    pub fn into_package_req(self) -> PackageReq {
+        self.spec.into_package_req()
+    }
+}
+
 #[cfg(feature = "lua")]
 impl mlua::UserData for LocalPackage {
     fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("name", |_, this| Ok(this.name.to_string()));
-        fields.add_field_method_get("version", |_, this| Ok(this.version.to_string()));
-        fields.add_field_method_get("pinned", |_, this| Ok(this.pinned.as_bool()));
-        fields.add_field_method_get("dependencies", |_, this| Ok(this.dependencies.clone()));
-        fields.add_field_method_get("constraint", |_, this| Ok(this.constraint.clone()));
-        fields.add_field_method_get("id", |_, this| Ok(this.id()));
+        fields.add_field_method_get("name", |_, this| Ok(this.name().to_string()));
+        fields.add_field_method_get("version", |_, this| Ok(this.version().to_string()));
+        fields.add_field_method_get("pinned", |_, this| Ok(this.pinned().as_bool()));
+        fields.add_field_method_get("dependencies", |_, this| {
+            Ok(this
+                .spec
+                .dependencies
+                .iter()
+                .map(|id| id.clone().0)
+                .collect_vec())
+        });
+        fields.add_field_method_get("constraint", |_, this| Ok(this.spec.constraint.clone()));
+        fields.add_field_method_get("id", |_, this| Ok(this.id().0));
     }
 
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
@@ -187,10 +330,39 @@ impl mlua::UserData for LocalPackageHashes {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum LockConstraint {
     Unconstrained,
     Constrained(PackageVersionReq),
+}
+
+impl LockConstraint {
+    pub fn to_string_opt(&self) -> Option<String> {
+        match self {
+            LockConstraint::Unconstrained => None,
+            LockConstraint::Constrained(req) => Some(req.to_string()),
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum LockConstraintParseError {
+    #[error("Invalid constraint in LuaPackage: {0}")]
+    LockConstraintParseError(#[from] PackageVersionReqError),
+}
+
+impl TryFrom<&Option<String>> for LockConstraint {
+    type Error = LockConstraintParseError;
+
+    fn try_from(constraint: &Option<String>) -> Result<Self, Self::Error> {
+        match constraint {
+            Some(constraint) => {
+                let package_version_req = constraint.parse()?;
+                Ok(LockConstraint::Constrained(package_version_req))
+            }
+            None => Ok(LockConstraint::Unconstrained),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -200,8 +372,8 @@ pub struct Lockfile {
     // TODO: Serialize this directly into a `Version`
     version: String,
     // NOTE: We cannot directly serialize to a `Sha256` object as they don't implement serde traits.
-    rocks: HashMap<String, LocalPackage>,
-    entrypoints: Vec<String>,
+    rocks: HashMap<LocalPackageId, LocalPackage>,
+    entrypoints: Vec<LocalPackageId>,
 }
 
 impl Lockfile {
@@ -241,7 +413,7 @@ impl Lockfile {
 
         self.rocks
             .entry(target_id)
-            .and_modify(|rock| rock.dependencies.push(dependency_id));
+            .and_modify(|rock| rock.spec.dependencies.push(dependency_id));
 
         // Since rocks entries are mutable, we only add the dependency if it
         // has not already been added.
@@ -258,15 +430,15 @@ impl Lockfile {
         &self.version
     }
 
-    pub fn rocks(&self) -> &HashMap<String, LocalPackage> {
+    pub fn rocks(&self) -> &HashMap<LocalPackageId, LocalPackage> {
         &self.rocks
     }
 
-    pub fn get(&self, id: &str) -> Option<&LocalPackage> {
+    pub fn get(&self, id: &LocalPackageId) -> Option<&LocalPackage> {
         self.rocks.get(id)
     }
 
-    pub fn get_mut(&mut self, id: &str) -> Option<&mut LocalPackage> {
+    pub fn get_mut(&mut self, id: &LocalPackageId) -> Option<&mut LocalPackage> {
         self.rocks.get_mut(id)
     }
 
@@ -276,13 +448,13 @@ impl Lockfile {
         let dependencies = self
             .rocks
             .iter()
-            .flat_map(|(_, rock)| &rock.dependencies)
+            .flat_map(|(_, rock)| rock.dependencies())
             .collect_vec();
 
         self.entrypoints = self
             .rocks
             .keys()
-            .filter(|id| !dependencies.iter().contains(id))
+            .filter(|id| !dependencies.iter().contains(&id))
             .cloned()
             .collect();
 
@@ -320,9 +492,17 @@ impl mlua::UserData for Lockfile {
         });
 
         methods.add_method("version", |_, this, ()| Ok(this.version().to_owned()));
-        methods.add_method("rocks", |_, this, ()| Ok(this.rocks().to_owned()));
+        methods.add_method("rocks", |_, this, ()| {
+            Ok(this
+                .rocks()
+                .iter()
+                .map(|(id, rock)| (id.0.clone(), rock.clone()))
+                .collect::<HashMap<String, LocalPackage>>())
+        });
 
-        methods.add_method("get", |_, this, id: String| Ok(this.get(&id).cloned()));
+        methods.add_method("get", |_, this, id: String| {
+            Ok(this.get(&LocalPackageId(id)).cloned())
+        });
         methods.add_method_mut("flush", |_, this, ()| this.flush().into_lua_err());
     }
 }
@@ -388,7 +568,7 @@ mod tests {
             crate::lockfile::LockConstraint::Constrained(">= 1.0.0".parse().unwrap()),
             mock_hashes.clone(),
         );
-        test_local_dep_package.pinned = PinnedState::Pinned;
+        test_local_dep_package.spec.pinned = PinnedState::Pinned;
         lockfile.add(&test_local_dep_package);
 
         lockfile.add_dependency(&test_local_package, &test_local_dep_package);

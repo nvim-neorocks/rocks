@@ -180,7 +180,7 @@ pub async fn build(
         constraint,
         hashes,
     );
-    package.pinned = pinned;
+    package.spec.pinned = pinned;
 
     match tree.lockfile()?.get(&package.id()) {
         Some(package) if behaviour == BuildBehaviour::NoForce => Ok(package.clone()),
