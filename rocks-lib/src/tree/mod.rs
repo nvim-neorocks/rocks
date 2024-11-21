@@ -118,8 +118,8 @@ impl Tree {
         self.root().join(format!(
             "{}-{}@{}",
             package.id(),
-            package.name,
-            package.version
+            package.name(),
+            package.version()
         ))
     }
 
@@ -135,7 +135,7 @@ impl Tree {
                 packages
                     .iter()
                     .rev()
-                    .find(|package| req.version_req().matches(&package.version))
+                    .find(|package| req.version_req().matches(package.version()))
             })?
             .cloned()
     }
@@ -151,7 +151,7 @@ impl Tree {
                 packages
                     .iter()
                     .rev()
-                    .find(|package| req.version_req().matches(&package.version) && filter(package))
+                    .find(|package| req.version_req().matches(package.version()) && filter(package))
             })?
             .cloned()
     }
@@ -320,7 +320,7 @@ mod tests {
                     name,
                     package
                         .into_iter()
-                        .map(|package| package.version)
+                        .map(|package| package.spec.version)
                         .sorted()
                         .collect_vec(),
                 )

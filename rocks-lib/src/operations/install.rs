@@ -1,16 +1,18 @@
-use std::io;
+use std::{collections::HashMap, io};
 
 use crate::{
     build::{BuildBehaviour, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
-    lockfile::{LocalPackage, LockConstraint, Lockfile, PinnedState},
+    lockfile::{
+        LocalPackage, LocalPackageId, LocalPackageSpec, LockConstraint, Lockfile, PinnedState,
+    },
     package::{PackageName, PackageReq, PackageVersionReq},
     progress::{MultiProgress, ProgressBar},
-    rockspec::LuaVersionError,
+    rockspec::{LuaVersionError, Rockspec},
     tree::Tree,
 };
 
-use async_recursion::async_recursion;
+use futures::future::join_all;
 use itertools::Itertools;
 use semver::VersionReq;
 use thiserror::Error;
@@ -25,6 +27,12 @@ pub enum InstallError {
     LuaVersionUnset(#[from] LuaVersionUnset),
     Io(#[from] io::Error),
     BuildError(#[from] BuildError),
+}
+
+struct PackageInstallSpec {
+    build_behaviour: BuildBehaviour,
+    rockspec: Rockspec,
+    local_package_spec: LocalPackageSpec,
 }
 
 pub async fn install(
@@ -43,7 +51,6 @@ where
     result
 }
 
-#[async_recursion]
 async fn install_impl(
     progress: &MultiProgress,
     packages: Vec<(BuildBehaviour, PackageReq)>,
@@ -51,69 +58,111 @@ async fn install_impl(
     config: &Config,
     lockfile: &mut Lockfile,
 ) -> Result<Vec<LocalPackage>, InstallError> {
-    let mut result = Vec::new();
-    for (build_behaviour, package_req) in packages {
-        let bar = progress.add(ProgressBar::from(format!("💻 Installing {}", package_req)));
+    let bar = progress.add(ProgressBar::from(
+        "🔭 Resolving dependencies...".to_string(),
+    ));
+    let all_packages = join_all(packages.iter().map(|(behaviour, pkg)| {
+        flattened_install_specs(&bar, (*behaviour, pkg.clone()), &pin, config)
+    }))
+    .await
+    .into_iter()
+    .try_collect::<_, Vec<Vec<PackageInstallSpec>>, InstallError>()?
+    .into_iter()
+    .flatten()
+    .unique_by(|install_spec| install_spec.local_package_spec.id().clone())
+    .collect_vec();
 
-        let package = go(
-            progress,
+    let local_package_specs = all_packages
+        .iter()
+        .map(|install_spec| install_spec.local_package_spec.clone())
+        .collect_vec();
+
+    let installed_packages = join_all(all_packages.into_iter().map(|install_spec| {
+        let local_package_spec = install_spec.local_package_spec;
+        bar.set_message(format!("💻 Installing {}", local_package_spec.to_package()));
+        crate::build::build(
             &bar,
-            package_req,
+            install_spec.rockspec,
             pin,
-            build_behaviour,
+            local_package_spec.constraint(),
+            install_spec.build_behaviour,
             config,
-            lockfile,
         )
-        .await?;
+    }))
+    .await
+    .into_iter()
+    .map(|result| result.map(|pkg| (pkg.id(), pkg)))
+    .try_collect::<_, HashMap<LocalPackageId, LocalPackage>, _>()?;
 
-        result.push(package);
-    }
-    Ok(result)
+    local_package_specs
+        .into_iter()
+        .filter_map(|spec| {
+            let installed_package_opt = installed_packages.get(&spec.id());
+            installed_package_opt.map(|installed_package| (installed_package, spec))
+        })
+        .for_each(|(pkg, spec)| {
+            lockfile.add(pkg);
+            spec.dependencies
+                .iter()
+                .filter_map(|id| installed_packages.get(id))
+                .for_each(|dependency| lockfile.add_dependency(pkg, dependency))
+        });
+
+    Ok(installed_packages.into_values().collect_vec())
 }
 
-async fn go(
-    multiprogress: &MultiProgress,
+/// Get a flattened list of packages to install
+async fn flattened_install_specs(
     progress: &ProgressBar,
-    package_req: PackageReq,
-    pin: PinnedState,
-    build_behaviour: BuildBehaviour,
+    (build_behaviour, package): (BuildBehaviour, PackageReq),
+    pin: &PinnedState,
     config: &Config,
-    lockfile: &mut Lockfile,
-) -> Result<LocalPackage, InstallError> {
-    let rockspec = super::download_rockspec(progress, &package_req, config).await?;
-
-    let lua_version = rockspec.lua_version_from_config(config)?;
-
-    let tree = Tree::new(config.tree().clone(), lua_version)?;
-
-    let constraint = if *package_req.version_req() == PackageVersionReq::SemVer(VersionReq::STAR) {
+) -> Result<Vec<PackageInstallSpec>, InstallError> {
+    let constraint = if *package.version_req() == PackageVersionReq::SemVer(VersionReq::STAR) {
         LockConstraint::Unconstrained
     } else {
-        LockConstraint::Constrained(package_req.version_req().clone())
+        LockConstraint::Constrained(package.version_req().clone())
+    };
+    let rockspec = super::download_rockspec(progress, &package, config).await?;
+    rockspec.validate_lua_version(config)?;
+    let lua_pkg = PackageName::new("lua".into());
+    let dependency_install_spec = join_all(
+        rockspec
+            .dependencies
+            .current_platform()
+            .iter()
+            .filter(|pkg| !pkg.name().eq(&lua_pkg))
+            .map(|pkg| {
+                flattened_install_specs(progress, (build_behaviour, pkg.clone()), pin, config)
+            }),
+    )
+    .await
+    .into_iter()
+    .try_collect::<_, Vec<Vec<PackageInstallSpec>>, InstallError>()?
+    .into_iter()
+    .flatten()
+    .collect_vec();
+
+    let dependency_spec = dependency_install_spec
+        .iter()
+        .map(|info| info.local_package_spec.id().clone())
+        .collect_vec();
+
+    let local_package_spec = LocalPackageSpec::new(
+        &rockspec.package,
+        &rockspec.version,
+        constraint,
+        dependency_spec,
+        pin,
+    );
+    let install_spec = PackageInstallSpec {
+        build_behaviour,
+        rockspec,
+        local_package_spec,
     };
 
-    // Recursively build all dependencies.
-    let dependencies = rockspec
-        .dependencies
-        .current_platform()
-        .iter()
-        .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
-        .collect_vec();
-    let missing_dependencies = dependencies
+    Ok(dependency_install_spec
         .into_iter()
-        .filter(|req| tree.has_rock(req).is_none())
-        .map(|req| (build_behaviour, req.to_owned()))
-        .collect_vec();
-    let installed_dependencies =
-        install_impl(multiprogress, missing_dependencies, pin, config, lockfile).await?;
-
-    let package =
-        crate::build::build(progress, rockspec, pin, constraint, build_behaviour, config).await?;
-
-    lockfile.add(&package);
-    for dependency in installed_dependencies {
-        lockfile.add_dependency(&package, &dependency);
-    }
-
-    Ok(package)
+        .chain(std::iter::once(install_spec))
+        .collect_vec())
 }

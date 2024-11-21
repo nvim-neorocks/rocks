@@ -18,7 +18,7 @@ impl Tree {
             .rocks()
             .values()
             .cloned()
-            .map(|locked_rock| (locked_rock.name.clone(), locked_rock))
+            .map(|locked_rock| (locked_rock.name().clone(), locked_rock))
             .into_group_map())
     }
 
