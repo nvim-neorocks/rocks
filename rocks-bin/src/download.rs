@@ -1,7 +1,6 @@
 use clap::Args;
 use eyre::Result;
-use indicatif::MultiProgress;
-use rocks_lib::{config::Config, package::PackageReq};
+use rocks_lib::{config::Config, package::PackageReq, progress::MultiProgress};
 
 #[derive(Args)]
 pub struct Download {
@@ -9,17 +8,16 @@ pub struct Download {
 }
 
 pub async fn download(dl_data: Download, config: Config) -> Result<()> {
-    println!("Downloading {}...", dl_data.package_req.name());
+    let progress = MultiProgress::new();
+    let bar = progress.new_bar();
 
-    let rock = rocks_lib::operations::download_to_file(
-        &MultiProgress::new(),
-        &dl_data.package_req,
-        None,
-        &config,
-    )
-    .await?;
+    let rock =
+        rocks_lib::operations::download_to_file(&bar, &dl_data.package_req, None, &config).await?;
 
-    println!("Succesfully downloaded {}@{}", rock.name, rock.version);
+    bar.finish_with_message(format!(
+        "Succesfully downloaded {}@{}",
+        rock.name, rock.version
+    ));
 
     Ok(())
 }

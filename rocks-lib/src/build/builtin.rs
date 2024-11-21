@@ -6,10 +6,10 @@ use std::{
 use crate::{
     config::Config,
     lua_installation::LuaInstallation,
+    progress::ProgressBar,
     rockspec::{utils, Build, BuiltinBuildSpec, LuaModule, ModuleSpec},
     tree::RockLayout,
 };
-use indicatif::{MultiProgress, ProgressBar};
 use walkdir::WalkDir;
 
 use super::BuildError;
@@ -19,7 +19,7 @@ impl Build for BuiltinBuildSpec {
 
     async fn run(
         self,
-        progress: &MultiProgress,
+        progress: &ProgressBar,
         output_paths: &RockLayout,
         _no_install: bool,
         lua: &LuaInstallation,
@@ -32,12 +32,13 @@ impl Build for BuiltinBuildSpec {
             .chain(self.modules)
             .collect::<HashMap<_, _>>();
 
-        let bar = progress.add(ProgressBar::new(modules.len() as u64));
+        progress.set_position(modules.len() as u64);
+
         for (counter, (destination_path, module_type)) in modules.iter().enumerate() {
             match module_type {
                 ModuleSpec::SourcePath(source) => {
                     if source.extension().map(|ext| ext == "c").unwrap_or(false) {
-                        bar.set_message(format!(
+                        progress.set_message(format!(
                             "Compiling {} -> {}...",
                             &source.to_string_lossy(),
                             &destination_path
@@ -50,7 +51,7 @@ impl Build for BuiltinBuildSpec {
                             lua,
                         )?
                     } else {
-                        bar.set_message(format!(
+                        progress.set_message(format!(
                             "Copying {} to {}...",
                             &source.to_string_lossy(),
                             &destination_path
@@ -64,7 +65,7 @@ impl Build for BuiltinBuildSpec {
                     }
                 }
                 ModuleSpec::SourcePaths(files) => {
-                    bar.set_message("Compiling C files...");
+                    progress.set_message("Compiling C files...");
                     let absolute_source_paths =
                         files.iter().map(|file| build_dir.join(file)).collect();
                     utils::compile_c_files(
@@ -75,7 +76,7 @@ impl Build for BuiltinBuildSpec {
                     )?
                 }
                 ModuleSpec::ModulePaths(data) => {
-                    bar.set_message("Compiling C modules...");
+                    progress.set_message("Compiling C modules...");
                     utils::compile_c_modules(
                         data,
                         build_dir,
@@ -85,7 +86,7 @@ impl Build for BuiltinBuildSpec {
                     )?
                 }
             }
-            bar.set_position(counter as u64);
+            progress.set_position(counter as u64);
         }
 
         Ok(())

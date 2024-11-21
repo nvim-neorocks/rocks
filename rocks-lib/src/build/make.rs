@@ -1,4 +1,3 @@
-use indicatif::MultiProgress;
 use itertools::Itertools;
 use std::{
     io,
@@ -11,6 +10,7 @@ use crate::{
     build::variables::HasVariables,
     config::Config,
     lua_installation::LuaInstallation,
+    progress::ProgressBar,
     rockspec::{Build, MakeBuildSpec},
     tree::RockLayout,
 };
@@ -36,7 +36,7 @@ impl Build for MakeBuildSpec {
 
     async fn run(
         self,
-        _progress: &MultiProgress,
+        _progress: &ProgressBar,
         output_paths: &RockLayout,
         no_install: bool,
         lua: &LuaInstallation,

@@ -1,11 +1,8 @@
-use std::io;
-
 use eyre::Result;
-use indicatif::MultiProgress;
 use inquire::Confirm;
 use rocks_lib::{
     config::{Config, LuaVersion},
-    progress::with_spinner,
+    progress::{MultiProgress, ProgressBar},
     tree::Tree,
 };
 
@@ -19,15 +16,12 @@ pub async fn purge(config: Config) -> Result<()> {
         .prompt()?
     {
         let root_dir = tree.root();
-        with_spinner(
-            &MultiProgress::new(),
-            format!("🗑️ Purging {}", root_dir.display()),
-            || async {
-                std::fs::remove_dir_all(tree.root())?;
-                Ok::<_, io::Error>(())
-            },
-        )
-        .await?
+
+        let _spinner = MultiProgress::new().add(ProgressBar::from(format!(
+            "🗑️ Purging {}",
+            root_dir.display()
+        )));
+        std::fs::remove_dir_all(tree.root())?;
     }
 
     Ok(())

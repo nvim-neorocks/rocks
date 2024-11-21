@@ -1,4 +1,3 @@
-use indicatif::MultiProgress;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -7,7 +6,7 @@ use std::{fs, io};
 use thiserror::Error;
 
 use crate::config::LuaVersionUnset;
-use crate::progress::with_spinner;
+use crate::progress::ProgressBar;
 use crate::rockspec::utils::lua_lib_extension;
 use crate::{
     config::{Config, LuaVersion},
@@ -35,7 +34,7 @@ impl Build for RustMluaBuildSpec {
 
     async fn run(
         self,
-        progress: &MultiProgress,
+        progress: &ProgressBar,
         output_paths: &RockLayout,
         _no_install: bool,
         _lua: &LuaInstallation,
@@ -122,23 +121,15 @@ fn install_lua_libs(
     Ok(())
 }
 
-async fn cleanup(progress: &MultiProgress, output_paths: &RockLayout) -> io::Result<()> {
+async fn cleanup(progress: &ProgressBar, output_paths: &RockLayout) -> io::Result<()> {
     let root_dir = &output_paths.rock_path;
-    with_spinner(
-        progress,
-        format!("🗑️ Cleaning up {}", root_dir.display()),
-        || async {
-            match std::fs::remove_dir_all(root_dir) {
-                Ok(_) => (),
-                Err(err) => progress.println(format!(
-                    "Error cleaning up {}: {}",
-                    root_dir.display(),
-                    err
-                ))?,
-            };
-            Ok::<_, io::Error>(())
-        },
-    )
-    .await?;
+
+    progress.set_message(format!("🗑️ Cleaning up {}", root_dir.display()));
+
+    match std::fs::remove_dir_all(root_dir) {
+        Ok(_) => (),
+        Err(err) => progress.println(format!("Error cleaning up {}: {}", root_dir.display(), err)),
+    };
+
     Ok(())
 }

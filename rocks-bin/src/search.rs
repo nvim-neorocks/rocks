@@ -9,6 +9,7 @@ use rocks_lib::{
     config::Config,
     manifest::{manifest_from_server, ManifestMetadata},
     package::{PackageName, PackageReq, PackageVersion},
+    progress::{MultiProgress, ProgressBar},
 };
 
 #[derive(Args)]
@@ -21,6 +22,12 @@ pub struct Search {
 }
 
 pub async fn search(data: Search, config: Config) -> Result<()> {
+    let progress = MultiProgress::new();
+    let bar = progress.add(ProgressBar::from(format!(
+        "🔎 Searching for `{}`...",
+        data.lua_package_req
+    )));
+
     let formatting = TreeFormatting::dir_tree(FormatCharacters::box_chars());
 
     let manifest = manifest_from_server(config.server().clone(), &config).await?;
@@ -50,6 +57,8 @@ pub async fn search(data: Search, config: Config) -> Result<()> {
             }
         })
         .collect();
+
+    bar.finish_and_clear();
 
     if data.porcelain {
         println!("{}", serde_json::to_string(&rock_to_version_map)?);

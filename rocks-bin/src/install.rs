@@ -1,5 +1,4 @@
 use eyre::Result;
-use indicatif::MultiProgress;
 use inquire::Confirm;
 use itertools::Itertools;
 use rocks_lib::{
@@ -7,6 +6,7 @@ use rocks_lib::{
     config::{Config, LuaVersion},
     lockfile::PinnedState,
     package::PackageReq,
+    progress::MultiProgress,
     tree::Tree,
 };
 

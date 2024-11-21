@@ -6,7 +6,6 @@ mod rust_mlua;
 pub mod utils; // Make build utilities available as a submodule
 pub use builtin::{BuiltinBuildSpec, LuaModule, ModulePaths, ModuleSpec};
 pub use cmake::*;
-use indicatif::MultiProgress;
 pub use make::*;
 pub use rust_mlua::*;
 
@@ -29,7 +28,9 @@ use thiserror::Error;
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
-use crate::{config::Config, lua_installation::LuaInstallation, tree::RockLayout};
+use crate::{
+    config::Config, lua_installation::LuaInstallation, progress::ProgressBar, tree::RockLayout,
+};
 
 use super::{
     mlua_json_value_to_vec, LuaTableKey, PartialOverride, PerPlatform, PlatformIdentifier,
@@ -526,7 +527,7 @@ pub trait Build {
 
     fn run(
         self,
-        progress: &MultiProgress,
+        progress: &ProgressBar,
         output_paths: &RockLayout,
         no_install: bool,
         lua: &LuaInstallation,

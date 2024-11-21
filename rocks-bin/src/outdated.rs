@@ -6,6 +6,7 @@ use itertools::Itertools;
 use rocks_lib::{
     config::{Config, LuaVersion},
     manifest::{manifest_from_server, ManifestMetadata},
+    progress::{MultiProgress, ProgressBar},
     tree::Tree,
 };
 use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
@@ -17,6 +18,11 @@ pub struct Outdated {
 }
 
 pub async fn outdated(outdated_data: Outdated, config: Config) -> Result<()> {
+    let progress = MultiProgress::new();
+    let bar = progress.add(ProgressBar::from(
+        "🔎 Checking for outdated rocks...".to_string(),
+    ));
+
     let manifest = manifest_from_server(config.server().clone(), &config).await?;
 
     let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
@@ -38,6 +44,8 @@ pub async fn outdated(outdated_data: Outdated, config: Config) -> Result<()> {
         })
         .sorted_by_key(|(rock, _)| rock.name().to_owned())
         .into_group_map_by(|(rock, _)| rock.name().to_owned());
+
+    bar.finish_and_clear();
 
     if outdated_data.porcelain {
         let jsonified_rock_list = rock_list

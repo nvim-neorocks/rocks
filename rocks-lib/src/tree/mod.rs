@@ -1,5 +1,3 @@
-use mlua::{ExternalResult as _, Function};
-
 use crate::{
     build::variables::{self, HasVariables},
     config::LuaVersion,
@@ -7,6 +5,9 @@ use crate::{
     package::PackageReq,
 };
 use std::{io, path::PathBuf};
+
+#[cfg(feature = "lua")]
+use mlua::ExternalResult as _;
 
 mod list;
 
@@ -205,7 +206,7 @@ impl mlua::UserData for Tree {
         });
         methods.add_method(
             "has_rock_and",
-            |_, this, (req, callback): (PackageReq, Function)| {
+            |_, this, (req, callback): (PackageReq, mlua::Function)| {
                 Ok(this.has_rock_and(&req, |package| {
                     callback
                         .call(package.clone())

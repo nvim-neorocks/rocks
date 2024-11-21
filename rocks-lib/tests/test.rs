@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use indicatif::MultiProgress;
 use rocks_lib::{
     config::{ConfigBuilder, LuaVersion},
     operations::{ensure_busted, run_tests, TestEnv},
+    progress::MultiProgress,
     project::Project,
     tree::Tree,
 };
