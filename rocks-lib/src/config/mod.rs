@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::{
     build::variables::{self, HasVariables},
-    package::PackageVersion,
+    package::{PackageVersion, PackageVersionReq},
     project::{Project, ProjectError},
 };
 
@@ -27,6 +27,14 @@ impl LuaVersion {
             LuaVersion::Lua52 | LuaVersion::LuaJIT52 => "5.2.0".parse().unwrap(),
             LuaVersion::Lua53 => "5.3.0".parse().unwrap(),
             LuaVersion::Lua54 => "5.4.0".parse().unwrap(),
+        }
+    }
+    pub fn as_version_req(&self) -> PackageVersionReq {
+        match self {
+            LuaVersion::Lua51 | LuaVersion::LuaJIT => "~> 5.1".parse().unwrap(),
+            LuaVersion::Lua52 | LuaVersion::LuaJIT52 => "~> 5.2".parse().unwrap(),
+            LuaVersion::Lua53 => "~> 5.3".parse().unwrap(),
+            LuaVersion::Lua54 => "~> 5.4".parse().unwrap(),
         }
     }
 }

@@ -17,6 +17,7 @@ use rocks_lib::{
     lockfile::PinnedState::{Pinned, Unpinned},
 };
 use run::Run;
+use run_lua::RunLua;
 use search::Search;
 use test::Test;
 use update::Update;
@@ -38,6 +39,7 @@ mod project;
 mod purge;
 mod remove;
 mod run;
+mod run_lua;
 mod search;
 mod test;
 mod unpack;
@@ -134,6 +136,8 @@ enum Commands {
     Lint,
     /// List currently installed rocks.
     List(ListCmd),
+    /// Run lua, with the `LUA_PATH` and `LUA_CPATH` set to the specified rocks tree.
+    Lua(RunLua),
     /// Create a new Lua project.
     New(NewProject),
     /// List outdated rocks.
@@ -211,6 +215,7 @@ async fn main() {
             .unwrap(),
         Commands::Build(build_data) => build::build(build_data, config).await.unwrap(),
         Commands::List(list_data) => list::list_installed(list_data, config).unwrap(),
+        Commands::Lua(run_lua) => run_lua::run_lua(run_lua, config).await.unwrap(),
         Commands::Install(install_data) => install::install(install_data, config).await.unwrap(),
         Commands::Outdated(outdated) => outdated::outdated(outdated, config).await.unwrap(),
         Commands::InstallLua => install_lua::install_lua(config).await.unwrap(),
