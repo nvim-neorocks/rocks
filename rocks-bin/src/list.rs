@@ -27,8 +27,7 @@ pub fn list_installed(list_data: ListCmd, config: Config) -> Result<()> {
 
             for package in packages {
                 tree.push(format!(
-                    "{} {}{}",
-                    package.name(),
+                    "{}{}",
                     package.version(),
                     if package.pinned() == PinnedState::Pinned {
                         " (pinned)"
