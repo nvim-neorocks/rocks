@@ -330,7 +330,7 @@ impl mlua::UserData for LocalPackageHashes {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LockConstraint {
     Unconstrained,
     Constrained(PackageVersionReq),

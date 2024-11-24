@@ -1,5 +1,6 @@
 use std::{borrow::Cow, time::Duration};
 
+#[derive(Clone)]
 pub struct MultiProgress(indicatif::MultiProgress);
 pub struct ProgressBar(indicatif::ProgressBar);
 

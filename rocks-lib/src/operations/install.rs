@@ -3,19 +3,20 @@ use std::{collections::HashMap, io};
 use crate::{
     build::{BuildBehaviour, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
-    lockfile::{
-        LocalPackage, LocalPackageId, LocalPackageSpec, LockConstraint, Lockfile, PinnedState,
-    },
-    package::{PackageName, PackageReq, PackageVersionReq},
+    lockfile::{LocalPackage, LocalPackageId, LockConstraint, Lockfile, PinnedState},
+    operations::download_rockspec,
+    package::{PackageReq, PackageVersionReq},
     progress::{MultiProgress, ProgressBar},
     rockspec::{LuaVersionError, Rockspec},
     tree::Tree,
 };
 
+use async_recursion::async_recursion;
 use futures::future::join_all;
 use itertools::Itertools;
 use semver::VersionReq;
 use thiserror::Error;
+use tokio::sync::mpsc::UnboundedSender;
 
 use super::SearchAndDownloadError;
 
@@ -29,10 +30,11 @@ pub enum InstallError {
     BuildError(#[from] BuildError),
 }
 
+#[derive(Debug)]
 struct PackageInstallSpec {
     build_behaviour: BuildBehaviour,
     rockspec: Rockspec,
-    local_package_spec: LocalPackageSpec,
+    constraint: LockConstraint,
 }
 
 pub async fn install(
@@ -58,111 +60,99 @@ async fn install_impl(
     config: &Config,
     lockfile: &mut Lockfile,
 ) -> Result<Vec<LocalPackage>, InstallError> {
-    let bar = progress.add(ProgressBar::from(
-        "🔭 Resolving dependencies...".to_string(),
-    ));
-    let all_packages = join_all(packages.iter().map(|(behaviour, pkg)| {
-        flattened_install_specs(&bar, (*behaviour, pkg.clone()), &pin, config)
-    }))
-    .await
-    .into_iter()
-    .try_collect::<_, Vec<Vec<PackageInstallSpec>>, InstallError>()?
-    .into_iter()
-    .flatten()
-    .unique_by(|install_spec| install_spec.local_package_spec.id().clone())
-    .collect_vec();
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
-    let local_package_specs = all_packages
-        .iter()
-        .map(|install_spec| install_spec.local_package_spec.clone())
-        .collect_vec();
+    get_all_dependencies(tx, progress.clone(), packages, config).await?;
+
+    let mut all_packages = Vec::with_capacity(rx.len());
+
+    while let Some(dep) = rx.recv().await {
+        all_packages.push(dep);
+    }
 
     let installed_packages = join_all(all_packages.into_iter().map(|install_spec| {
-        let local_package_spec = install_spec.local_package_spec;
-        bar.set_message(format!("💻 Installing {}", local_package_spec.to_package()));
-        crate::build::build(
-            &bar,
-            install_spec.rockspec,
-            pin,
-            local_package_spec.constraint(),
-            install_spec.build_behaviour,
-            config,
-        )
+        let bar = progress.add(ProgressBar::from(format!(
+            "💻 Installing {}",
+            install_spec.rockspec.package,
+        )));
+        let config = config.clone();
+
+        tokio::spawn(async move {
+            let pkg = crate::build::build(
+                &bar,
+                install_spec.rockspec,
+                pin,
+                install_spec.constraint,
+                install_spec.build_behaviour,
+                &config,
+            )
+            .await?;
+
+            bar.finish_and_clear();
+
+            Ok::<_, BuildError>((pkg.id(), pkg))
+        })
     }))
     .await
     .into_iter()
-    .map(|result| result.map(|pkg| (pkg.id(), pkg)))
+    .flatten()
     .try_collect::<_, HashMap<LocalPackageId, LocalPackage>, _>()?;
 
-    local_package_specs
-        .into_iter()
-        .filter_map(|spec| {
-            let installed_package_opt = installed_packages.get(&spec.id());
-            installed_package_opt.map(|installed_package| (installed_package, spec))
-        })
-        .for_each(|(pkg, spec)| {
-            lockfile.add(pkg);
-            spec.dependencies
-                .iter()
-                .filter_map(|id| installed_packages.get(id))
-                .for_each(|dependency| lockfile.add_dependency(pkg, dependency))
-        });
+    installed_packages.iter().for_each(|(_, pkg)| {
+        lockfile.add(pkg);
+        pkg.dependencies()
+            .iter()
+            .filter_map(|id| installed_packages.get(id))
+            .for_each(|dependency| lockfile.add_dependency(pkg, dependency))
+    });
 
     Ok(installed_packages.into_values().collect_vec())
 }
 
-/// Get a flattened list of packages to install
-async fn flattened_install_specs(
-    progress: &ProgressBar,
-    (build_behaviour, package): (BuildBehaviour, PackageReq),
-    pin: &PinnedState,
+#[async_recursion]
+async fn get_all_dependencies(
+    tx: UnboundedSender<PackageInstallSpec>,
+    progress: MultiProgress,
+    packages: Vec<(BuildBehaviour, PackageReq)>,
     config: &Config,
-) -> Result<Vec<PackageInstallSpec>, InstallError> {
-    let constraint = if *package.version_req() == PackageVersionReq::SemVer(VersionReq::STAR) {
-        LockConstraint::Unconstrained
-    } else {
-        LockConstraint::Constrained(package.version_req().clone())
-    };
-    let rockspec = super::download_rockspec(progress, &package, config).await?;
-    rockspec.validate_lua_version(config)?;
-    let lua_pkg = PackageName::new("lua".into());
-    let dependency_install_spec = join_all(
-        rockspec
-            .dependencies
-            .current_platform()
-            .iter()
-            .filter(|pkg| !pkg.name().eq(&lua_pkg))
-            .map(|pkg| {
-                flattened_install_specs(progress, (build_behaviour, pkg.clone()), pin, config)
-            }),
-    )
-    .await
-    .into_iter()
-    .try_collect::<_, Vec<Vec<PackageInstallSpec>>, InstallError>()?
-    .into_iter()
-    .flatten()
-    .collect_vec();
+) -> Result<(), SearchAndDownloadError> {
+    for (build_behaviour, package) in packages {
+        let config = config.clone();
+        let tx = tx.clone();
+        let progress = progress.clone();
 
-    let dependency_spec = dependency_install_spec
-        .iter()
-        .map(|info| info.local_package_spec.id().clone())
-        .collect_vec();
+        tokio::spawn(async move {
+            let bar = progress.new_bar();
 
-    let local_package_spec = LocalPackageSpec::new(
-        &rockspec.package,
-        &rockspec.version,
-        constraint,
-        dependency_spec,
-        pin,
-    );
-    let install_spec = PackageInstallSpec {
-        build_behaviour,
-        rockspec,
-        local_package_spec,
-    };
+            let rockspec = download_rockspec(&bar, &package, &config).await.unwrap();
 
-    Ok(dependency_install_spec
-        .into_iter()
-        .chain(std::iter::once(install_spec))
-        .collect_vec())
+            let constraint =
+                if *package.version_req() == PackageVersionReq::SemVer(VersionReq::STAR) {
+                    LockConstraint::Unconstrained
+                } else {
+                    LockConstraint::Constrained(package.version_req().clone())
+                };
+
+            let dependencies = rockspec
+                .dependencies
+                .current_platform()
+                .iter()
+                .filter(|dep| !dep.name().eq(&"lua".into()))
+                .map(|dep| (build_behaviour, dep.clone()))
+                .collect_vec();
+
+            tx.send(PackageInstallSpec {
+                build_behaviour,
+                rockspec,
+                constraint,
+            })
+            .unwrap();
+
+            get_all_dependencies(tx, progress, dependencies, &config).await?;
+
+            Ok::<_, SearchAndDownloadError>(())
+        });
+    }
+
+    Ok(())
 }
