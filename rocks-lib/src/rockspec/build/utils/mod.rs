@@ -2,6 +2,7 @@ use itertools::Itertools;
 use std::{
     io,
     path::{Path, PathBuf},
+    process::Output,
 };
 use target_lexicon::Triple;
 
@@ -22,6 +23,17 @@ pub fn copy_lua_to_module_path(
 
     std::fs::copy(source, target)?;
 
+    Ok(())
+}
+
+fn validate_output(output: Output) -> Result<(), BuildError> {
+    if !output.status.success() {
+        return Err(BuildError::CommandFailure {
+            status: output.status,
+            stdout: String::from_utf8_lossy(&output.stdout).into(),
+            stderr: String::from_utf8_lossy(&output.stderr).into(),
+        });
+    }
     Ok(())
 }
 
@@ -67,13 +79,14 @@ pub fn compile_c_files(
         .out_dir(intermediate_dir)
         .target(&host.to_string());
     let objects = build.compile_intermediates();
-    build
+    let output = build
         .get_compiler()
         .to_command()
         .args(["-shared", "-o"])
         .arg(parent.join(file))
         .args(&objects)
-        .status()?;
+        .output()?;
+    validate_output(output)?;
     Ok(())
 }
 
@@ -158,7 +171,7 @@ pub fn compile_c_modules(
         .iter()
         .map(|library| format!("-l{}", library.to_str().unwrap()));
 
-    build
+    let output = build
         .get_compiler()
         .to_command()
         .args(["-shared", "-o"])
@@ -166,7 +179,8 @@ pub fn compile_c_modules(
         .args(&objects)
         .args(libdir_args)
         .args(library_args)
-        .status()?;
+        .output()?;
+    validate_output(output)?;
 
     Ok(())
 }
