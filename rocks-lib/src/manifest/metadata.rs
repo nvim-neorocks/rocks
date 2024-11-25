@@ -10,6 +10,7 @@ use crate::{
 
 use super::ManifestFromServerError;
 
+#[derive(Clone)]
 pub struct ManifestMetadata {
     pub repository: HashMap<PackageName, HashMap<PackageVersion, Vec<ManifestRockEntry>>>,
 }
@@ -96,7 +97,7 @@ impl ManifestMetadata {
     }
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Clone, serde::Deserialize)]
 pub struct ManifestRockEntry {
     /// e.g. "linux-x86_64", "rockspec", "src", ...
     pub arch: String,

@@ -53,6 +53,7 @@ pub async fn update(
             progress,
             vec![(BuildBehaviour::NoForce, constraint)],
             PinnedState::Unpinned,
+            manifest,
             config,
         )
         .await

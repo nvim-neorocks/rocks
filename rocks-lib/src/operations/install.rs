@@ -1,9 +1,10 @@
-use std::{collections::HashMap, io};
+use std::{collections::HashMap, io, sync::Arc};
 
 use crate::{
     build::{BuildBehaviour, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{LocalPackage, LocalPackageId, LockConstraint, Lockfile, PinnedState},
+    manifest::ManifestMetadata,
     operations::download_rockspec,
     package::{PackageReq, PackageVersionReq},
     progress::{MultiProgress, ProgressBar},
@@ -41,6 +42,7 @@ pub async fn install(
     progress: &MultiProgress,
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
+    manifest: &ManifestMetadata,
     config: &Config,
 ) -> Result<Vec<LocalPackage>, InstallError>
 where
@@ -48,7 +50,15 @@ where
     let lua_version = LuaVersion::from(config)?;
     let tree = Tree::new(config.tree().clone(), lua_version)?;
     let mut lockfile = tree.lockfile()?;
-    let result = install_impl(progress, packages, pin, config, &mut lockfile).await;
+    let result = install_impl(
+        progress,
+        packages,
+        pin,
+        manifest.clone(),
+        config,
+        &mut lockfile,
+    )
+    .await;
     lockfile.flush()?;
     result
 }
@@ -57,12 +67,13 @@ async fn install_impl(
     progress: &MultiProgress,
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
+    manifest: ManifestMetadata,
     config: &Config,
     lockfile: &mut Lockfile,
 ) -> Result<Vec<LocalPackage>, InstallError> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
-    get_all_dependencies(tx, progress.clone(), packages, config).await?;
+    get_all_dependencies(tx, progress.clone(), packages, Arc::new(manifest), config).await?;
 
     let mut all_packages = Vec::with_capacity(rx.len());
 
@@ -114,17 +125,21 @@ async fn get_all_dependencies(
     tx: UnboundedSender<PackageInstallSpec>,
     progress: MultiProgress,
     packages: Vec<(BuildBehaviour, PackageReq)>,
+    manifest: Arc<ManifestMetadata>,
     config: &Config,
 ) -> Result<(), SearchAndDownloadError> {
     for (build_behaviour, package) in packages {
         let config = config.clone();
         let tx = tx.clone();
         let progress = progress.clone();
+        let manifest = Arc::clone(&manifest);
 
         tokio::spawn(async move {
             let bar = progress.new_bar();
 
-            let rockspec = download_rockspec(&bar, &package, &config).await.unwrap();
+            let rockspec = download_rockspec(&bar, &package, &manifest, &config)
+                .await
+                .unwrap();
 
             let constraint =
                 if *package.version_req() == PackageVersionReq::SemVer(VersionReq::STAR) {
@@ -148,7 +163,7 @@ async fn get_all_dependencies(
             })
             .unwrap();
 
-            get_all_dependencies(tx, progress, dependencies, &config).await?;
+            get_all_dependencies(tx, progress, dependencies, manifest, &config).await?;
 
             Ok::<_, SearchAndDownloadError>(())
         });

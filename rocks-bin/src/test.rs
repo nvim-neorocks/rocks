@@ -2,6 +2,7 @@ use clap::Args;
 use eyre::{OptionExt, Result};
 use rocks_lib::{
     config::Config,
+    manifest::ManifestMetadata,
     operations::{ensure_busted, ensure_dependencies, run_tests, TestEnv},
     progress::MultiProgress,
     project::Project,
@@ -25,6 +26,7 @@ pub async fn test(test: Test, config: Config) -> Result<()> {
         Ok(lua_version) => Ok(lua_version),
         Err(_) => rockspec.test_lua_version().ok_or_eyre("lua version not set! Please provide a version through `--lua-version <ver>` or add it to your rockspec's dependencies"),
     }?;
+    let manifest = ManifestMetadata::from_config(&config).await?;
     let test_config = config.with_lua_version(lua_version);
     let tree = Tree::new(
         test_config.tree().clone(),
@@ -32,8 +34,8 @@ pub async fn test(test: Test, config: Config) -> Result<()> {
     )?;
     let progress = MultiProgress::new();
     // TODO(#204): Only ensure busted if running with busted (e.g. a .busted directory exists)
-    ensure_busted(&progress, &tree, &test_config).await?;
-    ensure_dependencies(&progress, rockspec, &tree, &test_config).await?;
+    ensure_busted(&progress, &tree, &manifest, &test_config).await?;
+    ensure_dependencies(&progress, rockspec, &tree, &manifest, &test_config).await?;
     let test_args = test.test_args.unwrap_or_default();
     let test_env = if test.impure {
         TestEnv::Impure

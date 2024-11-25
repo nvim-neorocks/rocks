@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use rocks_lib::{
     config::{ConfigBuilder, LuaVersion},
+    manifest::ManifestMetadata,
     operations::{ensure_busted, run_tests, TestEnv},
     progress::MultiProgress,
     project::Project,
@@ -19,7 +20,8 @@ async fn run_busted_test() {
         .build()
         .unwrap();
     let tree = Tree::new(config.tree().clone(), config.lua_version().unwrap().clone()).unwrap();
-    ensure_busted(&MultiProgress::new(), &tree, &config)
+    let manifest = ManifestMetadata::from_config(&config).await.unwrap();
+    ensure_busted(&MultiProgress::new(), &tree, &manifest, &config)
         .await
         .unwrap();
     run_tests(project, Vec::new(), TestEnv::Pure, config)

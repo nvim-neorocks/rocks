@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use eyre::Result;
-use rocks_lib::{config::Config, progress::MultiProgress};
+use rocks_lib::{config::Config, manifest::ManifestMetadata, progress::MultiProgress};
 
 use crate::unpack::UnpackRemote;
 
@@ -9,7 +9,9 @@ pub async fn fetch_remote(data: UnpackRemote, config: Config) -> Result<()> {
     let package_req = data.package_req;
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
-    let rockspec = rocks_lib::operations::download_rockspec(&bar, &package_req, &config).await?;
+    let manifest = ManifestMetadata::from_config(&config).await?;
+    let rockspec =
+        rocks_lib::operations::download_rockspec(&bar, &package_req, &manifest, &config).await?;
 
     let destination = data
         .path
