@@ -1,4 +1,4 @@
-use std::{io, path::Path};
+use std::{io, path::Path, process::ExitStatus};
 
 use crate::{
     config::Config,
@@ -36,6 +36,12 @@ pub enum BuildError {
     LuaVersionError(#[from] LuaVersionError),
     #[error("failed to fetch rock source: {0}")]
     FetchSrcRockError(#[from] FetchSrcRockError),
+    #[error("compilation failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
+    CommandFailure {
+        status: ExitStatus,
+        stdout: String,
+        stderr: String,
+    },
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
