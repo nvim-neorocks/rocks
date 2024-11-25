@@ -2748,9 +2748,9 @@ dependencies = [
 
 [[package]]
 name = "remove_dir_all"
-version = "0.8.4"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a694f9e0eb3104451127f6cc1e5de55f59d3b1fc8c5ddfaeb6f1e716479ceb4a"
+checksum = "808cc0b475acf76adf36f08ca49429b12aad9f678cb56143d5b3cb49b9a1dd08"
 dependencies = [
  "cfg-if",
  "cvt",
@@ -2879,7 +2879,7 @@ dependencies = [
  "openssl",
  "pathdiff",
  "proptest",
- "remove_dir_all 0.8.4",
+ "remove_dir_all 1.0.0",
  "reqwest",
  "semver",
  "serde",
