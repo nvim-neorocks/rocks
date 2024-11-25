@@ -9,7 +9,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
-      - uses: Swatinem/rust-cache@v2
       - name: Install neovim
         uses: rhysd/action-setup-vim@v1 # Used by the 'run' integration test
         with:
