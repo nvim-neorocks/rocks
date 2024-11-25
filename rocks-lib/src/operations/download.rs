@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use crate::{
     config::Config,
-    manifest::ManifestError,
+    manifest::{ManifestError, ManifestMetadata},
     package::{PackageName, PackageReq, PackageVersion, RemotePackage},
     progress::ProgressBar,
     rockspec::{Rockspec, RockspecError},
@@ -35,9 +35,10 @@ pub enum DownloadRockspecError {
 pub async fn download_rockspec(
     progress: &ProgressBar,
     package_req: &PackageReq,
+    manifest: &ManifestMetadata,
     config: &Config,
 ) -> Result<Rockspec, SearchAndDownloadError> {
-    let package = search_manifest(progress, package_req, config).await?;
+    let package = search_manifest(progress, package_req, manifest, config).await?;
 
     progress.set_message(format!("📥 Downloading rockspec for {}", package_req));
 
@@ -63,9 +64,10 @@ pub enum SearchAndDownloadError {
 pub async fn search_and_download_src_rock(
     progress: &ProgressBar,
     package_req: &PackageReq,
+    manifest: &ManifestMetadata,
     config: &Config,
 ) -> Result<DownloadedSrcRockBytes, SearchAndDownloadError> {
-    let package = search_manifest(progress, package_req, config).await?;
+    let package = search_manifest(progress, package_req, manifest, config).await?;
     Ok(download_src_rock(progress, &package, config).await?)
 }
 
@@ -87,11 +89,12 @@ pub async fn download_to_file(
     progress: &ProgressBar,
     package_req: &PackageReq,
     destination_dir: Option<PathBuf>,
+    manifest: &ManifestMetadata,
     config: &Config,
 ) -> Result<DownloadedSrcRock, SearchAndDownloadError> {
     progress.set_message(format!("📥 Downloading {}", package_req));
 
-    let rock = search_and_download_src_rock(progress, package_req, config).await?;
+    let rock = search_and_download_src_rock(progress, package_req, manifest, config).await?;
     let full_rock_name = full_rock_name(&rock.name, &rock.version);
     tokio::fs::write(
         destination_dir
@@ -121,18 +124,19 @@ pub enum SearchManifestError {
 async fn search_manifest(
     progress: &ProgressBar,
     package_req: &PackageReq,
+    manifest: &ManifestMetadata,
     config: &Config,
 ) -> Result<RemotePackage, SearchManifestError> {
     progress.set_message("🔎 Searching manifest...");
 
-    search_manifest_impl(package_req, config).await
+    search_manifest_impl(package_req, manifest, config).await
 }
 
 async fn search_manifest_impl(
     package_req: &PackageReq,
+    manifest: &ManifestMetadata,
     config: &Config,
 ) -> Result<RemotePackage, SearchManifestError> {
-    let manifest = crate::manifest::ManifestMetadata::from_config(config).await?;
     if !manifest.has_rock(package_req.name()) {
         return Err(SearchManifestError::RockNotFound {
             name: package_req.name().clone(),

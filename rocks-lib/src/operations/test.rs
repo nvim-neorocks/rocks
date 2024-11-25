@@ -4,6 +4,7 @@ use crate::{
     build::BuildBehaviour,
     config::Config,
     lockfile::PinnedState,
+    manifest::ManifestMetadata,
     package::{PackageName, PackageReq, PackageVersionReqError},
     path::Paths,
     progress::MultiProgress,
@@ -101,6 +102,7 @@ pub enum InstallTestDependenciesError {
 pub async fn ensure_busted(
     progress: &MultiProgress,
     tree: &Tree,
+    manifest: &ManifestMetadata,
     config: &Config,
 ) -> Result<(), InstallTestDependenciesError> {
     let busted_req = PackageReq::new("busted".into(), None)?;
@@ -110,6 +112,7 @@ pub async fn ensure_busted(
             progress,
             vec![(BuildBehaviour::NoForce, busted_req)],
             PinnedState::Unpinned,
+            manifest,
             config,
         )
         .await?;
@@ -124,6 +127,7 @@ pub async fn ensure_dependencies(
     progress: &MultiProgress,
     rockspec: &Rockspec,
     tree: &Tree,
+    manifest: &ManifestMetadata,
     config: &Config,
 ) -> Result<(), InstallTestDependenciesError> {
     let dependencies = rockspec
@@ -142,7 +146,14 @@ pub async fn ensure_dependencies(
         })
         .collect_vec();
 
-    install(progress, dependencies, PinnedState::Unpinned, config).await?;
+    install(
+        progress,
+        dependencies,
+        PinnedState::Unpinned,
+        manifest,
+        config,
+    )
+    .await?;
 
     Ok(())
 }

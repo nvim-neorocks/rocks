@@ -2,6 +2,7 @@ use clap::Args;
 use eyre::Result;
 use rocks_lib::{
     config::{Config, LuaVersion},
+    manifest::ManifestMetadata,
     operations::download_rockspec,
     package::PackageReq,
     progress::MultiProgress,
@@ -16,11 +17,12 @@ pub struct Info {
 pub async fn info(data: Info, config: Config) -> Result<()> {
     // TODO(vhyrro): Add `Tree::from(&Config)`
     let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
+    let manifest = ManifestMetadata::from_config(&config).await?;
 
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    let rockspec = download_rockspec(&bar, &data.package, &config).await?;
+    let rockspec = download_rockspec(&bar, &data.package, &manifest, &config).await?;
 
     bar.finish_and_clear();
 
