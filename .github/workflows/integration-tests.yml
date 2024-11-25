@@ -4,17 +4,25 @@ name: Integration tests
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: Integration tests (${{ matrix.job.os }})
+    runs-on: ${{ matrix.job.os }}
+    permissions:
+      contents: "read"
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          - { os: ubuntu-20.04 }
+          - { os: macos-14 }
+          # FIXME - { os: windows-2019 } (nlua doesn't work with windows)
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
-      - uses: Swatinem/rust-cache@v2
       - name: Install neovim
         uses: rhysd/action-setup-vim@v1 # Used by the 'run' integration test
         with:
           neovim: true
-      - name: Integration tests
-        run: | 
-          nix develop --command cargo nextest run --test "*"
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+      - name: Run tests
+        run: cargo nextest run --test "*"
         shell: bash
