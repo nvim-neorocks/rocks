@@ -35,6 +35,7 @@ pub enum InstallError {
 struct PackageInstallSpec {
     build_behaviour: BuildBehaviour,
     rockspec: Rockspec,
+    id: LocalPackageId,
     constraint: LockConstraint,
 }
 
@@ -73,7 +74,15 @@ async fn install_impl(
 ) -> Result<Vec<LocalPackage>, InstallError> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
-    get_all_dependencies(tx, progress.clone(), packages, Arc::new(manifest), config).await?;
+    get_all_dependencies(
+        tx,
+        progress.clone(),
+        packages,
+        pin,
+        Arc::new(manifest),
+        config,
+    )
+    .await?;
 
     let mut all_packages = Vec::with_capacity(rx.len());
 
@@ -81,29 +90,34 @@ async fn install_impl(
         all_packages.push(dep);
     }
 
-    let installed_packages = join_all(all_packages.into_iter().map(|install_spec| {
-        let bar = progress.add(ProgressBar::from(format!(
-            "💻 Installing {}",
-            install_spec.rockspec.package,
-        )));
-        let config = config.clone();
+    let installed_packages = join_all(
+        all_packages
+            .into_iter()
+            .unique_by(|spec| spec.id.clone())
+            .map(|install_spec| {
+                let bar = progress.add(ProgressBar::from(format!(
+                    "💻 Installing {}",
+                    install_spec.rockspec.package,
+                )));
+                let config = config.clone();
 
-        tokio::spawn(async move {
-            let pkg = crate::build::build(
-                &bar,
-                install_spec.rockspec,
-                pin,
-                install_spec.constraint,
-                install_spec.build_behaviour,
-                &config,
-            )
-            .await?;
+                tokio::spawn(async move {
+                    let pkg = crate::build::build(
+                        &bar,
+                        install_spec.rockspec,
+                        pin,
+                        install_spec.constraint,
+                        install_spec.build_behaviour,
+                        &config,
+                    )
+                    .await?;
 
-            bar.finish_and_clear();
+                    bar.finish_and_clear();
 
-            Ok::<_, BuildError>((pkg.id(), pkg))
-        })
-    }))
+                    Ok::<_, BuildError>((pkg.id(), pkg))
+                })
+            }),
+    )
     .await
     .into_iter()
     .flatten()
@@ -125,6 +139,7 @@ async fn get_all_dependencies(
     tx: UnboundedSender<PackageInstallSpec>,
     progress: MultiProgress,
     packages: Vec<(BuildBehaviour, PackageReq)>,
+    pin: PinnedState,
     manifest: Arc<ManifestMetadata>,
     config: &Config,
 ) -> Result<(), SearchAndDownloadError> {
@@ -157,13 +172,19 @@ async fn get_all_dependencies(
                 .collect_vec();
 
             tx.send(PackageInstallSpec {
+                id: LocalPackageId::new(
+                    &rockspec.package,
+                    &rockspec.version,
+                    pin,
+                    constraint.clone(),
+                ),
                 build_behaviour,
                 rockspec,
                 constraint,
             })
             .unwrap();
 
-            get_all_dependencies(tx, progress, dependencies, manifest, &config).await?;
+            get_all_dependencies(tx, progress, dependencies, pin, manifest, &config).await?;
 
             Ok::<_, SearchAndDownloadError>(())
         });
