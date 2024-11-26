@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use rocks_lib::{
-    config::{ConfigBuilder, LuaVersion},
+    config::ConfigBuilder,
     manifest::ManifestMetadata,
     operations::{ensure_busted, run_tests, TestEnv},
     progress::MultiProgress,
@@ -16,7 +16,6 @@ async fn run_busted_test() {
     let project: Project = Project::from(project_root).unwrap().unwrap();
     let config = ConfigBuilder::new()
         .tree(Some(project.root().to_path_buf().join(".rocks")))
-        .lua_version(Some(LuaVersion::Lua51))
         .build()
         .unwrap();
     let tree = Tree::new(config.tree().clone(), config.lua_version().unwrap().clone()).unwrap();

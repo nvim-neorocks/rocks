@@ -20,21 +20,48 @@ pub enum LuaVersion {
     // LuaU,
 }
 
+#[derive(Debug, Error)]
+pub enum LuaVersionError {
+    #[error("unsupported Lua version: {0}")]
+    UnsupportedLuaVersion(PackageVersion),
+}
+
 impl LuaVersion {
     pub fn as_version(&self) -> PackageVersion {
         match self {
-            LuaVersion::Lua51 | LuaVersion::LuaJIT => "5.1.0".parse().unwrap(),
-            LuaVersion::Lua52 | LuaVersion::LuaJIT52 => "5.2.0".parse().unwrap(),
+            LuaVersion::Lua51 => "5.1.0".parse().unwrap(),
+            LuaVersion::Lua52 => "5.2.0".parse().unwrap(),
             LuaVersion::Lua53 => "5.3.0".parse().unwrap(),
             LuaVersion::Lua54 => "5.4.0".parse().unwrap(),
+            LuaVersion::LuaJIT => "2.0.0".parse().unwrap(),
+            LuaVersion::LuaJIT52 => "2.0.0".parse().unwrap(), // TODO: Is this the same version?
         }
     }
     pub fn as_version_req(&self) -> PackageVersionReq {
         match self {
-            LuaVersion::Lua51 | LuaVersion::LuaJIT => "~> 5.1".parse().unwrap(),
-            LuaVersion::Lua52 | LuaVersion::LuaJIT52 => "~> 5.2".parse().unwrap(),
+            LuaVersion::Lua51 => "~> 5.1".parse().unwrap(),
+            LuaVersion::Lua52 => "~> 5.2".parse().unwrap(),
             LuaVersion::Lua53 => "~> 5.3".parse().unwrap(),
             LuaVersion::Lua54 => "~> 5.4".parse().unwrap(),
+            LuaVersion::LuaJIT => "~> 2".parse().unwrap(),
+            LuaVersion::LuaJIT52 => "~> 2".parse().unwrap(),
+        }
+    }
+    pub fn from_version(version: PackageVersion) -> Result<LuaVersion, LuaVersionError> {
+        if LuaVersion::Lua51.as_version_req().matches(&version) {
+            Ok(LuaVersion::Lua51)
+        } else if LuaVersion::Lua52.as_version_req().matches(&version) {
+            Ok(LuaVersion::Lua52)
+        } else if LuaVersion::Lua53.as_version_req().matches(&version) {
+            Ok(LuaVersion::Lua53)
+        } else if LuaVersion::Lua54.as_version_req().matches(&version) {
+            Ok(LuaVersion::Lua54)
+        } else if LuaVersion::LuaJIT.as_version_req().matches(&version) {
+            Ok(LuaVersion::LuaJIT)
+        } else if LuaVersion::LuaJIT52.as_version_req().matches(&version) {
+            Ok(LuaVersion::LuaJIT52)
+        } else {
+            Err(LuaVersionError::UnsupportedLuaVersion(version))
         }
     }
 }
@@ -323,6 +350,14 @@ impl ConfigBuilder {
     pub fn build(self) -> Result<Config, ConfigError> {
         let data_dir = self.data_dir.unwrap_or(Config::get_default_data_path()?);
         let current_project = Project::current()?;
+        let lua_version = self
+            .lua_version
+            .or(current_project
+                .as_ref()
+                .and_then(|project| project.rockspec().lua_version()))
+            .or(crate::lua_installation::get_installed_lua_version("lua")
+                .ok()
+                .and_then(|version| LuaVersion::from_version(version).ok()));
 
         Ok(Config {
             enable_development_rockspecs: self.enable_development_rockspecs.unwrap_or(false),
@@ -333,9 +368,7 @@ impl ConfigBuilder {
             only_sources: self.only_sources,
             namespace: self.namespace.unwrap_or_default(),
             lua_dir: self.lua_dir.unwrap_or_else(|| data_dir.join("lua")),
-            lua_version: self.lua_version.or(current_project
-                .as_ref()
-                .and_then(|project| project.rockspec().lua_version())),
+            lua_version,
             tree: self
                 .tree
                 .or_else(|| {

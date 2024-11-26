@@ -1,9 +1,12 @@
-use std::path::PathBuf;
+use std::io;
+use std::{path::PathBuf, process::Command};
 use target_lexicon::Triple;
+use thiserror::Error;
 
 use crate::{
     build::variables::{self, HasVariables},
     config::{Config, LuaVersion},
+    package::PackageVersion,
 };
 
 pub struct LuaInstallation {
@@ -85,5 +88,61 @@ impl HasVariables for LuaInstallation {
             },
             input,
         )
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum GetLuaVersionError {
+    #[error("failed to run {0}: {1}")]
+    RunLuaCommandError(String, io::Error),
+    #[error("failed to parse Lua version from output: {0}")]
+    ParseLuaVersionError(String),
+    #[error(transparent)]
+    PackageVersionParseError(#[from] crate::package::PackageVersionParseError),
+}
+
+pub fn get_installed_lua_version(lua_cmd: &str) -> Result<PackageVersion, GetLuaVersionError> {
+    let output = match Command::new(lua_cmd).arg("-v").output() {
+        Ok(output) => Ok(output),
+        Err(err) => Err(GetLuaVersionError::RunLuaCommandError(lua_cmd.into(), err)),
+    }?;
+    let output_vec = if output.stderr.is_empty() {
+        output.stdout
+    } else {
+        // Yes, Lua 5.1 prints to stderr (-‸ლ)
+        output.stderr
+    };
+    let lua_output = String::from_utf8_lossy(&output_vec).to_string();
+    parse_lua_version_from_output(&lua_output)
+}
+
+fn parse_lua_version_from_output(lua_output: &str) -> Result<PackageVersion, GetLuaVersionError> {
+    let lua_version_str = lua_output
+        .trim_start_matches("Lua")
+        .trim_start_matches("JIT")
+        .split_whitespace()
+        .next()
+        .map(|s| s.to_string())
+        .ok_or(GetLuaVersionError::ParseLuaVersionError(
+            lua_output.to_string(),
+        ))?;
+    Ok(PackageVersion::parse(&lua_version_str)?)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[tokio::test]
+    async fn parse_luajit_version() {
+        let luajit_output =
+            "LuaJIT 2.1.1713773202 -- Copyright (C) 2005-2023 Mike Pall. https://luajit.org/";
+        parse_lua_version_from_output(luajit_output).unwrap();
+    }
+
+    #[tokio::test]
+    async fn parse_lua_51_version() {
+        let lua_output = "Lua 5.1.5  Copyright (C) 1994-2012 Lua.org, PUC-Rio";
+        parse_lua_version_from_output(lua_output).unwrap();
     }
 }
