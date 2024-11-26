@@ -33,22 +33,26 @@ impl LuaVersion {
             LuaVersion::Lua52 => "5.2.0".parse().unwrap(),
             LuaVersion::Lua53 => "5.3.0".parse().unwrap(),
             LuaVersion::Lua54 => "5.4.0".parse().unwrap(),
-            LuaVersion::LuaJIT => "2.0.0".parse().unwrap(),
-            LuaVersion::LuaJIT52 => "2.0.0".parse().unwrap(), // TODO: Is this the same version?
+            LuaVersion::LuaJIT => "5.1.0".parse().unwrap(),
+            LuaVersion::LuaJIT52 => "5.2.0".parse().unwrap(),
         }
     }
     pub fn as_version_req(&self) -> PackageVersionReq {
         match self {
-            LuaVersion::Lua51 => "~> 5.1".parse().unwrap(),
-            LuaVersion::Lua52 => "~> 5.2".parse().unwrap(),
+            LuaVersion::Lua51 | LuaVersion::LuaJIT => "~> 5.1".parse().unwrap(),
+            LuaVersion::Lua52 | LuaVersion::LuaJIT52 => "~> 5.2".parse().unwrap(),
             LuaVersion::Lua53 => "~> 5.3".parse().unwrap(),
             LuaVersion::Lua54 => "~> 5.4".parse().unwrap(),
-            LuaVersion::LuaJIT => "~> 2".parse().unwrap(),
-            LuaVersion::LuaJIT52 => "~> 2".parse().unwrap(),
         }
     }
+
+    /// Get the LuaVersion from a version that has been parsed from the `lua -v` output
     pub fn from_version(version: PackageVersion) -> Result<LuaVersion, LuaVersionError> {
-        if LuaVersion::Lua51.as_version_req().matches(&version) {
+        // NOTE: Special case. luajit -v outputs 2.x.y as a version
+        let luajit_version_req: PackageVersionReq = "~> 2".parse().unwrap();
+        if luajit_version_req.matches(&version) {
+            Ok(LuaVersion::LuaJIT)
+        } else if LuaVersion::Lua51.as_version_req().matches(&version) {
             Ok(LuaVersion::Lua51)
         } else if LuaVersion::Lua52.as_version_req().matches(&version) {
             Ok(LuaVersion::Lua52)
@@ -56,10 +60,6 @@ impl LuaVersion {
             Ok(LuaVersion::Lua53)
         } else if LuaVersion::Lua54.as_version_req().matches(&version) {
             Ok(LuaVersion::Lua54)
-        } else if LuaVersion::LuaJIT.as_version_req().matches(&version) {
-            Ok(LuaVersion::LuaJIT)
-        } else if LuaVersion::LuaJIT52.as_version_req().matches(&version) {
-            Ok(LuaVersion::LuaJIT52)
         } else {
             Err(LuaVersionError::UnsupportedLuaVersion(version))
         }

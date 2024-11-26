@@ -65,21 +65,28 @@
           inherit rocks;
         };
 
-        devShells.default = pkgs.mkShell {
-          name = "rocks devShell";
-          inherit (git-hooks-check) shellHook;
-          buildInputs =
-            (with pkgs; [
-              rust-analyzer
-              cargo-nextest
-              lua5_1
-            ])
-            ++ self.checks.${system}.git-hooks-check.enabledPackages
-            ++ pkgs.rocks.buildInputs
-            ++ pkgs.rocks.nativeBuildInputs;
-          env = {
-            RUST_BACKTRACE = 1;
-          };
+        devShells = let
+          mkDevShell = lua_pkg:
+            pkgs.mkShell {
+              name = "rocks devShell";
+              inherit (git-hooks-check) shellHook;
+              buildInputs =
+                (with pkgs; [
+                  rust-analyzer
+                  cargo-nextest
+                  lua_pkg
+                ])
+                ++ self.checks.${system}.git-hooks-check.enabledPackages
+                ++ pkgs.rocks.buildInputs
+                ++ pkgs.rocks.nativeBuildInputs;
+            };
+        in rec {
+          default = lua51;
+          lua51 = mkDevShell pkgs.lua5_1;
+          lua52 = mkDevShell pkgs.lua5_2;
+          lua53 = mkDevShell pkgs.lua5_3;
+          lua54 = mkDevShell pkgs.lua5_4;
+          luajit = mkDevShell pkgs.luajit;
         };
 
         checks = rec {
