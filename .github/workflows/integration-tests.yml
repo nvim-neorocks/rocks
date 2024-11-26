@@ -1,10 +1,20 @@
-on: [push, pull_request]
+on: 
+  pull_request:
+  push:
+    branches:
+      - master
 
 name: Integration tests
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: ["ubuntu-24.04", "macos-14"] # TODO: add windows-2019?
+        lua-version: ["lua51", "lua52", "lua53", "lua54", "luajit"]
+      fail-fast: false
+          
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
@@ -15,5 +25,5 @@ jobs:
           neovim: true
       - name: Integration tests
         run: | 
-          nix develop --command cargo nextest run --test "*"
+          nix develop .#${{ matrix.lua-version }} --command cargo nextest run --test "*"
         shell: bash
