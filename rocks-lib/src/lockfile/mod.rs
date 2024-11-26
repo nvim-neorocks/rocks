@@ -75,6 +75,30 @@ pub(crate) struct LocalPackageSpec {
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, Clone)]
 pub struct LocalPackageId(String);
 
+impl LocalPackageId {
+    pub fn new(
+        name: &PackageName,
+        version: &PackageVersion,
+        pinned: PinnedState,
+        constraint: LockConstraint,
+    ) -> Self {
+        let mut hasher = Sha256::new();
+
+        hasher.update(format!(
+            "{}{}{}{}",
+            name,
+            version,
+            pinned.as_bool(),
+            match constraint {
+                LockConstraint::Unconstrained => String::default(),
+                LockConstraint::Constrained(version_req) => version_req.to_string(),
+            },
+        ));
+
+        Self(hex::encode(hasher.finalize()))
+    }
+}
+
 impl Display for LocalPackageId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
@@ -102,17 +126,15 @@ impl LocalPackageSpec {
     }
 
     pub fn id(&self) -> LocalPackageId {
-        let mut hasher = Sha256::new();
-
-        hasher.update(format!(
-            "{}{}{}{}",
-            self.name,
-            self.version,
-            self.pinned.as_bool(),
-            self.constraint.clone().unwrap_or_default()
-        ));
-
-        LocalPackageId(hex::encode(hasher.finalize()))
+        LocalPackageId::new(
+            self.name(),
+            self.version(),
+            self.pinned,
+            match &self.constraint {
+                None => LockConstraint::Unconstrained,
+                Some(constraint) => LockConstraint::Constrained(constraint.parse().unwrap()),
+            },
+        )
     }
 
     pub fn constraint(&self) -> LockConstraint {
