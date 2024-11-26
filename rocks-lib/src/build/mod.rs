@@ -44,7 +44,7 @@ pub enum BuildError {
     },
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum BuildBehaviour {
     NoForce,
     Force,

@@ -93,12 +93,13 @@ pub async fn download_to_file(
 
     let rock = search_and_download_src_rock(progress, package_req, config).await?;
     let full_rock_name = full_rock_name(&rock.name, &rock.version);
-    std::fs::write(
+    tokio::fs::write(
         destination_dir
             .map(|dest| dest.join(&full_rock_name))
             .unwrap_or_else(|| full_rock_name.clone().into()),
         &rock.bytes,
-    )?;
+    )
+    .await?;
 
     Ok(DownloadedSrcRock {
         name: rock.name.to_owned(),

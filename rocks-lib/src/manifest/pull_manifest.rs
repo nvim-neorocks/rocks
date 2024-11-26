@@ -1,6 +1,7 @@
 use reqwest::{header::ToStrError, Client};
-use std::{fs, io, time::SystemTime};
+use std::time::SystemTime;
 use thiserror::Error;
+use tokio::{fs, io};
 
 use crate::config::Config;
 
@@ -32,12 +33,12 @@ pub async fn manifest_from_server(
     let cache = config.cache_dir().join(&manifest_filename);
 
     // Ensure all intermediate directories for the cache file are created (e.g. `~/.cache/rocks/manifest`)
-    fs::create_dir_all(cache.parent().unwrap())?;
+    fs::create_dir_all(cache.parent().unwrap()).await?;
 
     let client = Client::new();
 
     // Read the metadata of the local cache and attempt to get the last modified date.
-    if let Ok(metadata) = fs::metadata(&cache) {
+    if let Ok(metadata) = fs::metadata(&cache).await {
         let last_modified_local: SystemTime = metadata.modified()?;
 
         // Ask the server for the last modified date of its manifest.
@@ -51,13 +52,13 @@ pub async fn manifest_from_server(
                 // Since we only pulled in the headers previously we must now request the entire
                 // manifest from scratch.
                 let new_manifest_content = client.get(&url).send().await?.text().await?;
-                fs::write(&cache, &new_manifest_content)?;
+                fs::write(&cache, &new_manifest_content).await?;
 
                 return Ok(new_manifest_content);
             }
 
             // Else return the cached manifest.
-            return Ok(fs::read_to_string(&cache)?);
+            return Ok(fs::read_to_string(&cache).await?);
         }
     }
 
@@ -65,7 +66,7 @@ pub async fn manifest_from_server(
 
     let new_manifest = client.get(url).send().await?.text().await?;
 
-    fs::write(&cache, &new_manifest)?;
+    fs::write(&cache, &new_manifest).await?;
 
     Ok(new_manifest)
 }
@@ -134,8 +135,8 @@ mod tests {
         let manifest_content = "dummy data";
         let cache_dir = assert_fs::TempDir::new().unwrap();
         let cache = cache_dir.join("manifest");
-        fs::write(&cache, manifest_content).unwrap();
-        let _metadata = fs::metadata(&cache).unwrap();
+        fs::write(&cache, manifest_content).await.unwrap();
+        let _metadata = fs::metadata(&cache).await.unwrap();
         let config = ConfigBuilder::new()
             .cache_dir(Some(cache_dir.to_path_buf()))
             .build()
