@@ -3,7 +3,7 @@ use std::time::SystemTime;
 use thiserror::Error;
 use tokio::{fs, io};
 
-use crate::config::Config;
+use crate::config::{Config, LuaVersion};
 
 #[derive(Error, Debug)]
 pub enum ManifestFromServerError {
@@ -24,6 +24,20 @@ pub async fn manifest_from_server(
     let manifest_filename = "manifest".to_string()
         + &config
             .lua_version()
+            .filter(|lua_version| {
+                // There's no manifest-luajit
+                matches!(
+                    lua_version,
+                    LuaVersion::Lua51 | LuaVersion::Lua52 | LuaVersion::Lua53 | LuaVersion::Lua54
+                )
+            })
+            .or(config
+                .lua_version()
+                .and_then(|lua_version| match lua_version {
+                    LuaVersion::LuaJIT => Some(&LuaVersion::Lua51),
+                    LuaVersion::LuaJIT52 => Some(&LuaVersion::Lua52),
+                    _ => None,
+                }))
             .map(|s| format!("-{}", s))
             .unwrap_or_default();
     let url = url.trim_end_matches('/').to_string() + "/" + &manifest_filename;
@@ -97,13 +111,14 @@ mod tests {
 
     #[tokio::test]
     #[serial]
-    pub async fn get_manifest() {
+    pub async fn get_manifest_luajit() {
         let cache_dir = assert_fs::TempDir::new().unwrap().to_path_buf();
-        let server = start_test_server("manifest".into());
+        let server = start_test_server("manifest-5.1".into());
         let mut url_str = server.url_str(""); // Remove trailing "/"
         url_str.pop();
         let config = ConfigBuilder::new()
             .cache_dir(Some(cache_dir))
+            .lua_version(Some(crate::config::LuaVersion::LuaJIT))
             .build()
             .unwrap();
         manifest_from_server(url_str, &config).await.unwrap();
@@ -129,16 +144,17 @@ mod tests {
     #[tokio::test]
     #[serial]
     pub async fn get_cached_manifest() {
-        let server = start_test_server("manifest".into());
+        let server = start_test_server("manifest-5.1".into());
         let mut url_str = server.url_str(""); // Remove trailing "/"
         url_str.pop();
         let manifest_content = "dummy data";
         let cache_dir = assert_fs::TempDir::new().unwrap();
-        let cache = cache_dir.join("manifest");
+        let cache = cache_dir.join("manifest-5.1");
         fs::write(&cache, manifest_content).await.unwrap();
         let _metadata = fs::metadata(&cache).await.unwrap();
         let config = ConfigBuilder::new()
             .cache_dir(Some(cache_dir.to_path_buf()))
+            .lua_version(Some(crate::config::LuaVersion::Lua51))
             .build()
             .unwrap();
         let result = manifest_from_server(url_str, &config).await.unwrap();

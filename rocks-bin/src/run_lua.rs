@@ -1,11 +1,11 @@
 use std::process::Command;
 
 use clap::Args;
-use eyre::{eyre, OptionExt as _, Result};
+use eyre::{eyre, Result};
 use itertools::Itertools;
 use rocks_lib::{
     config::{Config, LuaVersion},
-    package::PackageVersion,
+    lua_installation::get_installed_lua_version,
     path::Paths,
     project::Project,
     tree::Tree,
@@ -40,7 +40,8 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
         Ok(installed_version) => {
             if !lua_version.as_version_req().matches(&installed_version) {
                 return Err(eyre!(
-                    "lua -v (= {}) does not match expected Lua version {}",
+                    "{} -v (= {}) does not match expected Lua version {}",
+                    &lua_cmd,
                     installed_version,
                     &lua_version,
                 ));
@@ -108,25 +109,6 @@ Options:
         lua_help,
     );
     Ok(())
-}
-
-fn get_installed_lua_version(lua_cmd: &str) -> Result<PackageVersion> {
-    let output = match Command::new(lua_cmd).arg("-v").output() {
-        Ok(output) => Ok(output),
-        Err(err) => Err(eyre!("Failed to run {}: {}", lua_cmd, err)),
-    }?;
-    // Example: Lua 5.1.5  Copyright (C) 1994-2012 Lua.org, PUC-Rio
-    let lua_output = String::from_utf8_lossy(&output.stderr); // Yes, Lua prints to stderr (-‸ლ)
-    let lua_version_str = lua_output
-        .trim_start_matches("Lua")
-        .split_whitespace()
-        .next()
-        .map(|s| s.to_string())
-        .ok_or_eyre(format!(
-            "Could not extract Lua version from output: {}",
-            lua_output
-        ))?;
-    Ok(PackageVersion::parse(&lua_version_str)?)
 }
 
 #[cfg(test)]

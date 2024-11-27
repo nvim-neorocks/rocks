@@ -26,7 +26,7 @@ mod tests {
     #[tokio::test]
     pub async fn parse_metadata_from_test_manifest() {
         let mut test_manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        test_manifest_path.push("resources/test/manifest");
+        test_manifest_path.push("resources/test/manifest-5.1");
         let manifest = String::from_utf8(fs::read(&test_manifest_path).unwrap()).unwrap();
         metadata::ManifestMetadata::new(&manifest).unwrap();
     }
@@ -34,7 +34,7 @@ mod tests {
     #[tokio::test]
     pub async fn latest_match_regression() {
         let mut test_manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        test_manifest_path.push("resources/test/manifest");
+        test_manifest_path.push("resources/test/manifest-5.1");
         let manifest = String::from_utf8(fs::read(&test_manifest_path).unwrap()).unwrap();
         let metadata = metadata::ManifestMetadata::new(&manifest).unwrap();
 
