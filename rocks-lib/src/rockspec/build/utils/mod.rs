@@ -74,7 +74,7 @@ pub fn compile_c_files(
         .debug(false)
         .files(files)
         .host(std::env::consts::OS)
-        .includes(&lua.include_dir)
+        .include(&lua.include_dir)
         .opt_level(3)
         .out_dir(intermediate_dir)
         .target(&host.to_string());
@@ -84,6 +84,8 @@ pub fn compile_c_files(
         .to_command()
         .args(["-shared", "-o"])
         .arg(parent.join(file))
+        .arg(format!("-L{}", lua.lib_dir.to_string_lossy())) // TODO: In luarocks, this is behind a link_lua_explicitly config option Library directory
+        .arg(&lua.link_lua_arg)
         .args(&objects)
         .output()?;
     validate_output(output)?;
@@ -140,7 +142,7 @@ pub fn compile_c_modules(
         .files(source_files)
         .host(std::env::consts::OS)
         .includes(&include_dirs)
-        .includes(&lua.include_dir)
+        .include(&lua.include_dir)
         .opt_level(3)
         .out_dir(intermediate_dir)
         .shared_flag(true)
@@ -176,6 +178,8 @@ pub fn compile_c_modules(
         .to_command()
         .args(["-shared", "-o"])
         .arg(parent.join(file))
+        .arg(format!("-L{}", lua.lib_dir.to_string_lossy())) // TODO: In luarocks, this is behind a link_lua_explicitly config option Library directory
+        .arg(&lua.link_lua_arg)
         .args(&objects)
         .args(libdir_args)
         .args(library_args)

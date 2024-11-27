@@ -36,9 +36,9 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
         Some(prj) => prj.rockspec().lua_version_from_config(&config)?,
         None => LuaVersion::from(&config)?,
     };
-    match get_installed_lua_version(&lua_cmd) {
+    match get_installed_lua_version(&lua_cmd).and_then(|ver| Ok(LuaVersion::from_version(ver)?)) {
         Ok(installed_version) => {
-            if !lua_version.as_version_req().matches(&installed_version) {
+            if installed_version != lua_version {
                 return Err(eyre!(
                     "{} -v (= {}) does not match expected Lua version {}",
                     &lua_cmd,
@@ -123,10 +123,7 @@ mod test {
             args: Some(vec!["-v".into()]),
             ..RunLua::default()
         };
-        let config = ConfigBuilder::new()
-            .lua_version(Some(LuaVersion::Lua51))
-            .build()
-            .unwrap();
+        let config = ConfigBuilder::new().build().unwrap();
         run_lua(args, config).await.unwrap()
     }
 }

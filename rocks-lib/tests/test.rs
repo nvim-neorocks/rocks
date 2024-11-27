@@ -14,10 +14,9 @@ async fn run_busted_test() {
     let project_root =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-project-busted");
     let project: Project = Project::from(project_root).unwrap().unwrap();
-    let config = ConfigBuilder::new()
-        .tree(Some(project.root().to_path_buf().join(".rocks")))
-        .build()
-        .unwrap();
+    let tree_root = project.root().to_path_buf().join(".rocks");
+    let _ = std::fs::remove_dir_all(&tree_root);
+    let config = ConfigBuilder::new().tree(Some(tree_root)).build().unwrap();
     let tree = Tree::new(config.tree().clone(), config.lua_version().unwrap().clone()).unwrap();
     let manifest = ManifestMetadata::from_config(&config).await.unwrap();
     ensure_busted(&MultiProgress::new(), &tree, &manifest, &config)

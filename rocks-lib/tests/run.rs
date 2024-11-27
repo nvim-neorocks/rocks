@@ -1,5 +1,5 @@
 use rocks_lib::{
-    config::{ConfigBuilder, LuaVersion},
+    config::ConfigBuilder,
     operations::{install_command, run},
 };
 use tempdir::TempDir;
@@ -9,7 +9,6 @@ async fn run_nlua() {
     let dir = TempDir::new("rocks-test").unwrap();
     let config = ConfigBuilder::new()
         .tree(Some(dir.into_path()))
-        .lua_version(Some(LuaVersion::Lua51))
         .build()
         .unwrap();
     install_command("nlua", &config).await.unwrap();
