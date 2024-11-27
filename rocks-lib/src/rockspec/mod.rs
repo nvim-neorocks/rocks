@@ -36,7 +36,7 @@ pub enum RockspecError {
     LuaTable(#[from] LuaTableError),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Rockspec {
     /// The file format version. Example: "1.0"
     pub rockspec_format: Option<RockspecFormat>,
@@ -178,7 +178,7 @@ impl HasIntegrity for Rockspec {
     }
 }
 
-#[derive(Deserialize, Debug, PartialEq, Default)]
+#[derive(Clone, Deserialize, Debug, PartialEq, Default)]
 pub struct RockDescription {
     /// A one-line description of the package.
     pub summary: Option<String>,
@@ -201,7 +201,7 @@ pub struct RockDescription {
 #[error("invalid rockspec format: {0}")]
 pub struct InvalidRockspecFormat(String);
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RockspecFormat {
     #[serde(rename = "1.0")]
     _1_0,

@@ -40,7 +40,7 @@ use super::{
 ///
 /// See [the rockspec format](https://github.com/luarocks/luarocks/wiki/Rockspec-format) for more
 /// info.
-#[derive(Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct BuildSpec {
     /// Determines the build backend to use.
     pub build_backend: Option<BuildBackendSpec>,

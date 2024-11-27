@@ -10,7 +10,7 @@ use super::{
     FromPlatformOverridable, PartialOverride, PerPlatform, PerPlatformWrapper, PlatformOverridable,
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct RockSource {
     pub source_spec: RockSourceSpec,
     pub integrity: Option<Integrity>,
