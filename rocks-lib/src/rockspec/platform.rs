@@ -100,7 +100,7 @@ impl PlatformIdentifier {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PlatformSupport {
     /// Do not match this platform
     platform_map: HashMap<PlatformIdentifier, bool>,
@@ -272,7 +272,7 @@ pub trait FromPlatformOverridable<T: PlatformOverridable, G: FromPlatformOverrid
 }
 
 /// Data that that can vary per platform
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PerPlatform<T> {
     /// The base data, applicable if no platform is specified
     pub default: T,

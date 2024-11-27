@@ -9,7 +9,7 @@ use super::{
     FromPlatformOverridable, PartialOverride, PerPlatform, PerPlatformWrapper, PlatformOverridable,
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TestSpec {
     AutoDetect,
     Busted(BustedTestSpec),
@@ -67,18 +67,18 @@ impl FromLua for PerPlatform<TestSpec> {
     }
 }
 
-#[derive(Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct BustedTestSpec {
     flags: Vec<String>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CommandTestSpec {
     command: String,
     flags: Vec<String>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ScriptTestSpec {
     script: PathBuf,
     flags: Vec<String>,
