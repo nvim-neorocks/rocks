@@ -1,6 +1,6 @@
 use rocks_lib::{
     build::{self, BuildBehaviour::Force},
-    config::{ConfigBuilder, LuaVersion},
+    config::ConfigBuilder,
     lockfile::{LockConstraint::Unconstrained, PinnedState::Unpinned},
     progress::MultiProgress,
     rockspec::Rockspec,
@@ -18,7 +18,6 @@ async fn builtin_build() {
 
     let config = ConfigBuilder::new()
         .tree(Some(dir.into_path()))
-        .lua_version(Some(LuaVersion::Lua51))
         .build()
         .unwrap();
 
@@ -42,7 +41,6 @@ async fn make_build() {
 
     let config = ConfigBuilder::new()
         .tree(Some(dir.into_path()))
-        .lua_version(Some(LuaVersion::Lua51))
         .build()
         .unwrap();
 

@@ -8,6 +8,8 @@ use crate::rockspec::{
     PlatformOverridable,
 };
 
+use super::utils::lua_lib_extension;
+
 #[derive(Debug, PartialEq, Deserialize, Default, Clone)]
 pub struct BuiltinBuildSpec {
     /// Keys are module names in the format normally used by the `require()` function
@@ -23,7 +25,7 @@ impl LuaModule {
     }
 
     pub fn to_lib_path(&self) -> PathBuf {
-        self.to_pathbuf(std::env::consts::DLL_SUFFIX)
+        self.to_pathbuf(&format!(".{}", lua_lib_extension()))
     }
 
     fn to_pathbuf(&self, extension: &str) -> PathBuf {

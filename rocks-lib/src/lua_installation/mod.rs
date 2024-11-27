@@ -12,16 +12,26 @@ use crate::{
 pub struct LuaInstallation {
     pub include_dir: PathBuf,
     pub lib_dir: PathBuf,
+    /// The argument used to link Lua, e.g. "-llua"
+    pub link_lua_arg: String,
 }
 
 impl LuaInstallation {
     pub fn new(version: &LuaVersion, config: &Config) -> Self {
         let output = Self::path(version, config);
 
+        let link_lua_arg = match version {
+            LuaVersion::LuaJIT => "-lluajit-5.1",
+            LuaVersion::LuaJIT52 => "-lluajit-5.2",
+            _ => "-llua",
+        }
+        .into();
+
         if output.exists() {
             LuaInstallation {
                 include_dir: output.join("include"),
                 lib_dir: output.join("lib"),
+                link_lua_arg,
             }
         } else {
             let host = Triple::host();
@@ -30,6 +40,10 @@ impl LuaInstallation {
 
             let (include_dir, lib_dir) = match version {
                 LuaVersion::LuaJIT | LuaVersion::LuaJIT52 => {
+                    // XXX: luajit_src panics if this is not set.
+                    let target_pointer_width =
+                        std::env::var("CARGO_CFG_TARGET_POINTER_WIDTH").unwrap_or("64".into());
+                    std::env::set_var("CARGO_CFG_TARGET_POINTER_WIDTH", target_pointer_width);
                     let build = luajit_src::Build::new()
                         .target(target)
                         .host(host_operating_system)
@@ -65,6 +79,7 @@ impl LuaInstallation {
             LuaInstallation {
                 include_dir,
                 lib_dir,
+                link_lua_arg,
             }
         }
     }
@@ -99,6 +114,8 @@ pub enum GetLuaVersionError {
     ParseLuaVersionError(String),
     #[error(transparent)]
     PackageVersionParseError(#[from] crate::package::PackageVersionParseError),
+    #[error(transparent)]
+    LuaVersionError(#[from] crate::config::LuaVersionError),
 }
 
 pub fn get_installed_lua_version(lua_cmd: &str) -> Result<PackageVersion, GetLuaVersionError> {

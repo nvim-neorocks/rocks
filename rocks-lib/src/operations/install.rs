@@ -8,7 +8,7 @@ use crate::{
     },
     manifest::ManifestMetadata,
     operations::download_rockspec,
-    package::{PackageReq, PackageVersionReq},
+    package::{PackageName, PackageReq, PackageVersionReq},
     progress::{MultiProgress, ProgressBar},
     rockspec::{LuaVersionError, Rockspec},
     tree::Tree,
@@ -24,13 +24,17 @@ use tokio::sync::mpsc::UnboundedSender;
 use super::SearchAndDownloadError;
 
 #[derive(Error, Debug)]
-#[error(transparent)]
 pub enum InstallError {
+    #[error(transparent)]
     SearchAndDownloadError(#[from] SearchAndDownloadError),
+    #[error(transparent)]
     LuaVersionError(#[from] LuaVersionError),
+    #[error(transparent)]
     LuaVersionUnset(#[from] LuaVersionUnset),
+    #[error(transparent)]
     Io(#[from] io::Error),
-    BuildError(#[from] BuildError),
+    #[error("failed to build {0}: {1}")]
+    BuildError(PackageName, BuildError),
 }
 
 #[derive(Clone, Debug)]
@@ -92,10 +96,8 @@ async fn install_impl(
     }
 
     let installed_packages = join_all(all_packages.clone().into_values().map(|install_spec| {
-        let bar = progress.add(ProgressBar::from(format!(
-            "💻 Installing {}",
-            install_spec.rockspec.package,
-        )));
+        let package = install_spec.rockspec.package.clone();
+        let bar = progress.add(ProgressBar::from(format!("💻 Installing {}", &package,)));
         let config = config.clone();
 
         tokio::spawn(async move {
@@ -107,11 +109,12 @@ async fn install_impl(
                 install_spec.build_behaviour,
                 &config,
             )
-            .await?;
+            .await
+            .map_err(|err| InstallError::BuildError(package, err))?;
 
             bar.finish_and_clear();
 
-            Ok::<_, BuildError>((pkg.id(), pkg))
+            Ok::<_, InstallError>((pkg.id(), pkg))
         })
     }))
     .await
