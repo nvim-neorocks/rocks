@@ -7,7 +7,7 @@ use crate::{
     manifest::{ManifestError, ManifestMetadata},
     package::{PackageReq, PackageVersionReqError},
     path::Paths,
-    progress::MultiProgress,
+    progress::{MultiProgress, Progress},
     tree::Tree,
 };
 use thiserror::Error;
@@ -61,11 +61,11 @@ pub async fn install_command(command: &str, config: &Config) -> Result<(), Insta
     let package_req = PackageReq::new(command.into(), None)?;
     let manifest = ManifestMetadata::from_config(config).await?;
     super::install(
-        &MultiProgress::new(),
         vec![(BuildBehaviour::NoForce, package_req)],
         PinnedState::Unpinned,
         &manifest,
         config,
+        &Progress::Progress(MultiProgress::new()),
     )
     .await?;
     Ok(())

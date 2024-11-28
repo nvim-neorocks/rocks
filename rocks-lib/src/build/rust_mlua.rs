@@ -6,7 +6,7 @@ use std::{fs, io};
 use thiserror::Error;
 
 use crate::config::LuaVersionUnset;
-use crate::progress::ProgressBar;
+use crate::progress::{Progress, ProgressBar};
 use crate::rockspec::utils::lua_lib_extension;
 use crate::{
     config::{Config, LuaVersion},
@@ -34,12 +34,12 @@ impl Build for RustMluaBuildSpec {
 
     async fn run(
         self,
-        progress: &ProgressBar,
         output_paths: &RockLayout,
         _no_install: bool,
         _lua: &LuaInstallation,
         config: &Config,
         build_dir: &Path,
+        progress: &Progress<ProgressBar>,
     ) -> Result<(), Self::Err> {
         let lua_version = LuaVersion::from(config)?;
         let lua_feature = match lua_version {
@@ -81,12 +81,12 @@ impl Build for RustMluaBuildSpec {
         if let Err(err) =
             install_rust_libs(self.modules, &self.target_path, build_dir, output_paths)
         {
-            cleanup(progress, output_paths).await?;
+            cleanup(output_paths, progress).await?;
             return Err(err.into());
         }
         fs::create_dir_all(&output_paths.src)?;
         if let Err(err) = install_lua_libs(self.include, build_dir, output_paths) {
-            cleanup(progress, output_paths).await?;
+            cleanup(output_paths, progress).await?;
             return Err(err.into());
         }
         Ok(())
@@ -121,14 +121,17 @@ fn install_lua_libs(
     Ok(())
 }
 
-async fn cleanup(progress: &ProgressBar, output_paths: &RockLayout) -> io::Result<()> {
+async fn cleanup(output_paths: &RockLayout, progress: &Progress<ProgressBar>) -> io::Result<()> {
     let root_dir = &output_paths.rock_path;
 
-    progress.set_message(format!("🗑️ Cleaning up {}", root_dir.display()));
+    progress.map(|p| p.set_message(format!("🗑️ Cleaning up {}", root_dir.display())));
 
     match std::fs::remove_dir_all(root_dir) {
         Ok(_) => (),
-        Err(err) => progress.println(format!("Error cleaning up {}: {}", root_dir.display(), err)),
+        Err(err) => {
+            progress
+                .map(|p| p.println(format!("Error cleaning up {}: {}", root_dir.display(), err)));
+        }
     };
 
     Ok(())

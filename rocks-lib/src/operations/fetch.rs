@@ -15,6 +15,7 @@ use thiserror::Error;
 use crate::config::Config;
 use crate::operations;
 use crate::package::RemotePackage;
+use crate::progress::Progress;
 use crate::progress::ProgressBar;
 use crate::{rockspec::RockSource, rockspec::RockSourceSpec};
 
@@ -33,14 +34,14 @@ pub enum FetchSrcError {
 }
 
 pub async fn fetch_src(
-    progress: &ProgressBar,
     dest_dir: &Path,
     rock_source: &RockSource,
+    progress: &Progress<ProgressBar>,
 ) -> Result<(), FetchSrcError> {
     match &rock_source.source_spec {
         RockSourceSpec::Git(git) => {
             let url = &git.url.to_string();
-            progress.set_message(format!("🦠 Cloning {}", url));
+            progress.map(|p| p.set_message(format!("🦠 Cloning {}", url)));
 
             let mut fetch_options = FetchOptions::new();
             if git.checkout_ref.is_none() {
@@ -56,7 +57,7 @@ pub async fn fetch_src(
             }
         }
         RockSourceSpec::Url(url) => {
-            progress.set_message(format!("📥 Downloading {}", url.to_owned()));
+            progress.map(|p| p.set_message(format!("📥 Downloading {}", url.to_owned())));
 
             let response = reqwest::get(url.to_owned()).await?.bytes().await?;
             let file_name = url
@@ -73,18 +74,18 @@ pub async fn fetch_src(
             let cursor = Cursor::new(response);
             let mime_type = infer::get(cursor.get_ref()).map(|file_type| file_type.mime_type());
             unpack(
-                progress,
                 mime_type,
                 cursor,
                 rock_source.unpack_dir.is_none(),
                 file_name,
                 dest_dir,
+                progress,
             )
             .await?
         }
         RockSourceSpec::File(path) => {
             if path.is_dir() {
-                progress.set_message(format!("📋 Copying {}", path.display()));
+                progress.map(|p| p.set_message(format!("📋 Copying {}", path.display())));
 
                 for file in walkdir::WalkDir::new(path).into_iter().flatten() {
                     if file.file_type().is_file() {
@@ -107,12 +108,12 @@ pub async fn fetch_src(
                     .unwrap_or(path.to_string_lossy())
                     .to_string();
                 unpack(
-                    progress,
                     mime_type,
                     file,
                     rock_source.unpack_dir.is_none(),
                     file_name,
                     dest_dir,
+                    progress,
                 )
                 .await?
             }
@@ -133,21 +134,21 @@ pub enum FetchSrcRockError {
 }
 
 pub async fn fetch_src_rock(
-    progress: &ProgressBar,
     package: &RemotePackage,
     dest_dir: &Path,
     config: &Config,
+    progress: &Progress<ProgressBar>,
 ) -> Result<(), FetchSrcRockError> {
-    let src_rock = operations::download_src_rock(progress, package, config).await?;
+    let src_rock = operations::download_src_rock(package, config, progress).await?;
     let cursor = Cursor::new(src_rock.bytes);
     let mime_type = infer::get(cursor.get_ref()).map(|file_type| file_type.mime_type());
     unpack(
-        progress,
         mime_type,
         cursor,
         false,
         src_rock.file_name,
         dest_dir,
+        progress,
     )
     .await?;
     Ok(())
@@ -201,14 +202,14 @@ pub enum UnpackError {
 }
 
 async fn unpack<R: Read + Seek + Send>(
-    progress: &ProgressBar,
     mime_type: Option<&str>,
     reader: R,
     auto_find_lua_sources: bool,
     file_name: String,
     dest_dir: &Path,
+    progress: &Progress<ProgressBar>,
 ) -> Result<(), UnpackError> {
-    progress.set_message(format!("📦 Unpacking {}", file_name));
+    progress.map(|p| p.set_message(format!("📦 Unpacking {}", file_name)));
 
     match mime_type {
         Some("application/zip") => {

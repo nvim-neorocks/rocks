@@ -7,7 +7,7 @@ use crate::{
     manifest::ManifestMetadata,
     package::{PackageName, PackageReq, PackageVersionReqError},
     path::Paths,
-    progress::MultiProgress,
+    progress::{MultiProgress, Progress},
     project::Project,
     rockspec::Rockspec,
     tree::Tree,
@@ -100,20 +100,20 @@ pub enum InstallTestDependenciesError {
 /// Ensure that busted is installed.
 /// This defaults to the local project tree if cwd is a project root.
 pub async fn ensure_busted(
-    progress: &MultiProgress,
     tree: &Tree,
     manifest: &ManifestMetadata,
     config: &Config,
+    progress: &Progress<MultiProgress>,
 ) -> Result<(), InstallTestDependenciesError> {
     let busted_req = PackageReq::new("busted".into(), None)?;
 
     if tree.has_rock(&busted_req).is_none() {
         install(
-            progress,
             vec![(BuildBehaviour::NoForce, busted_req)],
             PinnedState::Unpinned,
             manifest,
             config,
+            progress,
         )
         .await?;
     }
@@ -124,11 +124,11 @@ pub async fn ensure_busted(
 /// Ensure dependencies and test dependencies are installed
 /// This defaults to the local project tree if cwd is a project root.
 pub async fn ensure_dependencies(
-    progress: &MultiProgress,
     rockspec: &Rockspec,
     tree: &Tree,
     manifest: &ManifestMetadata,
     config: &Config,
+    progress: &Progress<MultiProgress>,
 ) -> Result<(), InstallTestDependenciesError> {
     let dependencies = rockspec
         .test_dependencies
@@ -147,11 +147,11 @@ pub async fn ensure_dependencies(
         .collect_vec();
 
     install(
-        progress,
         dependencies,
         PinnedState::Unpinned,
         manifest,
         config,
+        progress,
     )
     .await?;
 

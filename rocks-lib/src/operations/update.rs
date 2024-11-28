@@ -6,7 +6,7 @@ use crate::{
     lockfile::{LocalPackage, PinnedState},
     manifest::ManifestMetadata,
     package::{PackageReq, RemotePackage, RockConstraintUnsatisfied},
-    progress::{MultiProgress, ProgressBar},
+    progress::{MultiProgress, Progress, ProgressBar},
 };
 
 use super::{install, remove, InstallError, RemoveError};
@@ -30,13 +30,13 @@ pub enum UpdateError {
 }
 
 pub async fn update(
-    progress: &MultiProgress,
     package: LocalPackage,
     constraint: PackageReq,
     manifest: &ManifestMetadata,
     config: &Config,
+    progress: &Progress<MultiProgress>,
 ) -> Result<(), UpdateError> {
-    let bar = progress.add(ProgressBar::from(format!("Updating {}...", package.name())));
+    let bar = progress.map(|p| p.add(ProgressBar::from(format!("Updating {}...", package.name()))));
 
     let latest_version = package
         .to_package()
@@ -50,11 +50,11 @@ pub async fn update(
 
         // Install the newest package.
         install(
-            progress,
             vec![(BuildBehaviour::NoForce, constraint)],
             PinnedState::Unpinned,
             manifest,
             config,
+            progress,
         )
         .await
         .map_err(|error| UpdateError::Install {
@@ -63,7 +63,7 @@ pub async fn update(
         })?;
 
         // Remove the old package
-        remove(&bar, package.clone(), config)
+        remove(package.clone(), config, &bar)
             .await
             .map_err(|error| UpdateError::Remove {
                 error,

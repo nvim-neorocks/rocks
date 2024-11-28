@@ -29,7 +29,10 @@ use thiserror::Error;
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
 use crate::{
-    config::Config, lua_installation::LuaInstallation, progress::ProgressBar, tree::RockLayout,
+    config::Config,
+    lua_installation::LuaInstallation,
+    progress::{Progress, ProgressBar},
+    tree::RockLayout,
 };
 
 use super::{
@@ -527,12 +530,12 @@ pub trait Build {
 
     fn run(
         self,
-        progress: &ProgressBar,
         output_paths: &RockLayout,
         no_install: bool,
         lua: &LuaInstallation,
         config: &Config,
         build_dir: &Path,
+        progress: &Progress<ProgressBar>,
     ) -> impl Future<Output = Result<(), Self::Err>> + Send;
 }
 

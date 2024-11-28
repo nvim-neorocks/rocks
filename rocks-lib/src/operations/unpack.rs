@@ -3,6 +3,7 @@ use std::io::Seek;
 use std::path::PathBuf;
 use thiserror::Error;
 
+use crate::progress::Progress;
 use crate::progress::ProgressBar;
 
 #[derive(Error, Debug)]
@@ -10,14 +11,16 @@ use crate::progress::ProgressBar;
 pub struct UnpackError(#[from] zip::result::ZipError);
 
 pub async fn unpack_src_rock<R: Read + Seek + Send>(
-    progress: &ProgressBar,
     rock_src: R,
     destination: PathBuf,
+    progress: &Progress<ProgressBar>,
 ) -> Result<PathBuf, UnpackError> {
-    progress.set_message(format!(
-        "📦 Unpacking src.rock into {}",
-        destination.display()
-    ));
+    progress.map(|p| {
+        p.set_message(format!(
+            "📦 Unpacking src.rock into {}",
+            destination.display()
+        ))
+    });
 
     unpack_src_rock_impl(rock_src, destination).await
 }
@@ -47,8 +50,12 @@ mod tests {
             .join("luatest-0.2-1.src.rock");
         let file = File::open(&test_rock_path).unwrap();
         let dest = TempDir::new("rocks-test").unwrap();
-        unpack_src_rock(&MultiProgress::new().new_bar(), file, dest.into_path())
-            .await
-            .unwrap();
+        unpack_src_rock(
+            file,
+            dest.into_path(),
+            &Progress::Progress(MultiProgress::new().new_bar()),
+        )
+        .await
+        .unwrap();
     }
 }
