@@ -5,7 +5,7 @@ use rocks_lib::{
     manifest::ManifestMetadata,
     operations::download_rockspec,
     package::PackageReq,
-    progress::MultiProgress,
+    progress::{MultiProgress, Progress},
     tree::Tree,
 };
 
@@ -20,11 +20,11 @@ pub async fn info(data: Info, config: Config) -> Result<()> {
     let manifest = ManifestMetadata::from_config(&config).await?;
 
     let progress = MultiProgress::new();
-    let bar = progress.new_bar();
+    let bar = Progress::Progress(progress.new_bar());
 
-    let rockspec = download_rockspec(&bar, &data.package, &manifest, &config).await?;
+    let rockspec = download_rockspec(&data.package, &manifest, &config, &bar).await?;
 
-    bar.finish_and_clear();
+    bar.map(|b| b.finish_and_clear());
 
     if tree.has_rock(&data.package).is_some() {
         println!("Currently installed in {}", tree.root().display());

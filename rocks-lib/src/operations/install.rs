@@ -9,7 +9,7 @@ use crate::{
     manifest::ManifestMetadata,
     operations::download_rockspec,
     package::{PackageName, PackageReq, PackageVersionReq},
-    progress::{MultiProgress, ProgressBar},
+    progress::{MultiProgress, Progress, ProgressBar},
     rockspec::{LuaVersionError, Rockspec},
     tree::Tree,
 };
@@ -45,11 +45,11 @@ struct PackageInstallSpec {
 }
 
 pub async fn install(
-    progress: &MultiProgress,
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
     manifest: &ManifestMetadata,
     config: &Config,
+    progress: &Progress<MultiProgress>,
 ) -> Result<Vec<LocalPackage>, InstallError>
 where
 {
@@ -57,12 +57,12 @@ where
     let tree = Tree::new(config.tree().clone(), lua_version)?;
     let mut lockfile = tree.lockfile()?;
     let result = install_impl(
-        progress,
         packages,
         pin,
         manifest.clone(),
         config,
         &mut lockfile,
+        progress,
     )
     .await;
     lockfile.flush()?;
@@ -70,24 +70,16 @@ where
 }
 
 async fn install_impl(
-    progress: &MultiProgress,
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
     manifest: ManifestMetadata,
     config: &Config,
     lockfile: &mut Lockfile,
+    progress: &Progress<MultiProgress>,
 ) -> Result<Vec<LocalPackage>, InstallError> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
-    get_all_dependencies(
-        tx,
-        progress.clone(),
-        packages,
-        pin,
-        Arc::new(manifest),
-        config,
-    )
-    .await?;
+    get_all_dependencies(tx, packages, pin, Arc::new(manifest), config, progress).await?;
 
     let mut all_packages = HashMap::with_capacity(rx.len());
 
@@ -97,22 +89,27 @@ async fn install_impl(
 
     let installed_packages = join_all(all_packages.clone().into_values().map(|install_spec| {
         let package = install_spec.rockspec.package.clone();
-        let bar = progress.add(ProgressBar::from(format!("💻 Installing {}", &package,)));
+        let bar = progress.map(|p| {
+            p.add(ProgressBar::from(format!(
+                "💻 Installing {}",
+                install_spec.rockspec.package,
+            )))
+        });
         let config = config.clone();
 
         tokio::spawn(async move {
             let pkg = crate::build::build(
-                &bar,
                 install_spec.rockspec,
                 pin,
                 install_spec.spec.constraint(),
                 install_spec.build_behaviour,
                 &config,
+                &bar,
             )
             .await
             .map_err(|err| InstallError::BuildError(package, err))?;
 
-            bar.finish_and_clear();
+            bar.map(|b| b.finish_and_clear());
 
             Ok::<_, InstallError>((pkg.id(), pkg))
         })
@@ -146,11 +143,11 @@ async fn install_impl(
 #[async_recursion]
 async fn get_all_dependencies(
     tx: UnboundedSender<PackageInstallSpec>,
-    progress: MultiProgress,
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
     manifest: Arc<ManifestMetadata>,
     config: &Config,
+    progress: &Progress<MultiProgress>,
 ) -> Result<Vec<LocalPackageId>, SearchAndDownloadError> {
     join_all(packages.into_iter().map(|(build_behaviour, package)| {
         let config = config.clone();
@@ -159,9 +156,9 @@ async fn get_all_dependencies(
         let manifest = Arc::clone(&manifest);
 
         tokio::spawn(async move {
-            let bar = progress.new_bar();
+            let bar = progress.map(|p| p.new_bar());
 
-            let rockspec = download_rockspec(&bar, &package, &manifest, &config)
+            let rockspec = download_rockspec(&package, &manifest, &config, &bar)
                 .await
                 .unwrap();
 
@@ -181,7 +178,7 @@ async fn get_all_dependencies(
                 .collect_vec();
 
             let dependencies =
-                get_all_dependencies(tx.clone(), progress, dependencies, pin, manifest, &config)
+                get_all_dependencies(tx.clone(), dependencies, pin, manifest, &config, &progress)
                     .await?;
 
             let local_spec = LocalPackageSpec::new(

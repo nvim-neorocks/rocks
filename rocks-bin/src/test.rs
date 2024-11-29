@@ -4,7 +4,7 @@ use rocks_lib::{
     config::Config,
     manifest::ManifestMetadata,
     operations::{ensure_busted, ensure_dependencies, run_tests, TestEnv},
-    progress::MultiProgress,
+    progress::{MultiProgress, Progress},
     project::Project,
     tree::Tree,
 };
@@ -32,10 +32,10 @@ pub async fn test(test: Test, config: Config) -> Result<()> {
         test_config.tree().clone(),
         test_config.lua_version().unwrap().clone(),
     )?;
-    let progress = MultiProgress::new();
+    let progress = Progress::Progress(MultiProgress::new());
     // TODO(#204): Only ensure busted if running with busted (e.g. a .busted directory exists)
-    ensure_busted(&progress, &tree, &manifest, &test_config).await?;
-    ensure_dependencies(&progress, rockspec, &tree, &manifest, &test_config).await?;
+    ensure_busted(&tree, &manifest, &test_config, &progress).await?;
+    ensure_dependencies(rockspec, &tree, &manifest, &test_config, &progress).await?;
     let test_args = test.test_args.unwrap_or_default();
     let test_env = if test.impure {
         TestEnv::Impure

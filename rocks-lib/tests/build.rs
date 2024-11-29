@@ -2,7 +2,7 @@ use rocks_lib::{
     build::{self, BuildBehaviour::Force},
     config::ConfigBuilder,
     lockfile::{LockConstraint::Unconstrained, PinnedState::Unpinned},
-    progress::MultiProgress,
+    progress::{MultiProgress, Progress},
     rockspec::Rockspec,
 };
 use tempdir::TempDir;
@@ -24,9 +24,16 @@ async fn builtin_build() {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    build::build(&bar, rockspec, Unpinned, Unconstrained, Force, &config)
-        .await
-        .unwrap();
+    build::build(
+        rockspec,
+        Unpinned,
+        Unconstrained,
+        Force,
+        &config,
+        &Progress::Progress(bar),
+    )
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
@@ -47,7 +54,14 @@ async fn make_build() {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    build::build(&bar, rockspec, Unpinned, Unconstrained, Force, &config)
-        .await
-        .unwrap();
+    build::build(
+        rockspec,
+        Unpinned,
+        Unconstrained,
+        Force,
+        &config,
+        &Progress::Progress(bar),
+    )
+    .await
+    .unwrap();
 }

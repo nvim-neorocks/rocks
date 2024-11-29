@@ -6,7 +6,10 @@ use std::{
 use crate::{
     config::Config,
     lua_installation::LuaInstallation,
-    progress::ProgressBar,
+    progress::{
+        Progress::{self},
+        ProgressBar,
+    },
     rockspec::{utils, Build, BuiltinBuildSpec, LuaModule, ModuleSpec},
     tree::RockLayout,
 };
@@ -19,12 +22,12 @@ impl Build for BuiltinBuildSpec {
 
     async fn run(
         self,
-        progress: &ProgressBar,
         output_paths: &RockLayout,
         _no_install: bool,
         lua: &LuaInstallation,
         _config: &Config,
         build_dir: &Path,
+        progress: &Progress<ProgressBar>,
     ) -> Result<(), Self::Err> {
         // Detect all Lua modules
         let modules = autodetect_modules(build_dir)
@@ -32,17 +35,19 @@ impl Build for BuiltinBuildSpec {
             .chain(self.modules)
             .collect::<HashMap<_, _>>();
 
-        progress.set_position(modules.len() as u64);
+        progress.map(|p| p.set_position(modules.len() as u64));
 
         for (counter, (destination_path, module_type)) in modules.iter().enumerate() {
             match module_type {
                 ModuleSpec::SourcePath(source) => {
                     if source.extension().map(|ext| ext == "c").unwrap_or(false) {
-                        progress.set_message(format!(
-                            "Compiling {} -> {}...",
-                            &source.to_string_lossy(),
-                            &destination_path
-                        ));
+                        progress.map(|p| {
+                            p.set_message(format!(
+                                "Compiling {} -> {}...",
+                                &source.to_string_lossy(),
+                                &destination_path
+                            ))
+                        });
                         let absolute_source_paths = vec![build_dir.join(source)];
                         utils::compile_c_files(
                             &absolute_source_paths,
@@ -51,11 +56,13 @@ impl Build for BuiltinBuildSpec {
                             lua,
                         )?
                     } else {
-                        progress.set_message(format!(
-                            "Copying {} to {}...",
-                            &source.to_string_lossy(),
-                            &destination_path
-                        ));
+                        progress.map(|p| {
+                            p.set_message(format!(
+                                "Copying {} to {}...",
+                                &source.to_string_lossy(),
+                                &destination_path
+                            ))
+                        });
                         let absolute_source_path = build_dir.join(source);
                         utils::copy_lua_to_module_path(
                             &absolute_source_path,
@@ -65,7 +72,7 @@ impl Build for BuiltinBuildSpec {
                     }
                 }
                 ModuleSpec::SourcePaths(files) => {
-                    progress.set_message("Compiling C files...");
+                    progress.map(|p| p.set_message("Compiling C files..."));
                     let absolute_source_paths =
                         files.iter().map(|file| build_dir.join(file)).collect();
                     utils::compile_c_files(
@@ -76,7 +83,7 @@ impl Build for BuiltinBuildSpec {
                     )?
                 }
                 ModuleSpec::ModulePaths(data) => {
-                    progress.set_message("Compiling C modules...");
+                    progress.map(|p| p.set_message("Compiling C modules..."));
                     utils::compile_c_modules(
                         data,
                         build_dir,
@@ -86,7 +93,7 @@ impl Build for BuiltinBuildSpec {
                     )?
                 }
             }
-            progress.set_position(counter as u64);
+            progress.map(|p| p.set_position(counter as u64));
         }
 
         Ok(())

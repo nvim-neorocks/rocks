@@ -4,7 +4,7 @@ use rocks_lib::{
     config::{Config, LuaVersion},
     manifest::{manifest_from_server, ManifestMetadata},
     package::{PackageName, PackageVersion, RemotePackage},
-    progress::MultiProgress,
+    progress::{MultiProgress, Progress},
     tree::Tree,
 };
 
@@ -31,12 +31,12 @@ pub async fn remove(remove_args: Remove, config: Config) -> Result<()> {
     match tree.has_rock(
         &RemotePackage::new(remove_args.name.clone(), target_version.clone()).into_package_req(),
     ) {
-        Some(package) => {
-            Ok(
-                rocks_lib::operations::remove(&MultiProgress::new().new_bar(), package, &config)
-                    .await?,
-            )
-        }
+        Some(package) => Ok(rocks_lib::operations::remove(
+            package,
+            &config,
+            &Progress::Progress(MultiProgress::new().new_bar()),
+        )
+        .await?),
         None => {
             eprintln!("Could not find {}@{}", remove_args.name, target_version);
             Ok(())

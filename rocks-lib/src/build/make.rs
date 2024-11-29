@@ -10,7 +10,7 @@ use crate::{
     build::variables::HasVariables,
     config::Config,
     lua_installation::LuaInstallation,
-    progress::ProgressBar,
+    progress::{Progress, ProgressBar},
     rockspec::{Build, MakeBuildSpec},
     tree::RockLayout,
 };
@@ -36,12 +36,12 @@ impl Build for MakeBuildSpec {
 
     async fn run(
         self,
-        _progress: &ProgressBar,
         output_paths: &RockLayout,
         no_install: bool,
         lua: &LuaInstallation,
         config: &Config,
         build_dir: &Path,
+        _progress: &Progress<ProgressBar>,
     ) -> Result<(), Self::Err> {
         // Build step
         if self.build_pass {
