@@ -23,23 +23,15 @@
     flake-parts,
     git-hooks,
     ...
-  }: let
-    overlay = import ./nix/overlay.nix {inherit self;};
-  in
+  }:
     flake-parts.lib.mkFlake {inherit inputs;} {
-      systems = [
-        "x86_64-linux"
-        "aarch64-linux"
-        "x86_64-darwin"
-        "aarch64-darwin"
-      ];
-      perSystem = {system, ...}: let
-        pkgs = import nixpkgs {
-          inherit system;
-          overlays = [
-            overlay
-          ];
-        };
+      systems = builtins.attrNames nixpkgs.legacyPackages;
+      perSystem = attrs @ {
+        system,
+        pkgs,
+        ...
+      }: let
+        pkgs = attrs.pkgs.extend self.overlays.default;
         git-hooks-check = git-hooks.lib.${system}.run {
           src = self;
           hooks = {
@@ -98,7 +90,7 @@
         };
       };
       flake = {
-        overlays.default = overlay;
+        overlays.default = import ./nix/overlay.nix {inherit self;};
       };
     };
 }
