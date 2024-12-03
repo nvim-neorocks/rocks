@@ -86,6 +86,7 @@ async fn run_build(
                 .run(output_paths, false, lua, config, build_dir, progress)
                 .await?
         }
+        None => (),
         _ => unimplemented!(),
     }
 
