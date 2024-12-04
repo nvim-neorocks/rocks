@@ -1,19 +1,21 @@
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    str::FromStr,
 };
+use walkdir::WalkDir;
 
 use crate::{
+    build::utils,
     config::Config,
     lua_installation::LuaInstallation,
     progress::{
         Progress::{self},
         ProgressBar,
     },
-    rockspec::{utils, Build, BuiltinBuildSpec, LuaModule, ModuleSpec},
+    rockspec::{Build, BuiltinBuildSpec, LuaModule, ModuleSpec},
     tree::RockLayout,
 };
-use walkdir::WalkDir;
 
 use super::BuildError;
 
@@ -30,10 +32,11 @@ impl Build for BuiltinBuildSpec {
         progress: &Progress<ProgressBar>,
     ) -> Result<(), Self::Err> {
         // Detect all Lua modules
-        let modules = autodetect_modules(build_dir)
-            .into_iter()
-            .chain(self.modules)
-            .collect::<HashMap<_, _>>();
+        let modules = if self.modules.is_empty() {
+            autodetect_modules(build_dir)
+        } else {
+            self.modules
+        };
 
         progress.map(|p| p.set_position(modules.len() as u64));
 
@@ -123,8 +126,9 @@ fn autodetect_modules(build_dir: &Path) -> HashMap<LuaModule, ModuleSpec> {
             })
         })
         .map(|file| {
-            let diff: PathBuf = pathdiff::diff_paths(build_dir.join(file.into_path()), build_dir)
-                .expect("failed to autodetect modules");
+            let diff: PathBuf =
+                pathdiff::diff_paths(build_dir.join(file.clone().into_path()), build_dir)
+                    .expect("failed to autodetect modules");
 
             // NOTE(vhyrro): You may ask why we convert all paths to Lua module paths
             // just to convert them back later in the `run()` stage.
@@ -133,7 +137,13 @@ fn autodetect_modules(build_dir: &Path) -> HashMap<LuaModule, ModuleSpec> {
             // data in this form allows us to respect any overrides made by the user (which follow
             // the `module.name` format, not our internal one).
             let pathbuf = diff.components().skip(1).collect::<PathBuf>();
-            let lua_module = LuaModule::from_pathbuf(pathbuf);
+            let mut lua_module = LuaModule::from_pathbuf(pathbuf);
+
+            // NOTE(mrcjkb): `LuaModule` does not parse as "<module>.init" from files named "init.lua"
+            // To make sure we don't change the file structure when installing, we append it here.
+            if file.file_name().to_string_lossy().as_bytes() == b"init.lua" {
+                lua_module = lua_module.join(&LuaModule::from_str("init").unwrap())
+            }
 
             (lua_module, ModuleSpec::SourcePath(diff))
         })

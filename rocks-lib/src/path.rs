@@ -2,7 +2,7 @@ use itertools::Itertools;
 use serde::Serialize;
 use std::{env, fmt::Display, io, path::PathBuf, str::FromStr};
 
-use crate::{rockspec::utils::lua_lib_extension, tree::Tree};
+use crate::{build::utils::lua_lib_extension, tree::Tree};
 
 const LUA_PATH_SEPARATOR: &str = ";";
 

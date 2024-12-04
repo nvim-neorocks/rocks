@@ -3,12 +3,13 @@ use serde::{de, Deserialize, Deserializer};
 use std::{collections::HashMap, convert::Infallible, fmt::Display, path::PathBuf, str::FromStr};
 use thiserror::Error;
 
-use crate::rockspec::{
-    deserialize_vec_from_lua, FromPlatformOverridable, PartialOverride, PerPlatform,
-    PlatformOverridable,
+use crate::{
+    build::utils::lua_lib_extension,
+    rockspec::{
+        deserialize_vec_from_lua, FromPlatformOverridable, PartialOverride, PerPlatform,
+        PlatformOverridable,
+    },
 };
-
-use super::utils::lua_lib_extension;
 
 #[derive(Debug, PartialEq, Deserialize, Default, Clone)]
 pub struct BuiltinBuildSpec {
@@ -39,9 +40,15 @@ impl LuaModule {
             .unwrap_or("".into());
         let module = path
             .to_string_lossy()
-            .trim_end_matches(extension.as_str())
+            .trim_end_matches(format!("init.{}", extension).as_str())
+            .trim_end_matches(format!(".{}", extension).as_str())
+            .trim_end_matches(std::path::MAIN_SEPARATOR_STR)
             .replace(std::path::MAIN_SEPARATOR_STR, ".");
         LuaModule(module)
+    }
+
+    pub fn join(&self, other: &LuaModule) -> LuaModule {
+        LuaModule(format!("{}.{}", self.0, other.0))
     }
 
     pub fn as_str(&self) -> &str {
@@ -290,6 +297,18 @@ mod tests {
     use mlua::{Lua, LuaSerdeExt};
 
     use super::*;
+
+    #[tokio::test]
+    pub async fn parse_lua_module_from_path() {
+        let lua_module = LuaModule::from_pathbuf("foo/init.lua".into());
+        assert_eq!(&lua_module.0, "foo");
+        let lua_module = LuaModule::from_pathbuf("foo/bar.lua".into());
+        assert_eq!(&lua_module.0, "foo.bar");
+        let lua_module = LuaModule::from_pathbuf("foo/bar/init.lua".into());
+        assert_eq!(&lua_module.0, "foo.bar");
+        let lua_module = LuaModule::from_pathbuf("foo/bar/baz.lua".into());
+        assert_eq!(&lua_module.0, "foo.bar.baz");
+    }
 
     #[tokio::test]
     pub async fn modules_spec_from_lua() {
