@@ -3,7 +3,6 @@ mod cmake;
 mod make;
 mod rust_mlua;
 
-pub mod utils; // Make build utilities available as a submodule
 pub use builtin::{BuiltinBuildSpec, LuaModule, ModulePaths, ModuleSpec};
 pub use cmake::*;
 pub use make::*;

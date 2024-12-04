@@ -8,9 +8,10 @@ use crate::{
     operations::{self, FetchSrcRockError},
     package::RemotePackage,
     progress::{Progress, ProgressBar},
-    rockspec::{utils, Build as _, BuildBackendSpec, LuaVersionError, Rockspec},
+    rockspec::{Build as _, BuildBackendSpec, LuaVersionError, Rockspec},
     tree::{RockLayout, Tree},
 };
+pub(crate) mod utils; // Make build utilities available as a submodule
 use indicatif::style::TemplateError;
 use make::MakeError;
 use rust_mlua::RustError;
@@ -230,5 +231,73 @@ pub async fn build(
 
             Ok(package)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use predicates::prelude::*;
+    use std::path::PathBuf;
+
+    use assert_fs::{
+        assert::PathAssert,
+        prelude::{PathChild as _, PathCopy},
+    };
+
+    use crate::{
+        config::{ConfigBuilder, LuaVersion},
+        lua_installation::LuaInstallation,
+        progress::MultiProgress,
+        tree::RockLayout,
+    };
+
+    #[tokio::test]
+    async fn test_builtin_build() {
+        let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources/test/sample-project-no-build-spec");
+        let build_dir = assert_fs::TempDir::new().unwrap();
+        build_dir.copy_from(&project_root, &["**"]).unwrap();
+        let dest_dir = assert_fs::TempDir::new().unwrap();
+        let config = ConfigBuilder::new().build().unwrap();
+        let rock_layout = RockLayout {
+            rock_path: dest_dir.to_path_buf(),
+            etc: dest_dir.join("etc"),
+            lib: dest_dir.join("lib"),
+            src: dest_dir.join("src"),
+            bin: dest_dir.join("bin"),
+            conf: dest_dir.join("conf"),
+            doc: dest_dir.join("doc"),
+        };
+        let lua = LuaInstallation::new(config.lua_version().unwrap_or(&LuaVersion::Lua51), &config);
+        let rockspec_content = String::from_utf8(
+            std::fs::read("resources/test/sample-project-no-build-spec/project.rockspec").unwrap(),
+        )
+        .unwrap();
+        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+        let progress = Progress::Progress(MultiProgress::new());
+        run_build(
+            &rockspec,
+            &rock_layout,
+            &lua,
+            &config,
+            &build_dir,
+            &progress.map(|p| p.new_bar()),
+        )
+        .await
+        .unwrap();
+        let foo_dir = dest_dir.child("src").child("foo");
+        foo_dir.assert(predicate::path::is_dir());
+        let foo_init = foo_dir.child("init.lua");
+        foo_init.assert(predicate::path::is_file());
+        foo_init.assert(predicate::str::contains("return true"));
+        let foo_bar_dir = foo_dir.child("bar");
+        foo_bar_dir.assert(predicate::path::is_dir());
+        let foo_bar_init = foo_bar_dir.child("init.lua");
+        foo_bar_init.assert(predicate::path::is_file());
+        foo_bar_init.assert(predicate::str::contains("return true"));
+        let foo_bar_baz = foo_bar_dir.child("baz.lua");
+        foo_bar_baz.assert(predicate::path::is_file());
+        foo_bar_baz.assert(predicate::str::contains("return true"));
     }
 }
