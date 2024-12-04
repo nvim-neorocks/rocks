@@ -114,10 +114,6 @@ fn autodetect_modules(build_dir: &Path) -> HashMap<LuaModule, ModuleSpec> {
                     .extension()
                     .map(|ext| ext == "lua")
                     .unwrap_or(false)
-                    && !matches!(
-                        file.file_name().to_string_lossy().as_bytes(),
-                        b"spec" | b".luarocks" | b"lua_modules" | b"test.lua" | b"tests.lua"
-                    )
                 {
                     Some(file)
                 } else {
