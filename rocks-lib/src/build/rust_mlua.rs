@@ -1,19 +1,18 @@
-use itertools::Itertools;
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus};
-use std::{fs, io};
-use thiserror::Error;
-
+use super::utils::lua_lib_extension;
 use crate::config::LuaVersionUnset;
 use crate::progress::{Progress, ProgressBar};
-use crate::rockspec::utils::lua_lib_extension;
 use crate::{
     config::{Config, LuaVersion},
     lua_installation::LuaInstallation,
     rockspec::{Build, RustMluaBuildSpec},
     tree::RockLayout,
 };
+use itertools::Itertools;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::process::{Command, ExitStatus};
+use std::{fs, io};
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum RustError {
