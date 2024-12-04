@@ -23,6 +23,32 @@ rocks <command> <options>
 
 To view available options and their descriptions, run `rocks --help`.
 
+## Comparison with [`luarocks v3.11.1`](https://github.com/luarocks/luarocks)
+
+As this project is still a work in progress, some luarocks features
+have not been (fully) implemented yet.
+On the other hand, rocks has some features that are not present in luarocks.
+
+The following table provides a brief (incomplete) comparison:
+
+|                                                 | `rocks`                      | `luarocks v3.11.1` |
+| ---                                             | ---                          | ---                |
+| `builtin` build spec                            | :white_check_mark:           | :white_check_mark: |
+| `make` build spec                               | :white_check_mark:           | :white_check_mark: |
+| `rust-mlua` build spec                          | :white_check_mark: (builtin) | :white_check_mark: (external build backend) |
+| `tree-sitter` build spec                        | :x: (planned)                | :white_check_mark: (external build backend) |
+| `cmake` build spec                              | :x: (planned)                | :white_check_mark: |
+| `command` build spec                            | :x: (planned)                | :white_check_mark: |
+| custom build backends                           | :x: (planned[^1])            | :white_check_mark: |
+| install pre-built binary rocks                  | :x: (planned)                | :white_check_mark: |
+| parallel builds/installs                        | :white_check_mark:           | :x:                |
+| install multiple packages with a single command | :white_check_mark:           | :x:                |
+| install packages using version constraints      | :white_check_mark:           | :x:                |
+| lockfiles                                       | :white_check_mark:           | :white_check_mark: (basic, dependency versions only) |
+| formatting with stylua                          | :white_check_mark:           | :x:                |
+
+[^1]: planned via a luarocks compatibility layer.
+
 ## :book: License
 
 `rocks` is licensed under [MIT](./LICENSE).

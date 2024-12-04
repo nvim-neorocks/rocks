@@ -109,16 +109,16 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Add a dependency to the current project.
+    /// [UNIMPLEMENTED] Add a dependency to the current project.
     Add,
     /// Build/compile a rock.
     Build(Build),
-    /// Query information about Rocks's configuration.
+    /// [UNIMPLEMENTED] Query information about Rocks's configuration.
     Config,
     /// Various debugging utilities.
     #[command(subcommand, arg_required_else_help = true)]
     Debug(Debug),
-    /// Show documentation for an installed rock.
+    /// [UNIMPLEMENTED] Show documentation for an installed rock.
     Doc,
     /// Download a specific rock file from a rocks server.
     #[command(arg_required_else_help = true)]
@@ -132,7 +132,7 @@ enum Commands {
     Install(Install),
     /// Manually install and manage Lua headers for various Lua versions.
     InstallLua,
-    /// Check syntax of a rockspec.
+    /// [UNIMPLEMENTED] Check syntax of a rockspec.
     Lint,
     /// List currently installed rocks.
     List(ListCmd),
@@ -142,7 +142,7 @@ enum Commands {
     New(NewProject),
     /// List outdated rocks.
     Outdated(Outdated),
-    /// Create a rock, packing sources or binaries.
+    /// [UNIMPLEMENTED] Create a rock, packing sources or binaries.
     Pack,
     /// Return the currently configured package path.
     Path(Path),
@@ -162,7 +162,7 @@ enum Commands {
     Search(Search),
     /// Run the test suite in the current directory.
     Test(Test),
-    /// Uninstall a rock from the system.
+    /// [UNIMPLEMENTED] Uninstall a rock from the system.
     Uninstall,
     /// Unpins an existing rock, allowing updates to alter the package.
     Unpin(ChangePin),
@@ -170,7 +170,7 @@ enum Commands {
     Update(Update),
     /// Upload a rockspec to the public rocks repository.
     Upload(Upload),
-    /// Tell which file corresponds to a given module name.
+    /// [UNIMPLEMENTED] Tell which file corresponds to a given module name.
     Which,
 }
 
@@ -230,6 +230,12 @@ async fn main() {
         Commands::Pin(pin_data) => pin::set_pinned_state(pin_data, config, Pinned).unwrap(),
         Commands::Unpin(pin_data) => pin::set_pinned_state(pin_data, config, Unpinned).unwrap(),
         Commands::Upload(upload_data) => upload::upload(upload_data, config).await.unwrap(),
-        _ => unimplemented!(),
+        Commands::Add => unimplemented!(),
+        Commands::Config => unimplemented!(),
+        Commands::Doc => unimplemented!(),
+        Commands::Lint => unimplemented!(),
+        Commands::Pack => unimplemented!(),
+        Commands::Uninstall => unimplemented!(),
+        Commands::Which => unimplemented!(),
     }
 }
