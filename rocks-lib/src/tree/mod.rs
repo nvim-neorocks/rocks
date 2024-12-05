@@ -226,6 +226,7 @@ impl mlua::UserData for Tree {
 
 #[cfg(test)]
 mod tests {
+    use assert_fs::prelude::PathCopy as _;
     use itertools::Itertools;
     use std::path::PathBuf;
 
@@ -245,6 +246,10 @@ mod tests {
     fn rock_layout() {
         let tree_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-tree");
+
+        let temp = assert_fs::TempDir::new().unwrap();
+        temp.copy_from(&tree_path, &["**"]).unwrap();
+        let tree_path = temp.to_path_buf();
 
         let tree = Tree::new(tree_path.clone(), LuaVersion::Lua51).unwrap();
 
@@ -309,6 +314,10 @@ mod tests {
         let tree_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-tree");
 
+        let temp = assert_fs::TempDir::new().unwrap();
+        temp.copy_from(&tree_path, &["**"]).unwrap();
+        let tree_path = temp.to_path_buf();
+
         let tree = Tree::new(tree_path, LuaVersion::Lua51).unwrap();
         let result = tree.list().unwrap();
         // note: sorted_redaction doesn't work because we have a nested Vec
@@ -334,6 +343,10 @@ mod tests {
     fn rock_layout_substiture() {
         let tree_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-tree");
+
+        let temp = assert_fs::TempDir::new().unwrap();
+        temp.copy_from(&tree_path, &["**"]).unwrap();
+        let tree_path = temp.to_path_buf();
 
         let tree = Tree::new(tree_path.clone(), LuaVersion::Lua51).unwrap();
 
