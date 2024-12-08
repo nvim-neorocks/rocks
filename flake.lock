@@ -44,16 +44,15 @@
         "nixpkgs-stable": "nixpkgs-stable"
       },
       "locked": {
-        "lastModified": 1729632698,
-        "narHash": "sha256-Ci0X1vvcW4Is/thJg1YVsjn92A5kqCQn0t1G/o0l3VM=",
-        "owner": "mrcjkb",
+        "lastModified": 1733665616,
+        "narHash": "sha256-+XTFXYlFJBxohhMGLDpYdEnhUNdxN8dyTA8WAd+lh2A=",
+        "owner": "cachix",
         "repo": "git-hooks.nix",
-        "rev": "1ba78e75e53c7511a5eaf53c3bac8f162e615c8f",
+        "rev": "d8c02f0ffef0ef39f6063731fc539d8c71eb463a",
         "type": "github"
       },
       "original": {
-        "owner": "mrcjkb",
-        "ref": "clippy",
+        "owner": "cachix",
         "repo": "git-hooks.nix",
         "type": "github"
       }
