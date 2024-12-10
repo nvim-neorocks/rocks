@@ -53,6 +53,8 @@ pub struct Rockspec {
     pub source: PerPlatform<RockSource>,
     pub build: PerPlatform<BuildSpec>,
     pub test: PerPlatform<TestSpec>,
+    /// The original content of this rockspec, needed by luarocks
+    pub raw_content: String,
     /// The sha256 of this rockspec
     hash: Integrity,
 }
@@ -77,6 +79,7 @@ impl Rockspec {
             build: globals.get("build")?,
             test: globals.get("test")?,
             hash: Integrity::from(rockspec_content),
+            raw_content: rockspec_content.clone(),
         };
 
         let rockspec_file_name = format!("{}-{}.rockspec", rockspec.package, rockspec.version);

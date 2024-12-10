@@ -13,10 +13,12 @@ use crate::{
 };
 pub(crate) mod utils; // Make build utilities available as a submodule
 use indicatif::style::TemplateError;
+use luarocks::LuarocksBuildError;
 use make::MakeError;
 use rust_mlua::RustError;
 use thiserror::Error;
 mod builtin;
+mod luarocks;
 mod make;
 mod rust_mlua;
 pub mod variables;
@@ -43,6 +45,8 @@ pub enum BuildError {
         stdout: String,
         stderr: String,
     },
+    #[error(transparent)]
+    LuarocksBuildError(#[from] LuarocksBuildError),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -86,6 +90,9 @@ async fn run_build(
             rust_mlua_spec
                 .run(output_paths, false, lua, config, build_dir, progress)
                 .await?
+        }
+        Some(BuildBackendSpec::LuaRock(_)) => {
+            luarocks::build(rockspec, output_paths, lua).await?;
         }
         None => (),
         _ => unimplemented!(),
