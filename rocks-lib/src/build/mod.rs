@@ -13,10 +13,13 @@ use crate::{
 };
 pub(crate) mod utils; // Make build utilities available as a submodule
 use indicatif::style::TemplateError;
+use luarocks::LuarocksBuildError;
 use make::MakeError;
 use rust_mlua::RustError;
 use thiserror::Error;
+use utils::recursive_copy_dir;
 mod builtin;
+mod luarocks;
 mod make;
 mod rust_mlua;
 pub mod variables;
@@ -43,6 +46,8 @@ pub enum BuildError {
         stdout: String,
         stderr: String,
     },
+    #[error(transparent)]
+    LuarocksBuildError(#[from] LuarocksBuildError),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -86,6 +91,9 @@ async fn run_build(
             rust_mlua_spec
                 .run(output_paths, false, lua, config, build_dir, progress)
                 .await?
+        }
+        Some(BuildBackendSpec::LuaRock(_)) => {
+            luarocks::build(rockspec, output_paths, lua, config, build_dir, progress).await?;
         }
         None => (),
         _ => unimplemented!(),
@@ -214,19 +222,8 @@ pub async fn build(
 
             install(&rockspec, &tree, &output_paths, &lua, &build_dir, progress).await?;
 
-            // Copy over all `copy_directories` to their respective paths
             for directory in &rockspec.build.current_platform().copy_directories {
-                for file in walkdir::WalkDir::new(build_dir.join(directory))
-                    .into_iter()
-                    .flatten()
-                {
-                    if file.file_type().is_file() {
-                        let filepath = file.path();
-                        let target = output_paths.etc.join(filepath);
-                        std::fs::create_dir_all(target.parent().unwrap())?;
-                        std::fs::copy(filepath, target)?;
-                    }
-                }
+                recursive_copy_dir(&build_dir.join(directory), &output_paths.etc)?;
             }
 
             Ok(package)

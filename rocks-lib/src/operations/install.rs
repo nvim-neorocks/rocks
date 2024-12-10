@@ -6,11 +6,14 @@ use crate::{
     lockfile::{
         LocalPackage, LocalPackageId, LocalPackageSpec, LockConstraint, Lockfile, PinnedState,
     },
-    manifest::ManifestMetadata,
+    luarocks_installation::{
+        InstallBuildDependenciesError, LuaRocksError, LuaRocksInstallError, LuaRocksInstallation,
+    },
+    manifest::{ManifestError, ManifestMetadata},
     operations::download_rockspec,
     package::{PackageName, PackageReq, PackageVersionReq},
     progress::{MultiProgress, Progress, ProgressBar},
-    rockspec::{LuaVersionError, Rockspec},
+    rockspec::{BuildBackendSpec, LuaVersionError, Rockspec},
     tree::Tree,
 };
 
@@ -33,6 +36,14 @@ pub enum InstallError {
     LuaVersionUnset(#[from] LuaVersionUnset),
     #[error(transparent)]
     Io(#[from] io::Error),
+    #[error("error instantiating LuaRocks compatibility layer: {0}")]
+    LuaRocksError(#[from] LuaRocksError),
+    #[error("error installing LuaRocks compatibility layer: {0}")]
+    LuaRocksInstallError(#[from] LuaRocksInstallError),
+    #[error("error installing LuaRocks build dependencies: {0}")]
+    InstallBuildDependenciesError(#[from] InstallBuildDependenciesError),
+    #[error(transparent)]
+    ManifestError(#[from] ManifestError),
     #[error("failed to build {0}: {1}")]
     BuildError(PackageName, BuildError),
 }
@@ -89,6 +100,7 @@ async fn install_impl(
 
     let installed_packages = join_all(all_packages.clone().into_values().map(|install_spec| {
         let package = install_spec.rockspec.package.clone();
+
         let bar = progress.map(|p| {
             p.add(ProgressBar::from(format!(
                 "💻 Installing {}",
@@ -98,8 +110,19 @@ async fn install_impl(
         let config = config.clone();
 
         tokio::spawn(async move {
+            let rockspec = install_spec.rockspec;
+            if let Some(BuildBackendSpec::LuaRock(build_backend)) =
+                &rockspec.build.current_platform().build_backend
+            {
+                let luarocks = LuaRocksInstallation::new(&config)?;
+                luarocks.ensure_installed(&bar).await?;
+                luarocks
+                    .install_build_dependencies(build_backend, &rockspec, &bar)
+                    .await?;
+            }
+
             let pkg = crate::build::build(
-                install_spec.rockspec,
+                rockspec,
                 pin,
                 install_spec.spec.constraint(),
                 install_spec.build_behaviour,
