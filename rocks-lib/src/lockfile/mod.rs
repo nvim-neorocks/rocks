@@ -480,7 +480,7 @@ impl Lockfile {
             .cloned()
             .collect();
 
-        let content = serde_json::to_string(self)?;
+        let content = serde_json::to_string_pretty(self)?;
 
         std::fs::write(&self.filepath, content)?;
 
