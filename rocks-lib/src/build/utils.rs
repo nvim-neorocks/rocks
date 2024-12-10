@@ -27,6 +27,24 @@ pub(crate) fn copy_lua_to_module_path(
     Ok(())
 }
 
+pub(crate) fn recursive_copy_dir(src: &PathBuf, dest: &Path) -> Result<(), io::Error> {
+    if src.exists() {
+        for file in walkdir::WalkDir::new(src)
+            .into_iter()
+            .flatten()
+            .filter(|file| file.file_type().is_file())
+        {
+            let relative_src_path: PathBuf =
+                pathdiff::diff_paths(src.join(file.clone().into_path()), src)
+                    .expect("failed to copy directories!");
+            let filepath = file.path();
+            let target = dest.join(relative_src_path);
+            std::fs::create_dir_all(target.parent().unwrap())?;
+            std::fs::copy(filepath, target)?;
+        }
+    }
+    Ok(())
+}
 fn validate_output(output: Output) -> Result<(), BuildError> {
     if !output.status.success() {
         return Err(BuildError::CommandFailure {

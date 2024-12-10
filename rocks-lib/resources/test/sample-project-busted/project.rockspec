@@ -1,6 +1,6 @@
 local _MODREV, _SPECREV = 'scm', '-1'
 rockspec_format = '3.0'
-package = 'sample-project-busted'
+package = 'sample-project'
 version = _MODREV .. _SPECREV
 
 test_dependencies = {
