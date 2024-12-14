@@ -135,13 +135,7 @@ fn autodetect_modules(
                     .extension()
                     .map(|ext| ext == "lua")
                     .unwrap_or(false);
-                if is_lua_file
-                    && !exclude.contains(&file.clone().into_path())
-                    && !matches!(
-                        file.file_name().to_string_lossy().as_bytes(),
-                        b"spec" | b".luarocks" | b"lua_modules" | b"test.lua" | b"tests.lua"
-                    )
-                {
+                if is_lua_file && !exclude.contains(&file.clone().into_path()) {
                     Some(file)
                 } else {
                     None
