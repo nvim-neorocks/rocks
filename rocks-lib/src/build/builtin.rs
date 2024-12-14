@@ -40,7 +40,7 @@ impl Build for BuiltinBuildSpec {
 
         progress.map(|p| p.set_position(modules.len() as u64));
 
-        for (counter, (destination_path, module_type)) in modules.iter().enumerate() {
+        for (destination_path, module_type) in modules.iter() {
             match module_type {
                 ModuleSpec::SourcePath(source) => {
                     if source.extension().map(|ext| ext == "c").unwrap_or(false) {
@@ -96,7 +96,13 @@ impl Build for BuiltinBuildSpec {
                     )?
                 }
             }
-            progress.map(|p| p.set_position(counter as u64));
+        }
+
+        for relative_path in autodetect_bin_scripts(build_dir).iter() {
+            let source = build_dir.join("src").join("bin").join(relative_path);
+            let target = output_paths.bin.join(relative_path);
+            std::fs::create_dir_all(target.parent().unwrap())?;
+            std::fs::copy(source, target)?;
         }
 
         Ok(())
@@ -163,6 +169,19 @@ fn autodetect_modules(
             }
 
             (lua_module, ModuleSpec::SourcePath(diff))
+        })
+        .collect()
+}
+
+fn autodetect_bin_scripts(build_dir: &Path) -> Vec<PathBuf> {
+    WalkDir::new(build_dir.join("src").join("bin"))
+        .into_iter()
+        .filter_map(|file| file.ok())
+        .filter(|file| file.clone().into_path().is_file())
+        .map(|file| {
+            let diff = pathdiff::diff_paths(build_dir.join(file.into_path()), build_dir)
+                .expect("failed to autodetect bin scripts");
+            diff.components().skip(2).collect::<PathBuf>()
         })
         .collect()
 }

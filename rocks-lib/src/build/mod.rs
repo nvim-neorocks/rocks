@@ -299,5 +299,9 @@ mod tests {
         let foo_bar_baz = foo_bar_dir.child("baz.lua");
         foo_bar_baz.assert(predicate::path::is_file());
         foo_bar_baz.assert(predicate::str::contains("return true"));
+        let bin_file = dest_dir.child("bin").child("hello");
+        bin_file.assert(predicate::path::is_file());
+        bin_file.assert(predicate::str::contains("#!/usr/bin/env bash"));
+        bin_file.assert(predicate::str::contains("echo \"Hello\""));
     }
 }
