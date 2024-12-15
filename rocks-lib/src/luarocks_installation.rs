@@ -1,8 +1,11 @@
+use futures::future::join_all;
 use itertools::Itertools;
 use std::{
+    collections::HashMap,
     io,
     path::Path,
     process::{Command, ExitStatus},
+    sync::Arc,
 };
 use tempdir::TempDir;
 use thiserror::Error;
@@ -10,13 +13,13 @@ use thiserror::Error;
 use crate::{
     build::{build, BuildBehaviour, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
-    lockfile::{LockConstraint, PinnedState},
+    lockfile::{LocalPackage, LocalPackageId, LockConstraint, PinnedState},
     lua_installation::LuaInstallation,
     manifest::{ManifestError, ManifestMetadata},
-    operations::download_rockspec,
+    operations::{get_all_dependencies, SearchAndDownloadError},
     package::PackageReq,
     path::Paths,
-    progress::{Progress, ProgressBar},
+    progress::{MultiProgress, Progress, ProgressBar},
     rockspec::{Rockspec, RockspecFormat},
     tree::Tree,
 };
@@ -45,6 +48,8 @@ pub enum InstallBuildDependenciesError {
     Io(#[from] io::Error),
     #[error(transparent)]
     ManifestError(#[from] ManifestError),
+    #[error(transparent)]
+    SearchAndDownloadError(#[from] SearchAndDownloadError),
     #[error(transparent)]
     BuildError(#[from] BuildError),
 }
@@ -120,7 +125,7 @@ impl LuaRocksInstallation {
         self,
         build_backend: &str,
         rockspec: &Rockspec,
-        progress: &Progress<ProgressBar>,
+        progress: &Progress<MultiProgress>,
     ) -> Result<(), InstallBuildDependenciesError> {
         let mut lockfile = self.tree.lockfile()?;
         let manifest = ManifestMetadata::from_config(&self.config).await?;
@@ -137,24 +142,76 @@ impl LuaRocksInstallation {
                     .collect_vec()
             }
             _ => rockspec.build_dependencies.current_platform().to_vec(),
-        };
-        for package in build_dependencies {
-            if self.tree.has_rock(&package).is_none() {
-                let rockspec = download_rockspec(&package, &manifest, &self.config, progress)
-                    .await
-                    .unwrap();
-                let pkg = build(
+        }
+        .into_iter()
+        .map(|dep| (BuildBehaviour::NoForce, dep))
+        .collect_vec();
+
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let pin = PinnedState::Unpinned;
+        get_all_dependencies(
+            tx,
+            build_dependencies,
+            pin,
+            Arc::new(manifest),
+            &self.config,
+            progress,
+        )
+        .await?;
+
+        let mut all_packages = HashMap::with_capacity(rx.len());
+        while let Some(dep) = rx.recv().await {
+            all_packages.insert(dep.spec.id(), dep);
+        }
+
+        let installed_packages = join_all(all_packages.clone().into_values().map(|install_spec| {
+            let progress = progress.clone();
+            let bar = progress.map(|p| {
+                p.add(ProgressBar::from(format!(
+                    "💻 Installing build dependency: {}",
+                    install_spec.rockspec.package,
+                )))
+            });
+            let config = self.config.clone();
+            tokio::spawn(async move {
+                let rockspec = install_spec.rockspec;
+                let pkg = crate::build::build(
                     rockspec,
-                    PinnedState::Unpinned,
-                    LockConstraint::Constrained(package.version_req().clone()),
-                    BuildBehaviour::NoForce,
-                    &self.config,
-                    progress,
+                    pin,
+                    install_spec.spec.constraint(),
+                    install_spec.build_behaviour,
+                    &config,
+                    &bar,
                 )
                 .await?;
-                lockfile.add(&pkg);
-            }
-        }
+
+                bar.map(|b| b.finish_and_clear());
+
+                Ok::<_, InstallBuildDependenciesError>((pkg.id(), pkg))
+            })
+        }))
+        .await
+        .into_iter()
+        .flatten()
+        .try_collect::<_, HashMap<LocalPackageId, LocalPackage>, _>()?;
+
+        installed_packages.iter().for_each(|(id, pkg)| {
+            lockfile.add(pkg);
+
+            all_packages
+                .get(id)
+                .map(|pkg| pkg.spec.dependencies())
+                .unwrap_or_default()
+                .into_iter()
+                .for_each(|dependency_id| {
+                    lockfile.add_dependency(
+                        pkg,
+                        installed_packages
+                            .get(dependency_id)
+                            .expect("required dependency not found"),
+                    );
+                });
+        });
         lockfile.flush()?;
         Ok(())
     }

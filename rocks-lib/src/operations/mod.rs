@@ -16,8 +16,9 @@ pub use fetch::*;
 pub use install::*;
 pub use pin::*;
 pub use remove::*;
-pub use resolve::*;
 pub use run::*;
 pub use test::*;
 pub use unpack::*;
 pub use update::*;
+
+pub(crate) use resolve::*;
