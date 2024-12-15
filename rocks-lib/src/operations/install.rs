@@ -3,9 +3,7 @@ use std::{collections::HashMap, io, sync::Arc};
 use crate::{
     build::{BuildBehaviour, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
-    lockfile::{
-        LocalPackage, LocalPackageId, Lockfile, PinnedState,
-    },
+    lockfile::{LocalPackage, LocalPackageId, Lockfile, PinnedState},
     luarocks_installation::{
         InstallBuildDependenciesError, LuaRocksError, LuaRocksInstallError, LuaRocksInstallation,
     },
@@ -16,11 +14,11 @@ use crate::{
     tree::Tree,
 };
 
-use itertools::Itertools;
 use futures::future::join_all;
+use itertools::Itertools;
 use thiserror::Error;
 
-use super::{get_all_dependencies, SearchAndDownloadError};
+use super::{resolve::get_all_dependencies, SearchAndDownloadError};
 
 #[derive(Error, Debug)]
 pub enum InstallError {
@@ -88,6 +86,7 @@ async fn install_impl(
     }
 
     let installed_packages = join_all(all_packages.clone().into_values().map(|install_spec| {
+        let progress = progress.clone();
         let package = install_spec.rockspec.package.clone();
 
         let bar = progress.map(|p| {
@@ -106,7 +105,7 @@ async fn install_impl(
                 let luarocks = LuaRocksInstallation::new(&config)?;
                 luarocks.ensure_installed(&bar).await?;
                 luarocks
-                    .install_build_dependencies(build_backend, &rockspec, &bar)
+                    .install_build_dependencies(build_backend, &rockspec, &progress)
                     .await?;
             }
 
