@@ -64,6 +64,7 @@
                 (with pkgs; [
                   rust-analyzer
                   cargo-nextest
+                  libxcrypt # Needed for integration test build
                   lua_pkg
                 ])
                 ++ self.checks.${system}.git-hooks-check.enabledPackages

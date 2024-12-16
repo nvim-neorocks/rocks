@@ -1,11 +1,11 @@
 pub trait HasVariables {
     /// Substitute variables of the format `$(VAR)`, where `VAR` is the variable name.
-    fn substitute_variables(&self, input: String) -> String;
+    fn substitute_variables(&self, input: &str) -> String;
 }
 
 /// Substitute variables of the format `$(VAR)`, where `VAR` is the variable name
 /// passed to `get_var`.
-pub fn substitute<F>(get_var: F, input: String) -> String
+pub fn substitute<F>(get_var: F, input: &str) -> String
 where
     F: Fn(&str) -> Option<String>,
 {

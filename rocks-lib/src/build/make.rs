@@ -7,7 +7,7 @@ use std::{
 use thiserror::Error;
 
 use crate::{
-    build::variables::HasVariables,
+    build::utils,
     config::Config,
     lua_installation::LuaInstallation,
     progress::{Progress, ProgressBar},
@@ -15,12 +15,11 @@ use crate::{
     tree::RockLayout,
 };
 
-use super::BuildError;
-
 #[derive(Error, Debug)]
 pub enum MakeError {
-    #[error("make step failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
+    #[error("{name} step failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
     CommandFailure {
+        name: String,
         status: ExitStatus,
         stdout: String,
         stderr: String,
@@ -32,7 +31,7 @@ pub enum MakeError {
 }
 
 impl Build for MakeBuildSpec {
-    type Err = BuildError;
+    type Err = MakeError;
 
     async fn run(
         self,
@@ -49,15 +48,14 @@ impl Build for MakeBuildSpec {
                 .build_variables
                 .into_iter()
                 .map(|(key, value)| {
-                    let mut substituted_value = output_paths.substitute_variables(value);
-                    substituted_value = lua.substitute_variables(substituted_value);
-                    substituted_value = config.substitute_variables(substituted_value);
+                    let substituted_value =
+                        utils::substitute_variables(&value, output_paths, lua, config);
                     format!("{key}={substituted_value}")
                 })
                 .collect_vec();
             match Command::new(config.make_cmd())
                 .current_dir(build_dir)
-                .arg(self.build_target)
+                .arg(&self.build_target)
                 .args(["-f", self.makefile.to_str().unwrap()])
                 .args(build_args)
                 .spawn()
@@ -66,15 +64,15 @@ impl Build for MakeBuildSpec {
                     Ok(output) if output.status.success() => {}
                     Ok(output) => {
                         return Err(MakeError::CommandFailure {
+                            name: format!("{} {}", config.make_cmd(), self.build_target),
                             status: output.status,
                             stdout: String::from_utf8_lossy(&output.stdout).into(),
                             stderr: String::from_utf8_lossy(&output.stderr).into(),
-                        }
-                        .into());
+                        });
                     }
-                    Err(err) => return Err(MakeError::Io(err).into()),
+                    Err(err) => return Err(MakeError::Io(err)),
                 },
-                Err(_) => return Err(MakeError::CommandNotFound(config.make_cmd().clone()).into()),
+                Err(_) => return Err(MakeError::CommandNotFound(config.make_cmd().clone())),
             }
         };
 
@@ -84,15 +82,14 @@ impl Build for MakeBuildSpec {
                 .install_variables
                 .into_iter()
                 .map(|(key, value)| {
-                    let mut substituted_value = output_paths.substitute_variables(value);
-                    substituted_value = lua.substitute_variables(substituted_value);
-                    substituted_value = config.substitute_variables(substituted_value);
+                    let substituted_value =
+                        utils::substitute_variables(&value, output_paths, lua, config);
                     format!("{key}={substituted_value}")
                 })
                 .collect_vec();
             match Command::new(config.make_cmd())
                 .current_dir(build_dir)
-                .arg(self.install_target)
+                .arg(&self.install_target)
                 .args(["-f", self.makefile.to_str().unwrap()])
                 .args(install_args)
                 .output()
@@ -100,13 +97,13 @@ impl Build for MakeBuildSpec {
                 Ok(output) if output.status.success() => {}
                 Ok(output) => {
                     return Err(MakeError::CommandFailure {
+                        name: format!("{} {}", config.make_cmd(), self.install_target),
                         status: output.status,
                         stdout: String::from_utf8_lossy(&output.stdout).into(),
                         stderr: String::from_utf8_lossy(&output.stderr).into(),
-                    }
-                    .into())
+                    })
                 }
-                Err(err) => return Err(MakeError::Io(err).into()),
+                Err(err) => return Err(MakeError::Io(err)),
             }
         };
 

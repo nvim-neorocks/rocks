@@ -1,15 +1,20 @@
 use crate::{
     build::BuildError,
+    config::Config,
     lua_installation::LuaInstallation,
     rockspec::{LuaModule, ModulePaths},
+    tree::RockLayout,
 };
 use itertools::Itertools;
+use shlex::try_quote;
 use std::{
     io,
     path::{Path, PathBuf},
     process::Output,
 };
 use target_lexicon::Triple;
+
+use super::variables::HasVariables;
 
 /// Copies a lua source file to a specific destination. The destination is described by a
 /// `module.path` syntax (equivalent to the syntax provided to Lua's `require()` function).
@@ -111,12 +116,41 @@ pub(crate) fn compile_c_files(
     Ok(())
 }
 
+// TODO: (#261): special cases for mingw/cygwin?
+
 /// the extension for Lua libraries.
 pub(crate) fn lua_lib_extension() -> &'static str {
     if cfg!(target_os = "windows") {
         "dll"
     } else {
         "so"
+    }
+}
+
+/// the extension for Lua objects.
+pub(crate) fn lua_obj_extension() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "obj"
+    } else {
+        "o"
+    }
+}
+
+pub(crate) fn default_cflags() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "/nologo /MD /O2"
+    } else {
+        "-O2"
+    }
+}
+
+pub(crate) fn default_libflag() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "-bundle -undefined dynamic_lookup -all_load"
+    } else if cfg!(target_os = "windows") {
+        "/nologo /dll"
+    } else {
+        "-shared"
     }
 }
 
@@ -206,4 +240,26 @@ pub(crate) fn compile_c_modules(
     validate_output(output)?;
 
     Ok(())
+}
+
+pub(crate) fn substitute_variables(
+    input: &str,
+    output_paths: &RockLayout,
+    lua: &LuaInstallation,
+    config: &Config,
+) -> String {
+    let mut substituted = output_paths.substitute_variables(input);
+    substituted = lua.substitute_variables(&substituted);
+    config.substitute_variables(&substituted)
+}
+
+pub(crate) fn escape_path(path: &Path) -> String {
+    let path_str = format!("{}", path.display());
+    if cfg!(windows) {
+        format!("\"{}\"", path_str)
+    } else {
+        try_quote(&path_str)
+            .map(|str| str.to_string())
+            .unwrap_or(format!("'{}'", path_str))
+    }
 }
