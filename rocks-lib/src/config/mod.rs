@@ -1,4 +1,5 @@
 use directories::ProjectDirs;
+use mlua::{ExternalResult, FromLua};
 use std::{collections::HashMap, fmt::Display, io, path::PathBuf, str::FromStr, time::Duration};
 use thiserror::Error;
 
@@ -134,7 +135,7 @@ impl Display for LuaVersion {
 #[error("could not find a valid home directory")]
 pub struct NoValidHomeDirectory;
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, FromLua)]
 pub struct Config {
     enable_development_rockspecs: bool,
     server: String,
@@ -153,6 +154,25 @@ pub struct Config {
 
     cache_dir: PathBuf,
     data_dir: PathBuf,
+}
+
+impl mlua::UserData for Config {
+    fn add_fields<F: mlua::prelude::LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("enable_development_rockspecs", |_lua, this| Ok(this.enable_development_rockspecs));
+        fields.add_field_method_get("server", |_lua, this| Ok(this.server.clone()));
+        fields.add_field_method_get("only_server", |_lua, this| Ok(this.only_server.clone()));
+        fields.add_field_method_get("only_sources", |_lua, this| Ok(this.only_sources.clone()));
+        fields.add_field_method_get("namespace", |_lua, this| Ok(this.namespace.clone()));
+        fields.add_field_method_get("lua_dir", |_lua, this| Ok(this.lua_dir.clone()));
+        fields.add_field_method_get("lua_version", |_lua, this| Ok(this.lua_version.clone().map(|v| v.to_string())));
+        fields.add_field_method_get("tree", |_lua, this| Ok(this.tree.clone()));
+        fields.add_field_method_get("no_project", |_lua, this| Ok(this.no_project));
+        fields.add_field_method_get("timeout", |_lua, this| Ok(this.timeout.as_secs()));
+        fields.add_field_method_get("make", |_lua, this| Ok(this.make.clone()));
+        fields.add_field_method_get("variables", |_lua, this| Ok(this.variables.clone()));
+        fields.add_field_method_get("cache_dir", |_lua, this| Ok(this.cache_dir.clone()));
+        fields.add_field_method_get("data_dir", |_lua, this| Ok(this.data_dir.clone()));
+    }
 }
 
 impl Config {
@@ -264,7 +284,7 @@ pub enum ConfigError {
     Project(#[from] ProjectError),
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct ConfigBuilder {
     enable_development_rockspecs: Option<bool>,
     server: Option<String>,
@@ -412,6 +432,87 @@ impl ConfigBuilder {
             variables: self.variables.unwrap_or_default(),
             cache_dir,
             data_dir,
+        })
+    }
+}
+
+impl mlua::UserData for ConfigBuilder {
+    fn add_fields<F: mlua::prelude::LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_set("enable_development_rockspecs", |_lua, this, enable_development_rockspecs| {
+            this.enable_development_rockspecs = enable_development_rockspecs;
+
+            Ok(())
+        });
+        fields.add_field_method_set("server", |_lua, this, server| {
+            this.server = server;
+
+            Ok(())
+        });
+        fields.add_field_method_set("only_server", |_lua, this, only_server| {
+            this.only_server = only_server;
+
+            Ok(())
+        });
+        fields.add_field_method_set("only_sources", |_lua, this, only_sources| {
+            this.only_sources = only_sources;
+
+            Ok(())
+        });
+        fields.add_field_method_set("namespace", |_lua, this, namespace| {
+            this.namespace = namespace;
+
+            Ok(())
+        });
+        fields.add_field_method_set("lua_dir", |_lua, this, lua_dir| {
+            this.lua_dir = lua_dir;
+
+            Ok(())
+        });
+        fields.add_field_method_set("lua_version", |_lua, this, lua_version: Option<String>| {
+            this.lua_version = lua_version.and_then(|v| v.parse().ok());
+
+            Ok(())
+        });
+        fields.add_field_method_set("tree", |_lua, this, tree| {
+            this.tree = tree;
+
+            Ok(())
+        });
+        fields.add_field_method_set("no_project", |_lua, this, no_project| {
+            this.no_project = no_project;
+
+            Ok(())
+        });
+        fields.add_field_method_set("timeout", |_lua, this, timeout: Option<_>| {
+            this.timeout = timeout.map(Duration::from_secs);
+
+            Ok(())
+        });
+        fields.add_field_method_set("make", |_lua, this, make| {
+            this.make = make;
+
+            Ok(())
+        });
+        fields.add_field_method_set("variables", |_lua, this, variables| {
+            this.variables = variables;
+
+            Ok(())
+        });
+        fields.add_field_method_set("cache_dir", |_lua, this, cache_dir| {
+            this.cache_dir = cache_dir;
+
+            Ok(())
+        });
+        fields.add_field_method_set("data_dir", |_lua, this, data_dir| {
+            this.data_dir = data_dir;
+
+            Ok(())
+        });
+    }
+
+    fn add_methods<M: mlua::prelude::LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("build", |_lua, this, ()| {
+            this.clone().build().into_lua_err()
         })
     }
 }

@@ -15,6 +15,7 @@ pub(crate) mod utils; // Make build utilities available as a submodule
 use indicatif::style::TemplateError;
 use luarocks::LuarocksBuildError;
 use make::MakeError;
+use mlua::{LuaSerdeExt, Value};
 use rust_mlua::RustError;
 use thiserror::Error;
 use utils::recursive_copy_dir;
@@ -62,6 +63,28 @@ impl From<bool> for BuildBehaviour {
             Self::Force
         } else {
             Self::NoForce
+        }
+    }
+}
+
+impl mlua::IntoLua for BuildBehaviour {
+    fn into_lua(
+        self,
+        lua: &mlua::prelude::Lua,
+    ) -> mlua::prelude::LuaResult<mlua::prelude::LuaValue> {
+        lua.to_value(&match self {
+            Self::Force => true,
+            Self::NoForce => false,
+        })
+    }
+}
+
+impl mlua::FromLua for BuildBehaviour {
+    fn from_lua(value: mlua::prelude::LuaValue, _lua: &mlua::prelude::Lua) -> mlua::prelude::LuaResult<Self> {
+        if let Value::Boolean(b) = value {
+            Ok(Self::from(b))
+        } else {
+            Err(mlua::Error::FromLuaConversionError { from: value.type_name(), to: "buildbehaviour".into(), message: None })
         }
     }
 }

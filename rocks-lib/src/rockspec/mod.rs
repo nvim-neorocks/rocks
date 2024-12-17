@@ -8,7 +8,7 @@ mod test_spec;
 use std::{collections::HashMap, io, path::PathBuf, str::FromStr};
 
 use itertools::Itertools;
-use mlua::{FromLua, Lua, LuaSerdeExt, Value};
+use mlua::{ExternalResult, FromLua, Lua, LuaSerdeExt, Value};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 pub use build::*;
@@ -143,6 +143,17 @@ impl Rockspec {
 
     pub fn test_lua_version(&self) -> Option<LuaVersion> {
         latest_lua_version(&self.test_dependencies).or(self.lua_version())
+    }
+}
+
+impl mlua::UserData for Rockspec {}
+impl mlua::FromLua for Rockspec {
+    fn from_lua(value: Value, _lua: &Lua) -> mlua::prelude::LuaResult<Self> {
+        if let Value::String(str) = value {
+            Ok(Rockspec::new(&str.to_str().into_lua_err()?.to_string()).into_lua_err()?)
+        } else {
+            Err(mlua::Error::FromLuaConversionError { from: value.type_name(), to: "rockspec".into(), message: Some("a rockspec can only be constructed from a string".into()) })
+        }
     }
 }
 

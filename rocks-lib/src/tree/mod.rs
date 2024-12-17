@@ -8,6 +8,7 @@ use std::{io, path::PathBuf};
 
 #[cfg(feature = "lua")]
 use mlua::ExternalResult as _;
+use mlua::UserData;
 
 mod list;
 

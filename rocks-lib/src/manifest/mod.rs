@@ -176,6 +176,15 @@ impl ManifestMetadata {
     }
 }
 
+impl mlua::UserData for ManifestMetadata {
+    fn add_methods<M: mlua::prelude::LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("has_rock", |_lua, this, package_name: String| Ok(this.has_rock(&PackageName::new(package_name))));
+        methods.add_method("available_versions", |_lua, this, package_name: String| {
+            Ok(this.available_versions(&PackageName::new(package_name)).map(|val| val.into_iter().map(|version| version)))
+        });
+    }
+}
+
 #[derive(Clone, serde::Deserialize)]
 pub struct ManifestRockEntry {
     /// e.g. "linux-x86_64", "rockspec", "src", ...
