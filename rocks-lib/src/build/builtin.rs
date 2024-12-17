@@ -1,19 +1,22 @@
+use itertools::Itertools;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
+    str::FromStr,
 };
+use walkdir::WalkDir;
 
 use crate::{
+    build::utils,
     config::Config,
     lua_installation::LuaInstallation,
     progress::{
         Progress::{self},
         ProgressBar,
     },
-    rockspec::{utils, Build, BuiltinBuildSpec, LuaModule, ModuleSpec},
+    rockspec::{Build, BuiltinBuildSpec, LuaModule, ModuleSpec},
     tree::RockLayout,
 };
-use walkdir::WalkDir;
 
 use super::BuildError;
 
@@ -30,14 +33,14 @@ impl Build for BuiltinBuildSpec {
         progress: &Progress<ProgressBar>,
     ) -> Result<(), Self::Err> {
         // Detect all Lua modules
-        let modules = autodetect_modules(build_dir)
+        let modules = autodetect_modules(build_dir, source_paths(build_dir, &self.modules))
             .into_iter()
             .chain(self.modules)
             .collect::<HashMap<_, _>>();
 
         progress.map(|p| p.set_position(modules.len() as u64));
 
-        for (counter, (destination_path, module_type)) in modules.iter().enumerate() {
+        for (destination_path, module_type) in modules.iter() {
             match module_type {
                 ModuleSpec::SourcePath(source) => {
                     if source.extension().map(|ext| ext == "c").unwrap_or(false) {
@@ -93,29 +96,46 @@ impl Build for BuiltinBuildSpec {
                     )?
                 }
             }
-            progress.map(|p| p.set_position(counter as u64));
+        }
+
+        for relative_path in autodetect_bin_scripts(build_dir).iter() {
+            let source = build_dir.join("src").join("bin").join(relative_path);
+            let target = output_paths.bin.join(relative_path);
+            std::fs::create_dir_all(target.parent().unwrap())?;
+            std::fs::copy(source, target)?;
         }
 
         Ok(())
     }
 }
 
-fn autodetect_modules(build_dir: &Path) -> HashMap<LuaModule, ModuleSpec> {
+fn source_paths(build_dir: &Path, modules: &HashMap<LuaModule, ModuleSpec>) -> HashSet<PathBuf> {
+    modules
+        .iter()
+        .flat_map(|(_, spec)| match spec {
+            ModuleSpec::SourcePath(path_buf) => vec![path_buf],
+            ModuleSpec::SourcePaths(vec) => vec.iter().collect_vec(),
+            ModuleSpec::ModulePaths(module_paths) => module_paths.sources.iter().collect_vec(),
+        })
+        .map(|path| build_dir.join(path))
+        .collect()
+}
+
+fn autodetect_modules(
+    build_dir: &Path,
+    exclude: HashSet<PathBuf>,
+) -> HashMap<LuaModule, ModuleSpec> {
     WalkDir::new(build_dir.join("src"))
         .into_iter()
         .chain(WalkDir::new(build_dir.join("lua")))
         .chain(WalkDir::new(build_dir.join("lib")))
         .filter_map(|file| {
             file.ok().and_then(|file| {
-                if PathBuf::from(file.file_name())
+                let is_lua_file = PathBuf::from(file.file_name())
                     .extension()
                     .map(|ext| ext == "lua")
-                    .unwrap_or(false)
-                    && !matches!(
-                        file.file_name().to_string_lossy().as_bytes(),
-                        b"spec" | b".luarocks" | b"lua_modules" | b"test.lua" | b"tests.lua"
-                    )
-                {
+                    .unwrap_or(false);
+                if is_lua_file && !exclude.contains(&file.clone().into_path()) {
                     Some(file)
                 } else {
                     None
@@ -123,8 +143,9 @@ fn autodetect_modules(build_dir: &Path) -> HashMap<LuaModule, ModuleSpec> {
             })
         })
         .map(|file| {
-            let diff: PathBuf = pathdiff::diff_paths(build_dir.join(file.into_path()), build_dir)
-                .expect("failed to autodetect modules");
+            let diff: PathBuf =
+                pathdiff::diff_paths(build_dir.join(file.clone().into_path()), build_dir)
+                    .expect("failed to autodetect modules");
 
             // NOTE(vhyrro): You may ask why we convert all paths to Lua module paths
             // just to convert them back later in the `run()` stage.
@@ -133,9 +154,28 @@ fn autodetect_modules(build_dir: &Path) -> HashMap<LuaModule, ModuleSpec> {
             // data in this form allows us to respect any overrides made by the user (which follow
             // the `module.name` format, not our internal one).
             let pathbuf = diff.components().skip(1).collect::<PathBuf>();
-            let lua_module = LuaModule::from_pathbuf(pathbuf);
+            let mut lua_module = LuaModule::from_pathbuf(pathbuf);
+
+            // NOTE(mrcjkb): `LuaModule` does not parse as "<module>.init" from files named "init.lua"
+            // To make sure we don't change the file structure when installing, we append it here.
+            if file.file_name().to_string_lossy().as_bytes() == b"init.lua" {
+                lua_module = lua_module.join(&LuaModule::from_str("init").unwrap())
+            }
 
             (lua_module, ModuleSpec::SourcePath(diff))
+        })
+        .collect()
+}
+
+fn autodetect_bin_scripts(build_dir: &Path) -> Vec<PathBuf> {
+    WalkDir::new(build_dir.join("src").join("bin"))
+        .into_iter()
+        .filter_map(|file| file.ok())
+        .filter(|file| file.clone().into_path().is_file())
+        .map(|file| {
+            let diff = pathdiff::diff_paths(build_dir.join(file.into_path()), build_dir)
+                .expect("failed to autodetect bin scripts");
+            diff.components().skip(2).collect::<PathBuf>()
         })
         .collect()
 }

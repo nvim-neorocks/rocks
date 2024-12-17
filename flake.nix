@@ -10,9 +10,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
     git-hooks = {
-      # TODO: https://github.com/cachix/git-hooks.nix/pull/396
-      # url = "github:cachix/git-hooks.nix";
-      url = "github:mrcjkb/git-hooks.nix?ref=clippy";
+      url = "github:cachix/git-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };

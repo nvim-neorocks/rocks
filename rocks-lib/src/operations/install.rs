@@ -3,25 +3,22 @@ use std::{collections::HashMap, io, sync::Arc};
 use crate::{
     build::{BuildBehaviour, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
-    lockfile::{
-        LocalPackage, LocalPackageId, LocalPackageSpec, LockConstraint, Lockfile, PinnedState,
+    lockfile::{LocalPackage, LocalPackageId, Lockfile, PinnedState},
+    luarocks_installation::{
+        InstallBuildDependenciesError, LuaRocksError, LuaRocksInstallError, LuaRocksInstallation,
     },
-    manifest::ManifestMetadata,
-    operations::download_rockspec,
-    package::{PackageName, PackageReq, PackageVersionReq},
+    manifest::{ManifestError, ManifestMetadata},
+    package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress, ProgressBar},
-    rockspec::{LuaVersionError, Rockspec},
+    rockspec::{BuildBackendSpec, LuaVersionError},
     tree::Tree,
 };
 
-use async_recursion::async_recursion;
 use futures::future::join_all;
 use itertools::Itertools;
-use semver::VersionReq;
 use thiserror::Error;
-use tokio::sync::mpsc::UnboundedSender;
 
-use super::SearchAndDownloadError;
+use super::{resolve::get_all_dependencies, SearchAndDownloadError};
 
 #[derive(Error, Debug)]
 pub enum InstallError {
@@ -33,15 +30,16 @@ pub enum InstallError {
     LuaVersionUnset(#[from] LuaVersionUnset),
     #[error(transparent)]
     Io(#[from] io::Error),
+    #[error("error instantiating LuaRocks compatibility layer: {0}")]
+    LuaRocksError(#[from] LuaRocksError),
+    #[error("error installing LuaRocks compatibility layer: {0}")]
+    LuaRocksInstallError(#[from] LuaRocksInstallError),
+    #[error("error installing LuaRocks build dependencies: {0}")]
+    InstallBuildDependenciesError(#[from] InstallBuildDependenciesError),
+    #[error(transparent)]
+    ManifestError(#[from] ManifestError),
     #[error("failed to build {0}: {1}")]
     BuildError(PackageName, BuildError),
-}
-
-#[derive(Clone, Debug)]
-struct PackageInstallSpec {
-    build_behaviour: BuildBehaviour,
-    rockspec: Rockspec,
-    spec: LocalPackageSpec,
 }
 
 pub async fn install(
@@ -88,7 +86,9 @@ async fn install_impl(
     }
 
     let installed_packages = join_all(all_packages.clone().into_values().map(|install_spec| {
+        let progress = progress.clone();
         let package = install_spec.rockspec.package.clone();
+
         let bar = progress.map(|p| {
             p.add(ProgressBar::from(format!(
                 "💻 Installing {}",
@@ -98,8 +98,19 @@ async fn install_impl(
         let config = config.clone();
 
         tokio::spawn(async move {
+            let rockspec = install_spec.rockspec;
+            if let Some(BuildBackendSpec::LuaRock(build_backend)) =
+                &rockspec.build.current_platform().build_backend
+            {
+                let luarocks = LuaRocksInstallation::new(&config)?;
+                luarocks.ensure_installed(&bar).await?;
+                luarocks
+                    .install_build_dependencies(build_backend, &rockspec, &progress)
+                    .await?;
+            }
+
             let pkg = crate::build::build(
-                install_spec.rockspec,
+                rockspec,
                 pin,
                 install_spec.spec.constraint(),
                 install_spec.build_behaviour,
@@ -138,70 +149,4 @@ async fn install_impl(
     });
 
     Ok(installed_packages.into_values().collect_vec())
-}
-
-#[async_recursion]
-async fn get_all_dependencies(
-    tx: UnboundedSender<PackageInstallSpec>,
-    packages: Vec<(BuildBehaviour, PackageReq)>,
-    pin: PinnedState,
-    manifest: Arc<ManifestMetadata>,
-    config: &Config,
-    progress: &Progress<MultiProgress>,
-) -> Result<Vec<LocalPackageId>, SearchAndDownloadError> {
-    join_all(packages.into_iter().map(|(build_behaviour, package)| {
-        let config = config.clone();
-        let tx = tx.clone();
-        let progress = progress.clone();
-        let manifest = Arc::clone(&manifest);
-
-        tokio::spawn(async move {
-            let bar = progress.map(|p| p.new_bar());
-
-            let rockspec = download_rockspec(&package, &manifest, &config, &bar)
-                .await
-                .unwrap();
-
-            let constraint =
-                if *package.version_req() == PackageVersionReq::SemVer(VersionReq::STAR) {
-                    LockConstraint::Unconstrained
-                } else {
-                    LockConstraint::Constrained(package.version_req().clone())
-                };
-
-            let dependencies = rockspec
-                .dependencies
-                .current_platform()
-                .iter()
-                .filter(|dep| !dep.name().eq(&"lua".into()))
-                .map(|dep| (build_behaviour, dep.clone()))
-                .collect_vec();
-
-            let dependencies =
-                get_all_dependencies(tx.clone(), dependencies, pin, manifest, &config, &progress)
-                    .await?;
-
-            let local_spec = LocalPackageSpec::new(
-                &rockspec.package,
-                &rockspec.version,
-                constraint,
-                dependencies,
-                &pin,
-            );
-
-            let install_spec = PackageInstallSpec {
-                build_behaviour,
-                spec: local_spec.clone(),
-                rockspec,
-            };
-
-            tx.send(install_spec).unwrap();
-
-            Ok::<_, SearchAndDownloadError>(local_spec.id())
-        })
-    }))
-    .await
-    .into_iter()
-    .flatten()
-    .try_collect()
 }

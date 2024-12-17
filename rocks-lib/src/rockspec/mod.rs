@@ -53,12 +53,14 @@ pub struct Rockspec {
     pub source: PerPlatform<RockSource>,
     pub build: PerPlatform<BuildSpec>,
     pub test: PerPlatform<TestSpec>,
+    /// The original content of this rockspec, needed by luarocks
+    pub raw_content: String,
     /// The sha256 of this rockspec
     hash: Integrity,
 }
 
 impl Rockspec {
-    pub fn new(rockspec_content: &String) -> Result<Self, RockspecError> {
+    pub fn new(rockspec_content: &str) -> Result<Self, RockspecError> {
         let lua = Lua::new();
         lua.load(rockspec_content).exec()?;
 
@@ -77,6 +79,7 @@ impl Rockspec {
             build: globals.get("build")?,
             test: globals.get("test")?,
             hash: Integrity::from(rockspec_content),
+            raw_content: rockspec_content.into(),
         };
 
         let rockspec_file_name = format!("{}-{}.rockspec", rockspec.package, rockspec.version);
@@ -1071,9 +1074,8 @@ build = {
   },
   copy_directories = {},
 }
-"
-        .into();
-        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+";
+        let rockspec = Rockspec::new(rockspec_content).unwrap();
         let build_spec = rockspec.build.current_platform();
         assert!(matches!(
             build_spec.build_backend,
@@ -1159,9 +1161,8 @@ build = {
         },
         features = {'extra', 'features'},
     }
-            "
-        .into();
-        let rockspec = Rockspec::new(&rockspec_content).unwrap();
+            ";
+        let rockspec = Rockspec::new(rockspec_content).unwrap();
         let build_spec = rockspec.build.current_platform();
         if let Some(BuildBackendSpec::RustMlua(build_spec)) = build_spec.build_backend.to_owned() {
             assert_eq!(

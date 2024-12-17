@@ -38,7 +38,7 @@ remove_dir_all = "1.0.0"
 openssl = "0.10.66"
 lua-src = "547.0.0"
 luajit-src = "210.5.10"
-target-lexicon = "0.12.16"
+target-lexicon = "0.13.0"
 clap = { version = "4.5.3", features = ["derive"], optional = true}
 infer = "0.16.0"
 indicatif = "0.17.8"
@@ -53,10 +53,11 @@ async-recursion = "1.1.1"
 [dev-dependencies]
 httptest = { version = "0.16.1" }
 serial_test = { version = "3.2.0" }
-proptest = "1.4.0"
+proptest = "1.6.0"
 dir-diff = "0.3.3"
 insta = { version = "1.41.0", features = ["redactions", "yaml", "json"] }
 assert_fs = "1.1.2"
+predicates = "3.1.2"
 
 [features]
 clap = ["dep:clap"]

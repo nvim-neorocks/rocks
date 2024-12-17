@@ -5,6 +5,7 @@ mod fetch;
 mod install;
 mod pin;
 mod remove;
+mod resolve;
 mod run;
 mod test;
 mod unpack;
@@ -19,3 +20,5 @@ pub use run::*;
 pub use test::*;
 pub use unpack::*;
 pub use update::*;
+
+pub(crate) use resolve::*;

@@ -1,3 +1,8 @@
+use crate::{
+    build::BuildError,
+    lua_installation::LuaInstallation,
+    rockspec::{LuaModule, ModulePaths},
+};
 use itertools::Itertools;
 use std::{
     io,
@@ -6,13 +11,9 @@ use std::{
 };
 use target_lexicon::Triple;
 
-use crate::{build::BuildError, lua_installation::LuaInstallation};
-
-use super::{LuaModule, ModulePaths};
-
 /// Copies a lua source file to a specific destination. The destination is described by a
 /// `module.path` syntax (equivalent to the syntax provided to Lua's `require()` function).
-pub fn copy_lua_to_module_path(
+pub(crate) fn copy_lua_to_module_path(
     source: &PathBuf,
     target_module: &LuaModule,
     target_dir: &Path,
@@ -26,6 +27,24 @@ pub fn copy_lua_to_module_path(
     Ok(())
 }
 
+pub(crate) fn recursive_copy_dir(src: &PathBuf, dest: &Path) -> Result<(), io::Error> {
+    if src.exists() {
+        for file in walkdir::WalkDir::new(src)
+            .into_iter()
+            .flatten()
+            .filter(|file| file.file_type().is_file())
+        {
+            let relative_src_path: PathBuf =
+                pathdiff::diff_paths(src.join(file.clone().into_path()), src)
+                    .expect("failed to copy directories!");
+            let filepath = file.path();
+            let target = dest.join(relative_src_path);
+            std::fs::create_dir_all(target.parent().unwrap())?;
+            std::fs::copy(filepath, target)?;
+        }
+    }
+    Ok(())
+}
 fn validate_output(output: Output) -> Result<(), BuildError> {
     if !output.status.success() {
         return Err(BuildError::CommandFailure {
@@ -40,7 +59,7 @@ fn validate_output(output: Output) -> Result<(), BuildError> {
 /// Compiles a set of C files into a single dynamic library and places them under `{target_dir}/{target_file}`.
 /// # Panics
 /// Panics if no parent or no filename can be determined for the target path.
-pub fn compile_c_files(
+pub(crate) fn compile_c_files(
     files: &Vec<PathBuf>,
     target_module: &LuaModule,
     target_dir: &Path,
@@ -93,7 +112,7 @@ pub fn compile_c_files(
 }
 
 /// the extension for Lua libraries.
-pub fn lua_lib_extension() -> &'static str {
+pub(crate) fn lua_lib_extension() -> &'static str {
     if cfg!(target_os = "windows") {
         "dll"
     } else {
@@ -104,7 +123,7 @@ pub fn lua_lib_extension() -> &'static str {
 /// Compiles a set of C files (with extra metadata) to a given destination.
 /// # Panics
 /// Panics if no filename for the target path can be determined.
-pub fn compile_c_modules(
+pub(crate) fn compile_c_modules(
     data: &ModulePaths,
     source_dir: &Path,
     target_module: &LuaModule,

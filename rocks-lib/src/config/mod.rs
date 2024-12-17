@@ -37,13 +37,18 @@ impl LuaVersion {
             LuaVersion::LuaJIT52 => "5.2.0".parse().unwrap(),
         }
     }
-    pub fn as_version_req(&self) -> PackageVersionReq {
+    pub fn version_compatibility_str(&self) -> String {
         match self {
-            LuaVersion::Lua51 | LuaVersion::LuaJIT => "~> 5.1".parse().unwrap(),
-            LuaVersion::Lua52 | LuaVersion::LuaJIT52 => "~> 5.2".parse().unwrap(),
-            LuaVersion::Lua53 => "~> 5.3".parse().unwrap(),
-            LuaVersion::Lua54 => "~> 5.4".parse().unwrap(),
+            LuaVersion::Lua51 | LuaVersion::LuaJIT => "5.1".into(),
+            LuaVersion::Lua52 | LuaVersion::LuaJIT52 => "5.2".into(),
+            LuaVersion::Lua53 => "5.3".into(),
+            LuaVersion::Lua54 => "5.4".into(),
         }
+    }
+    pub fn as_version_req(&self) -> PackageVersionReq {
+        format!("~> {}", self.version_compatibility_str())
+            .parse()
+            .unwrap()
     }
 
     /// Get the LuaVersion from a version that has been parsed from the `lua -v` output
@@ -139,6 +144,7 @@ pub struct Config {
     lua_dir: PathBuf,
     lua_version: Option<LuaVersion>,
     tree: PathBuf,
+    luarocks_tree: PathBuf,
     no_project: bool,
     verbose: bool,
     timeout: Duration,
@@ -169,6 +175,10 @@ impl Config {
             lua_version: Some(lua_version),
             ..self
         }
+    }
+
+    pub fn with_tree(self, tree: PathBuf) -> Self {
+        Self { tree, ..self }
     }
 }
 
@@ -204,6 +214,11 @@ impl Config {
     // TODO(vhyrro): Return `&Tree` instead
     pub fn tree(&self) -> &PathBuf {
         &self.tree
+    }
+
+    /// The tree in which to install luarocks for use as a compatibility layer
+    pub fn luarocks_tree(&self) -> &PathBuf {
+        &self.luarocks_tree
     }
 
     pub fn no_project(&self) -> bool {
@@ -259,6 +274,7 @@ pub struct ConfigBuilder {
     lua_dir: Option<PathBuf>,
     lua_version: Option<LuaVersion>,
     tree: Option<PathBuf>,
+    luarocks_tree: Option<PathBuf>,
     no_project: Option<bool>,
     verbose: Option<bool>,
     timeout: Option<Duration>,
@@ -319,6 +335,13 @@ impl ConfigBuilder {
         Self { tree, ..self }
     }
 
+    pub fn luarocks_tree(self, luarocks_tree: Option<PathBuf>) -> Self {
+        Self {
+            luarocks_tree,
+            ..self
+        }
+    }
+
     pub fn no_project(self, no_project: Option<bool>) -> Self {
         Self { no_project, ..self }
     }
@@ -349,6 +372,7 @@ impl ConfigBuilder {
 
     pub fn build(self) -> Result<Config, ConfigError> {
         let data_dir = self.data_dir.unwrap_or(Config::get_default_data_path()?);
+        let cache_dir = self.cache_dir.unwrap_or(Config::get_default_cache_path()?);
         let current_project = Project::current()?;
         let lua_version = self
             .lua_version
@@ -358,7 +382,6 @@ impl ConfigBuilder {
             .or(crate::lua_installation::get_installed_lua_version("lua")
                 .ok()
                 .and_then(|version| LuaVersion::from_version(version).ok()));
-
         Ok(Config {
             enable_development_rockspecs: self.enable_development_rockspecs.unwrap_or(false),
             server: self
@@ -380,13 +403,14 @@ impl ConfigBuilder {
                             .map(|project| project.root().join(".rocks"))
                     }
                 })
-                .unwrap_or_else(|| data_dir.clone()),
+                .unwrap_or_else(|| data_dir.join("tree")),
+            luarocks_tree: self.luarocks_tree.unwrap_or(data_dir.join(".luarocks")),
             no_project: self.no_project.unwrap_or(false),
             verbose: self.verbose.unwrap_or(false),
             timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(30)),
             make: self.make.unwrap_or("make".into()),
             variables: self.variables.unwrap_or_default(),
-            cache_dir: self.cache_dir.unwrap_or(Config::get_default_cache_path()?),
+            cache_dir,
             data_dir,
         })
     }
