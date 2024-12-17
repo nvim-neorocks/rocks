@@ -7,7 +7,7 @@ use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
 
 use rocks_lib::{
     config::Config,
-    manifest::{manifest_from_server, ManifestMetadata},
+    manifest::ManifestMetadata,
     package::{PackageName, PackageReq, PackageVersion},
     progress::{MultiProgress, ProgressBar},
 };
@@ -30,9 +30,7 @@ pub async fn search(data: Search, config: Config) -> Result<()> {
 
     let formatting = TreeFormatting::dir_tree(FormatCharacters::box_chars());
 
-    let manifest = manifest_from_server(config.server().clone(), &config).await?;
-
-    let metadata = ManifestMetadata::new(&manifest)?;
+    let metadata = ManifestMetadata::from_config(&config).await?;
 
     let lua_package_req = data.lua_package_req;
 

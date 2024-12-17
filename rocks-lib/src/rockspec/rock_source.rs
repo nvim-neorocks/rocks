@@ -316,7 +316,7 @@ fn base_name(path: &str) -> Cow<'_, str> {
 }
 
 fn starts_with_any(str: &str, prefixes: Vec<&str>) -> bool {
-    return prefixes.iter().any(|&prefix| str.starts_with(prefix));
+    prefixes.iter().any(|&prefix| str.starts_with(prefix))
 }
 
 #[cfg(test)]

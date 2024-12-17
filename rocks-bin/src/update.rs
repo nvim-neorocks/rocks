@@ -4,11 +4,7 @@ use rocks_lib::config::LuaVersion;
 use rocks_lib::lockfile::PinnedState;
 use rocks_lib::progress::{MultiProgress, Progress, ProgressBar};
 use rocks_lib::{
-    config::Config,
-    manifest::{manifest_from_server, ManifestMetadata},
-    operations,
-    package::PackageReq,
-    tree::Tree,
+    config::Config, manifest::ManifestMetadata, operations, package::PackageReq, tree::Tree,
 };
 
 #[derive(Args)]
@@ -22,8 +18,7 @@ pub async fn update(config: Config) -> Result<()> {
 
     let lockfile = tree.lockfile()?;
     let rocks = lockfile.rocks();
-    let manifest =
-        ManifestMetadata::new(&manifest_from_server(config.server().clone(), &config).await?)?;
+    let manifest = ManifestMetadata::from_config(&config).await?;
 
     for package in rocks.values() {
         if package.pinned() == PinnedState::Unpinned {
