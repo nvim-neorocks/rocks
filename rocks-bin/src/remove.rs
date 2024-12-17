@@ -2,7 +2,7 @@ use clap::Args;
 use eyre::Result;
 use rocks_lib::{
     config::{Config, LuaVersion},
-    manifest::{manifest_from_server, ManifestMetadata},
+    manifest::ManifestMetadata,
     package::{PackageName, PackageVersion, RemotePackage},
     progress::{MultiProgress, Progress},
     tree::Tree,
@@ -17,9 +17,7 @@ pub struct Remove {
 }
 
 pub async fn remove(remove_args: Remove, config: Config) -> Result<()> {
-    let manifest = manifest_from_server(config.server().clone(), &config).await?;
-
-    let metadata = ManifestMetadata::new(&manifest)?;
+    let metadata = ManifestMetadata::from_config(&config).await?;
 
     let target_version = remove_args
         .version

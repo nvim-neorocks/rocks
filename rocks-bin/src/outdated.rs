@@ -5,7 +5,7 @@ use eyre::Result;
 use itertools::Itertools;
 use rocks_lib::{
     config::{Config, LuaVersion},
-    manifest::{manifest_from_server, ManifestMetadata},
+    manifest::ManifestMetadata,
     progress::{MultiProgress, ProgressBar},
     tree::Tree,
 };
@@ -23,11 +23,9 @@ pub async fn outdated(outdated_data: Outdated, config: Config) -> Result<()> {
         "🔎 Checking for outdated rocks...".to_string(),
     ));
 
-    let manifest = manifest_from_server(config.server().clone(), &config).await?;
-
     let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
 
-    let metadata = ManifestMetadata::new(&manifest)?;
+    let metadata = ManifestMetadata::from_config(&config).await?;
 
     // NOTE: This will display all installed versions and each possible upgrade.
     // However, this should also take into account dependency constraints made by other rocks.
