@@ -3,6 +3,7 @@ use std::{path::PathBuf, process::Command};
 use target_lexicon::Triple;
 use thiserror::Error;
 
+use crate::build::utils::escape_path;
 use crate::{
     build::variables::{self, HasVariables},
     config::{Config, LuaVersion},
@@ -90,16 +91,15 @@ impl LuaInstallation {
 }
 
 impl HasVariables for LuaInstallation {
-    fn substitute_variables(&self, input: String) -> String {
+    fn substitute_variables(&self, input: &str) -> String {
         variables::substitute(
             |var_name| {
                 let dir = match var_name {
-                    "LUA_INCDIR" => Some(self.include_dir.to_owned()),
-                    "LUA_LIBDIR" => Some(self.lib_dir.to_owned()),
-                    // TODO: "LUA" ?
+                    "LUA_INCDIR" => Some(escape_path(&self.include_dir)),
+                    "LUA_LIBDIR" => Some(escape_path(&self.lib_dir)),
                     _ => None,
                 }?;
-                Some(dir.to_string_lossy().to_string())
+                Some(dir)
             },
             input,
         )

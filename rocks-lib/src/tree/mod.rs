@@ -1,5 +1,8 @@
 use crate::{
-    build::variables::{self, HasVariables},
+    build::{
+        utils::escape_path,
+        variables::{self, HasVariables},
+    },
     config::LuaVersion,
     lockfile::{LocalPackage, Lockfile},
     package::PackageReq,
@@ -65,19 +68,19 @@ pub struct RockLayout {
 impl HasVariables for RockLayout {
     /// Substitute `$(VAR)` with one of the paths, where `VAR`
     /// is one of `PREFIX`, `LIBDIR`, `LUADIR`, `BINDIR`, `CONFDIR` or `DOCDIR`.
-    fn substitute_variables(&self, input: String) -> String {
+    fn substitute_variables(&self, input: &str) -> String {
         variables::substitute(
             |var| {
                 let path = match var {
-                    "PREFIX" => Some(self.rock_path.clone()),
-                    "LIBDIR" => Some(self.lib.clone()),
-                    "LUADIR" => Some(self.src.clone()),
-                    "BINDIR" => Some(self.bin.clone()),
-                    "CONFDIR" => Some(self.conf.clone()),
-                    "DOCDIR" => Some(self.doc.clone()),
+                    "PREFIX" => Some(escape_path(&self.rock_path)),
+                    "LIBDIR" => Some(escape_path(&self.lib)),
+                    "LUADIR" => Some(escape_path(&self.src)),
+                    "BINDIR" => Some(escape_path(&self.bin)),
+                    "CONFDIR" => Some(escape_path(&self.conf)),
+                    "DOCDIR" => Some(escape_path(&self.doc)),
                     _ => None,
                 }?;
-                Some(path.to_string_lossy().to_string())
+                Some(path)
             },
             input,
         )
@@ -377,7 +380,7 @@ mod tests {
         ];
         let result: Vec<String> = build_variables
             .into_iter()
-            .map(|var| neorg.substitute_variables(var.into()))
+            .map(|var| neorg.substitute_variables(var))
             .collect();
         assert_eq!(
             result,

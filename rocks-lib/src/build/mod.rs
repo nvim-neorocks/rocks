@@ -11,7 +11,9 @@ use crate::{
     rockspec::{Build as _, BuildBackendSpec, LuaVersionError, Rockspec},
     tree::{RockLayout, Tree},
 };
-pub(crate) mod utils; // Make build utilities available as a submodule
+pub(crate) mod utils;
+use command::CommandError;
+// Make build utilities available as a submodule
 use indicatif::style::TemplateError;
 use luarocks::LuarocksBuildError;
 use make::MakeError;
@@ -19,6 +21,7 @@ use rust_mlua::RustError;
 use thiserror::Error;
 use utils::recursive_copy_dir;
 mod builtin;
+mod command;
 mod luarocks;
 mod make;
 mod rust_mlua;
@@ -34,6 +37,8 @@ pub enum BuildError {
     CompilationError(#[from] cc::Error),
     #[error(transparent)]
     MakeError(#[from] MakeError),
+    #[error(transparent)]
+    CommandError(#[from] CommandError),
     #[error(transparent)]
     RustError(#[from] RustError),
     #[error(transparent)]
@@ -84,6 +89,11 @@ async fn run_build(
         }
         Some(BuildBackendSpec::Make(make_spec)) => {
             make_spec
+                .run(output_paths, false, lua, config, build_dir, progress)
+                .await?
+        }
+        Some(BuildBackendSpec::Command(command_spec)) => {
+            command_spec
                 .run(output_paths, false, lua, config, build_dir, progress)
                 .await?
         }

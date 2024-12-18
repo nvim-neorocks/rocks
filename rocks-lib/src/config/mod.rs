@@ -1,9 +1,14 @@
 use directories::ProjectDirs;
-use std::{collections::HashMap, fmt::Display, io, path::PathBuf, str::FromStr, time::Duration};
+use std::{
+    collections::HashMap, env, fmt::Display, io, path::PathBuf, str::FromStr, time::Duration,
+};
 use thiserror::Error;
 
 use crate::{
-    build::variables::{self, HasVariables},
+    build::{
+        utils,
+        variables::{self, HasVariables},
+    },
     package::{PackageVersion, PackageVersionReq},
     project::{Project, ProjectError},
 };
@@ -251,7 +256,7 @@ impl Config {
 }
 
 impl HasVariables for Config {
-    fn substitute_variables(&self, input: String) -> String {
+    fn substitute_variables(&self, input: &str) -> String {
         variables::substitute(|var_name| self.variables().get(var_name).cloned(), input)
     }
 }
@@ -382,6 +387,21 @@ impl ConfigBuilder {
             .or(crate::lua_installation::get_installed_lua_version("lua")
                 .ok()
                 .and_then(|version| LuaVersion::from_version(version).ok()));
+        let default_variables = vec![
+            ("LUA", "lua"),
+            ("LIB_EXTENSION", utils::lua_lib_extension()),
+            ("OBJ_EXTENSION", utils::lua_obj_extension()),
+            (
+                "CFLAGS",
+                env::var("CFLAGS")
+                    .unwrap_or(utils::default_cflags().into())
+                    .as_str(),
+            ),
+            ("LIBFLAG", utils::default_libflag()),
+        ]
+        .into_iter()
+        .map(|(key, val)| (key.into(), val.into()))
+        .collect();
         Ok(Config {
             enable_development_rockspecs: self.enable_development_rockspecs.unwrap_or(false),
             server: self
@@ -409,7 +429,7 @@ impl ConfigBuilder {
             verbose: self.verbose.unwrap_or(false),
             timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(30)),
             make: self.make.unwrap_or("make".into()),
-            variables: self.variables.unwrap_or_default(),
+            variables: self.variables.unwrap_or(default_variables),
             cache_dir,
             data_dir,
         })
