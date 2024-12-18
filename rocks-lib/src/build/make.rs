@@ -45,11 +45,12 @@ impl Build for MakeBuildSpec {
         // Build step
         if self.build_pass {
             let build_args = self
-                .build_variables
-                .into_iter()
+                .variables
+                .iter()
+                .chain(&self.build_variables)
                 .map(|(key, value)| {
                     let substituted_value =
-                        utils::substitute_variables(&value, output_paths, lua, config);
+                        utils::substitute_variables(value, output_paths, lua, config);
                     format!("{key}={substituted_value}")
                 })
                 .collect_vec();
@@ -79,11 +80,12 @@ impl Build for MakeBuildSpec {
         // Install step
         if self.install_pass && !no_install {
             let install_args = self
-                .install_variables
-                .into_iter()
+                .variables
+                .iter()
+                .chain(&self.install_variables)
                 .map(|(key, value)| {
                     let substituted_value =
-                        utils::substitute_variables(&value, output_paths, lua, config);
+                        utils::substitute_variables(value, output_paths, lua, config);
                     format!("{key}={substituted_value}")
                 })
                 .collect_vec();
