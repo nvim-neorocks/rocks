@@ -2,8 +2,9 @@ use std::io;
 
 use crate::config::{LuaVersion, LuaVersionUnset};
 use crate::lockfile::LocalPackage;
-use crate::progress::{Progress, ProgressBar};
+use crate::progress::{MultiProgress, Progress, ProgressBar};
 use crate::{config::Config, tree::Tree};
+use futures::future::join_all;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -15,27 +16,38 @@ pub enum RemoveError {
 
 // TODO: Remove dependencies recursively too!
 pub async fn remove(
-    package: LocalPackage,
+    packages: Vec<LocalPackage>,
     config: &Config,
-    progress: &Progress<ProgressBar>,
+    progress: &Progress<MultiProgress>,
 ) -> Result<(), RemoveError> {
-    progress.map(|p| {
-        p.set_message(format!(
-            "🗑️ Removing {}@{}",
-            package.name(),
-            package.version()
-        ))
-    });
+    join_all(packages.into_iter().map(|package| {
+        let bar = progress.map(|p| {
+            p.add(ProgressBar::from(format!(
+                "🗑️ Removing {}@{}",
+                package.name(),
+                package.version()
+            )))
+        });
 
-    remove_impl(package, config).await
+        let config = config.clone();
+
+        tokio::spawn(remove_package(package, bar, config))
+    }))
+    .await;
+
+    Ok(())
 }
 
-async fn remove_impl(package: LocalPackage, config: &Config) -> Result<(), RemoveError> {
-    let tree = Tree::new(config.tree().clone(), LuaVersion::from(config)?)?;
+async fn remove_package(
+    package: LocalPackage,
+    _bar: Progress<ProgressBar>,
+    config: Config,
+) -> Result<(), RemoveError> {
+    let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
 
     tree.lockfile()?.remove(&package);
 
-    std::fs::remove_dir_all(tree.root_for(&package))?;
+    tokio::fs::remove_dir_all(tree.root_for(&package)).await?;
 
     Ok(())
 }

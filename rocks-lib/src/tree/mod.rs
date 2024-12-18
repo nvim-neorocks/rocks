@@ -9,6 +9,7 @@ use crate::{
 };
 use std::{io, path::PathBuf};
 
+use itertools::Itertools as _;
 #[cfg(feature = "lua")]
 use mlua::ExternalResult as _;
 
@@ -100,6 +101,20 @@ impl mlua::UserData for RockLayout {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum RockMatches {
+    NotFound(PackageReq),
+    Single(LocalPackage),
+    Many(Vec<LocalPackage>),
+}
+
+// Loosely mimic the Option<T> functions.
+impl RockMatches {
+    pub fn is_found(&self) -> bool {
+        matches!(self, Self::Single(_) | Self::Many(_))
+    }
+}
+
 impl Tree {
     pub fn new(root: PathBuf, version: LuaVersion) -> io::Result<Self> {
         let path_with_version = root.join(version.to_string());
@@ -130,24 +145,49 @@ impl Tree {
         self.root.join("bin")
     }
 
-    pub fn has_rock(&self, req: &PackageReq) -> Option<LocalPackage> {
-        self.lockfile().ok()?.has_rock(req)
+    pub fn match_rocks(&self, req: &PackageReq) -> io::Result<RockMatches> {
+        match self.list()?.get(req.name()) {
+            Some(packages) => {
+                let mut found_packages = packages
+                    .iter()
+                    .rev()
+                    .filter(|package| req.version_req().matches(package.version()))
+                    .cloned()
+                    .collect_vec();
+
+                Ok(match found_packages.len() {
+                    0 => RockMatches::NotFound(req.clone()),
+                    1 => RockMatches::Single(found_packages.pop().unwrap()),
+                    2.. => RockMatches::Many(found_packages),
+                })
+            }
+            None => Ok(RockMatches::NotFound(req.clone())),
+        }
     }
 
-    pub fn has_rock_and<F>(&self, req: &PackageReq, filter: F) -> Option<LocalPackage>
+    pub fn match_rocks_and<F>(&self, req: &PackageReq, filter: F) -> io::Result<RockMatches>
     where
         F: Fn(&LocalPackage) -> bool,
     {
-        self.list()
-            .ok()?
-            .get(req.name())
-            .map(|packages| {
-                packages
+        match self.list()?.get(req.name()) {
+            Some(packages) => {
+                let mut found_packages = packages
                     .iter()
                     .rev()
-                    .find(|package| req.version_req().matches(package.version()) && filter(package))
-            })?
-            .cloned()
+                    .filter(|package| {
+                        req.version_req().matches(package.version()) && filter(package)
+                    })
+                    .cloned()
+                    .collect_vec();
+
+                Ok(match found_packages.len() {
+                    0 => RockMatches::NotFound(req.clone()),
+                    1 => RockMatches::Single(found_packages.pop().unwrap()),
+                    2.. => RockMatches::Many(found_packages),
+                })
+            }
+            None => Ok(RockMatches::NotFound(req.clone())),
+        }
     }
 
     /// Create a `RockLayout` for a package, without creating the directories.
@@ -195,13 +235,13 @@ impl mlua::UserData for Tree {
             Ok(this.root_for(&package))
         });
         methods.add_method("bin", |_, this, ()| Ok(this.bin()));
-        methods.add_method("has_rock", |_, this, req: PackageReq| {
-            Ok(this.has_rock(&req))
+        methods.add_method("match_rocks", |_, this, req: PackageReq| {
+            Ok(this.match_rocks(&req))
         });
         methods.add_method(
-            "has_rock_and",
+            "match_rocks_and",
             |_, this, (req, callback): (PackageReq, mlua::Function)| {
-                Ok(this.has_rock_and(&req, |package| {
+                Ok(this.match_rocks_and(&req, |package| {
                     callback
                         .call(package.clone())
                         .expect("failed to invoke Lua callback in `Tree::has_rock_and()`")

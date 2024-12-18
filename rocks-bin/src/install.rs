@@ -8,7 +8,7 @@ use rocks_lib::{
     package::PackageReq,
     progress::MultiProgress,
     remote_package_db::RemotePackageDB,
-    tree::Tree,
+    tree::{RockMatches, Tree},
 };
 
 #[derive(clap::Args)]
@@ -35,21 +35,23 @@ pub async fn install(data: Install, config: Config) -> Result<()> {
         .package_req
         .into_iter()
         .filter_map(|req| {
-            let build_behaviour: Option<BuildBehaviour> =
-                match tree.has_rock_and(&req, |rock| pin == rock.pinned()) {
-                    Some(_) if !data.force => {
-                        if Confirm::new(&format!("Package {} already exists. Overwrite?", req))
-                            .with_default(false)
-                            .prompt()
-                            .expect("Error prompting for reinstall")
-                        {
-                            Some(BuildBehaviour::Force)
-                        } else {
-                            None
-                        }
+            let build_behaviour: Option<BuildBehaviour> = match tree
+                .match_rocks_and(&req, |rock| pin == rock.pinned())
+                .expect("unable to get tree data")
+            {
+                RockMatches::Single(_) | RockMatches::Many(_) if !data.force => {
+                    if Confirm::new(&format!("Package {} already exists. Overwrite?", req))
+                        .with_default(false)
+                        .prompt()
+                        .expect("Error prompting for reinstall")
+                    {
+                        Some(BuildBehaviour::Force)
+                    } else {
+                        None
                     }
-                    _ => Some(BuildBehaviour::from(data.force)),
-                };
+                }
+                _ => Some(BuildBehaviour::from(data.force)),
+            };
             build_behaviour.map(|it| (it, req))
         })
         .collect_vec();
