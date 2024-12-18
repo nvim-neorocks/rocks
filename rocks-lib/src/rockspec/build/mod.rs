@@ -101,20 +101,25 @@ impl BuildSpec {
                 Some(BuildBackendSpec::Make(MakeBuildSpec {
                     makefile: internal.makefile.unwrap_or(default.makefile),
                     build_target: internal.make_build_target.unwrap_or_default(),
-                    build_pass: internal.make_build_pass.unwrap_or(default.build_pass),
+                    build_pass: internal.build_pass.unwrap_or(default.build_pass),
                     install_target: internal
                         .make_install_target
                         .unwrap_or(default.install_target),
-                    install_pass: internal.make_install_pass.unwrap_or(default.install_pass),
+                    install_pass: internal.install_pass.unwrap_or(default.install_pass),
                     build_variables: internal.make_build_variables.unwrap_or_default(),
                     install_variables: internal.make_install_variables.unwrap_or_default(),
                     variables: internal.variables.unwrap_or_default(),
                 }))
             }
-            BuildType::CMake => Some(BuildBackendSpec::CMake(CMakeBuildSpec {
-                cmake_lists_content: internal.cmake_lists_content,
-                variables: internal.variables.unwrap_or_default(),
-            })),
+            BuildType::CMake => {
+                let default = CMakeBuildSpec::default();
+                Some(BuildBackendSpec::CMake(CMakeBuildSpec {
+                    cmake_lists_content: internal.cmake_lists_content,
+                    build_pass: internal.build_pass.unwrap_or(default.build_pass),
+                    install_pass: internal.install_pass.unwrap_or(default.install_pass),
+                    variables: internal.variables.unwrap_or_default(),
+                }))
+            }
             BuildType::Command => {
                 let build_command = internal
                     .build_command
@@ -282,11 +287,11 @@ struct BuildSpecInternal {
     #[serde(rename = "build_target", default)]
     make_build_target: Option<String>,
     #[serde(default)]
-    make_build_pass: Option<bool>,
+    build_pass: Option<bool>,
     #[serde(rename = "install_target", default)]
     make_install_target: Option<String>,
     #[serde(default)]
-    make_install_pass: Option<bool>,
+    install_pass: Option<bool>,
     #[serde(rename = "build_variables", default)]
     make_build_variables: Option<HashMap<String, String>>,
     #[serde(rename = "install_variables", default)]
@@ -408,12 +413,12 @@ fn override_build_spec_internal(
         },
         makefile: override_opt(&override_spec.makefile, &base.makefile),
         make_build_target: override_opt(&override_spec.make_build_target, &base.make_build_target),
-        make_build_pass: override_opt(&override_spec.make_build_pass, &base.make_build_pass),
+        build_pass: override_opt(&override_spec.build_pass, &base.build_pass),
         make_install_target: override_opt(
             &override_spec.make_install_target,
             &base.make_install_target,
         ),
-        make_install_pass: override_opt(&override_spec.make_install_pass, &base.make_install_pass),
+        install_pass: override_opt(&override_spec.install_pass, &base.install_pass),
         make_build_variables: merge_map_opts(
             &override_spec.make_build_variables,
             &base.make_build_variables,

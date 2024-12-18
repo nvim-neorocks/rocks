@@ -36,10 +36,10 @@ The following table provides a brief (incomplete) comparison:
 | ---                                             | ---                          | ---                |
 | `builtin` build spec                            | :white_check_mark:           | :white_check_mark: |
 | `make` build spec                               | :white_check_mark:           | :white_check_mark: |
-| `rust-mlua` build spec                          | :white_check_mark: (builtin) | :white_check_mark: (external build backend) |
-| `cmake` build spec                              | :x: (planned)                | :white_check_mark: |
+| `cmake` build spec                              | :white_check_mark:           | :white_check_mark: |
 | `command` build spec                            | :white_check_mark:           | :white_check_mark: |
 | custom build backends                           | :white_check_mark:[^1]       | :white_check_mark: |
+| `rust-mlua` build spec                          | :white_check_mark: (builtin) | :white_check_mark: (external build backend) |
 | install pre-built binary rocks                  | :x: (planned)                | :white_check_mark: |
 | parallel builds/installs                        | :white_check_mark:           | :x:                |
 | install multiple packages with a single command | :white_check_mark:           | :x:                |

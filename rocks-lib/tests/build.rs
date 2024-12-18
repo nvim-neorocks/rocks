@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use rocks_lib::{
     build::{self, BuildBehaviour::Force},
     config::{ConfigBuilder, LuaVersion},
@@ -67,24 +69,31 @@ async fn make_build() {
 }
 
 #[tokio::test]
+async fn cmake_build() {
+    test_build_rockspec("resources/test/luv-1.48.0-2.rockspec".into()).await
+}
+
+#[tokio::test]
 async fn command_build() {
+    // The rockspec appears to be broken when using luajit headers on macos
+    let config = ConfigBuilder::new().build().unwrap();
+    if cfg!(target_os = "macos") && config.lua_version() == Some(&LuaVersion::LuaJIT) {
+        println!("luaposix is broken on macos/luajit! Skipping...");
+        return;
+    }
+    test_build_rockspec("resources/test/luaposix-35.1-1.rockspec".into()).await
+}
+
+async fn test_build_rockspec(rockspec_path: PathBuf) {
     let dir = TempDir::new("rocks-test").unwrap();
 
-    let content =
-        String::from_utf8(std::fs::read("resources/test/luaposix-35.1-1.rockspec").unwrap())
-            .unwrap();
+    let content = String::from_utf8(std::fs::read(rockspec_path).unwrap()).unwrap();
     let rockspec = Rockspec::new(&content).unwrap();
 
     let config = ConfigBuilder::new()
         .tree(Some(dir.into_path()))
         .build()
         .unwrap();
-
-    // The rockspec appears to be broken when using luajit headers on macos
-    if cfg!(target_os = "macos") && config.lua_version() == Some(&LuaVersion::LuaJIT) {
-        println!("luaposix is broken on macos/luajit! Skipping...");
-        return;
-    }
 
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
