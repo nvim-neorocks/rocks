@@ -12,6 +12,7 @@ use crate::{
     tree::{RockLayout, Tree},
 };
 pub(crate) mod utils;
+use cmake::CMakeError;
 use command::CommandError;
 // Make build utilities available as a submodule
 use indicatif::style::TemplateError;
@@ -21,6 +22,7 @@ use rust_mlua::RustError;
 use thiserror::Error;
 use utils::recursive_copy_dir;
 mod builtin;
+mod cmake;
 mod command;
 mod luarocks;
 mod make;
@@ -33,6 +35,8 @@ pub enum BuildError {
     Io(#[from] io::Error),
     #[error("failed to create spinner: {0}")]
     SpinnerFailure(#[from] TemplateError),
+    #[error(transparent)]
+    CMakeError(#[from] CMakeError),
     #[error("failed to compile build modules: {0}")]
     CompilationError(#[from] cc::Error),
     #[error(transparent)]
@@ -92,6 +96,11 @@ async fn run_build(
                 .run(output_paths, false, lua, config, build_dir, progress)
                 .await?
         }
+        Some(BuildBackendSpec::CMake(cmake_spec)) => {
+            cmake_spec
+                .run(output_paths, false, lua, config, build_dir, progress)
+                .await?
+        }
         Some(BuildBackendSpec::Command(command_spec)) => {
             command_spec
                 .run(output_paths, false, lua, config, build_dir, progress)
@@ -106,7 +115,6 @@ async fn run_build(
             luarocks::build(rockspec, output_paths, lua, config, build_dir, progress).await?;
         }
         None => (),
-        _ => unimplemented!(),
     }
 
     Ok(())

@@ -154,6 +154,7 @@ pub struct Config {
     verbose: bool,
     timeout: Duration,
     make: String,
+    cmake: String,
     variables: HashMap<String, String>,
 
     cache_dir: PathBuf,
@@ -242,6 +243,10 @@ impl Config {
         &self.make
     }
 
+    pub fn cmake_cmd(&self) -> &String {
+        &self.cmake
+    }
+
     pub fn variables(&self) -> &HashMap<String, String> {
         &self.variables
     }
@@ -284,6 +289,7 @@ pub struct ConfigBuilder {
     verbose: Option<bool>,
     timeout: Option<Duration>,
     make: Option<String>,
+    cmake: Option<String>,
     variables: Option<HashMap<String, String>>,
 
     cache_dir: Option<PathBuf>,
@@ -363,6 +369,10 @@ impl ConfigBuilder {
         Self { make, ..self }
     }
 
+    pub fn cmake_cmd(self, cmake: Option<String>) -> Self {
+        Self { cmake, ..self }
+    }
+
     pub fn variables(self, variables: Option<HashMap<String, String>>) -> Self {
         Self { variables, ..self }
     }
@@ -429,6 +439,7 @@ impl ConfigBuilder {
             verbose: self.verbose.unwrap_or(false),
             timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(30)),
             make: self.make.unwrap_or("make".into()),
+            cmake: self.cmake.unwrap_or("cmake".into()),
             variables: self.variables.unwrap_or(default_variables),
             cache_dir,
             data_dir,
