@@ -36,7 +36,7 @@ pub async fn install(data: Install, config: Config) -> Result<()> {
         .into_iter()
         .filter_map(|req| {
             let build_behaviour: Option<BuildBehaviour> =
-                match tree.has_rock_and(&req, |rock| pin == rock.pinned()) {
+                match tree.match_rocks_and(&req, |rock| pin == rock.pinned()) {
                     Some(_) if !data.force => {
                         if Confirm::new(&format!("Package {} already exists. Overwrite?", req))
                             .with_default(false)

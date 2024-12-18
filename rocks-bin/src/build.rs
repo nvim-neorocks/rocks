@@ -71,7 +71,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     let tree = Tree::new(config.tree().clone(), lua_version)?;
     let manifest = ManifestMetadata::from_config(&config).await?;
 
-    let build_behaviour = match tree.has_rock_and(
+    let build_behaviour = match tree.match_rocks_and(
         &PackageReq::new(
             rockspec.package.to_string(),
             Some(rockspec.version.to_string()),
@@ -106,7 +106,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
 
     let dependencies_to_install = dependencies
         .into_iter()
-        .filter(|req| tree.has_rock(req).is_none())
+        .filter(|req| tree.match_rocks(req).is_none())
         .map(|dep| (build_behaviour, dep.to_owned()))
         .collect_vec();
 
