@@ -9,6 +9,7 @@ use crate::{
 };
 use std::{io, path::PathBuf};
 
+use itertools::Itertools as _;
 #[cfg(feature = "lua")]
 use mlua::ExternalResult as _;
 
@@ -130,33 +131,32 @@ impl Tree {
         self.root.join("bin")
     }
 
-    pub fn has_rock(&self, req: &PackageReq) -> Option<LocalPackage> {
-        self.list()
-            .ok()?
-            .get(req.name())
-            .map(|packages| {
-                packages
-                    .iter()
-                    .rev()
-                    .find(|package| req.version_req().matches(package.version()))
-            })?
-            .cloned()
+    // TODO(vhyrro): Return a struct with `matches`, `duplicates` and `invalid`
+    // Add functions like `.no_duplicates()?` for centralized error checking
+    // as well as `.no_invalid()?`.
+    pub fn match_rocks(&self, req: &PackageReq) -> Option<Vec<LocalPackage>> {
+        self.list().ok()?.get(req.name()).map(|packages| {
+            packages
+                .iter()
+                .rev()
+                .filter(|package| req.version_req().matches(package.version()))
+                .cloned()
+                .collect_vec()
+        })
     }
 
-    pub fn has_rock_and<F>(&self, req: &PackageReq, filter: F) -> Option<LocalPackage>
+    pub fn match_rocks_and<F>(&self, req: &PackageReq, filter: F) -> Option<Vec<LocalPackage>>
     where
         F: Fn(&LocalPackage) -> bool,
     {
-        self.list()
-            .ok()?
-            .get(req.name())
-            .map(|packages| {
-                packages
-                    .iter()
-                    .rev()
-                    .find(|package| req.version_req().matches(package.version()) && filter(package))
-            })?
-            .cloned()
+        self.list().ok()?.get(req.name()).map(|packages| {
+            packages
+                .iter()
+                .rev()
+                .filter(|package| req.version_req().matches(package.version()) && filter(package))
+                .cloned()
+                .collect_vec()
+        })
     }
 
     /// Create a `RockLayout` for a package, without creating the directories.

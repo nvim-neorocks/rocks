@@ -104,7 +104,7 @@ impl LuaRocksInstallation {
         let mut lockfile = self.tree.lockfile()?;
         let luarocks_req =
             PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into())).unwrap();
-        if self.tree.has_rock(&luarocks_req).is_none() {
+        if self.tree.match_rocks(&luarocks_req).is_none() {
             let rockspec = Rockspec::new(LUAROCKS_ROCKSPEC).unwrap();
             let pkg = build(
                 rockspec,
