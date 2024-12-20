@@ -125,8 +125,9 @@ impl LuaRocksInstallation {
         self,
         build_backend: &str,
         rockspec: &Rockspec,
-        progress: &Progress<MultiProgress>,
+        progress_arc: Arc<Progress<MultiProgress>>,
     ) -> Result<(), InstallBuildDependenciesError> {
+        let progress = Arc::clone(&progress_arc);
         let mut lockfile = self.tree.lockfile()?;
         let manifest = ManifestMetadata::from_config(&self.config).await?;
         let build_dependencies = match rockspec.rockspec_format {
@@ -155,7 +156,7 @@ impl LuaRocksInstallation {
             pin,
             Arc::new(manifest),
             &self.config,
-            progress,
+            progress_arc,
         )
         .await?;
 
@@ -165,7 +166,6 @@ impl LuaRocksInstallation {
         }
 
         let installed_packages = join_all(all_packages.clone().into_values().map(|install_spec| {
-            let progress = progress.clone();
             let bar = progress.map(|p| {
                 p.add(ProgressBar::from(format!(
                     "💻 Installing build dependency: {}",

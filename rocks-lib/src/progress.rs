@@ -1,4 +1,4 @@
-use std::{borrow::Cow, time::Duration};
+use std::{borrow::Cow, sync::Arc, time::Duration};
 
 mod private {
     pub trait HasProgress {}
@@ -34,13 +34,17 @@ where
     }
 }
 
-#[derive(Clone)]
+// WARNING: Don't implement `Clone` for this.
 pub struct MultiProgress(indicatif::MultiProgress);
 pub struct ProgressBar(indicatif::ProgressBar);
 
 impl MultiProgress {
     pub fn new() -> Self {
         Self(indicatif::MultiProgress::new())
+    }
+
+    pub fn new_arc() -> Arc<Progress<MultiProgress>> {
+        Arc::new(Progress::Progress(MultiProgress::new()))
     }
 
     pub fn add(&self, bar: ProgressBar) -> ProgressBar {
