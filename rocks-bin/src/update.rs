@@ -2,7 +2,7 @@ use clap::Args;
 use eyre::Result;
 use rocks_lib::config::LuaVersion;
 use rocks_lib::lockfile::PinnedState;
-use rocks_lib::progress::{MultiProgress, Progress, ProgressBar};
+use rocks_lib::progress::{MultiProgress, ProgressBar};
 use rocks_lib::{
     config::Config, manifest::ManifestMetadata, operations, package::PackageReq, tree::Tree,
 };
@@ -11,7 +11,7 @@ use rocks_lib::{
 pub struct Update {}
 
 pub async fn update(config: Config) -> Result<()> {
-    let progress = Progress::Progress(MultiProgress::new());
+    let progress = MultiProgress::new_arc();
     progress.map(|p| p.add(ProgressBar::from("🔎 Looking for updates...".to_string())));
 
     let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
@@ -30,7 +30,7 @@ pub async fn update(config: Config) -> Result<()> {
                 )?,
                 &manifest,
                 &config,
-                &progress,
+                progress.clone(),
             )
             .await?;
         }

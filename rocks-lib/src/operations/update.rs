@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use thiserror::Error;
 
 use crate::{
@@ -34,7 +36,7 @@ pub async fn update(
     constraint: PackageReq,
     manifest: &ManifestMetadata,
     config: &Config,
-    progress: &Progress<MultiProgress>,
+    progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), UpdateError> {
     let bar = progress.map(|p| p.add(ProgressBar::from(format!("Updating {}...", package.name()))));
 

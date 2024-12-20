@@ -32,13 +32,13 @@ pub(crate) async fn get_all_dependencies(
     pin: PinnedState,
     manifest: Arc<ManifestMetadata>,
     config: &Config,
-    progress: &Progress<MultiProgress>,
+    progress: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackageId>, SearchAndDownloadError> {
     join_all(packages.into_iter().map(|(build_behaviour, package)| {
         let config = config.clone();
         let tx = tx.clone();
-        let progress = progress.clone();
         let manifest = Arc::clone(&manifest);
+        let progress = Arc::clone(&progress);
 
         tokio::spawn(async move {
             let bar = progress.map(|p| p.new_bar());
@@ -63,7 +63,7 @@ pub(crate) async fn get_all_dependencies(
                 .collect_vec();
 
             let dependencies =
-                get_all_dependencies(tx.clone(), dependencies, pin, manifest, &config, &progress)
+                get_all_dependencies(tx.clone(), dependencies, pin, manifest, &config, progress)
                     .await?;
 
             let local_spec = LocalPackageSpec::new(

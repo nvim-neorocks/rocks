@@ -47,7 +47,7 @@ pub async fn install(
     pin: PinnedState,
     manifest: &ManifestMetadata,
     config: &Config,
-    progress: &Progress<MultiProgress>,
+    progress: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, InstallError>
 where
 {
@@ -73,11 +73,20 @@ async fn install_impl(
     manifest: ManifestMetadata,
     config: &Config,
     lockfile: &mut Lockfile,
-    progress: &Progress<MultiProgress>,
+    progress_arc: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, InstallError> {
+    let progress = Arc::clone(&progress_arc);
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
-    get_all_dependencies(tx, packages, pin, Arc::new(manifest), config, progress).await?;
+    get_all_dependencies(
+        tx,
+        packages,
+        pin,
+        Arc::new(manifest),
+        config,
+        progress_arc.clone(),
+    )
+    .await?;
 
     let mut all_packages = HashMap::with_capacity(rx.len());
 
@@ -86,7 +95,7 @@ async fn install_impl(
     }
 
     let installed_packages = join_all(all_packages.clone().into_values().map(|install_spec| {
-        let progress = progress.clone();
+        let progress_arc = progress_arc.clone();
         let package = install_spec.rockspec.package.clone();
 
         let bar = progress.map(|p| {
@@ -105,7 +114,7 @@ async fn install_impl(
                 let luarocks = LuaRocksInstallation::new(&config)?;
                 luarocks.ensure_installed(&bar).await?;
                 luarocks
-                    .install_build_dependencies(build_backend, &rockspec, &progress)
+                    .install_build_dependencies(build_backend, &rockspec, progress_arc)
                     .await?;
             }
 
