@@ -12,6 +12,7 @@ Rocks serves as an application for:
 - Embedding rock manipulation logic into your own application
 
 > [!NOTE]
+>
 > This aims to be a full rewrite of `luarocks`, with many flags altered to be more
 > ergonomic. This is not a drop-in replacement for `luarocks` commands you may have in scripts.
 
@@ -45,6 +46,8 @@ The following table provides a brief (incomplete) comparison:
 | install packages using version constraints      | :white_check_mark:           | :x:                |
 | lockfiles                                       | :white_check_mark:           | :white_check_mark: (basic, dependency versions only) |
 | formatting with stylua                          | :white_check_mark:           | :x:                |
+| supports `pkg-config`                           | :white_check_mark:           | :x:                |
+| automatic lua detection/installation            | :white_check_mark:           | :x:                |
 
 [^1]: Supported via a compatibility layer that uses luarocks as a backend.
 
