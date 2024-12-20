@@ -1,7 +1,7 @@
 use eyre::eyre;
 use inquire::Confirm;
 use itertools::Itertools;
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
 use clap::Args;
 use eyre::Result;
@@ -11,7 +11,7 @@ use rocks_lib::{
     lockfile::{LockConstraint::Unconstrained, PinnedState},
     manifest::ManifestMetadata,
     package::{PackageName, PackageReq},
-    progress::{MultiProgress, Progress},
+    progress::MultiProgress,
     rockspec::Rockspec,
     tree::Tree,
 };
@@ -102,7 +102,8 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
         .collect_vec();
 
-    let progress = Progress::Progress(MultiProgress::new());
+    let progress_arc = MultiProgress::new_arc();
+    let progress = Arc::clone(&progress_arc);
 
     let dependencies_to_install = dependencies
         .into_iter()
@@ -110,8 +111,14 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         .map(|dep| (build_behaviour, dep.to_owned()))
         .collect_vec();
 
-    rocks_lib::operations::install(dependencies_to_install, pin, &manifest, &config, &progress)
-        .await?;
+    rocks_lib::operations::install(
+        dependencies_to_install,
+        pin,
+        &manifest,
+        &config,
+        progress_arc,
+    )
+    .await?;
 
     rocks_lib::build::build(
         rockspec,
