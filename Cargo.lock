@@ -2901,6 +2901,7 @@ dependencies = [
  "mlua",
  "openssl",
  "pathdiff",
+ "pkg-config",
  "predicates",
  "proptest",
  "remove_dir_all 1.0.0",

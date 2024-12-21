@@ -98,10 +98,14 @@ pub(crate) fn compile_c_files(
         .debug(false)
         .files(files)
         .host(std::env::consts::OS)
-        .include(&lua.include_dir)
         .opt_level(3)
         .out_dir(intermediate_dir)
         .target(&host.to_string());
+
+    for arg in lua.compile_args() {
+        build.flag(&arg);
+    }
+
     let objects = build.compile_intermediates();
     let output = build
         .get_compiler()
@@ -109,7 +113,7 @@ pub(crate) fn compile_c_files(
         .args(["-shared", "-o"])
         .arg(parent.join(file))
         .arg(format!("-L{}", lua.lib_dir.to_string_lossy())) // TODO: In luarocks, this is behind a link_lua_explicitly config option Library directory
-        .arg(&lua.link_lua_arg)
+        .args(lua.link_args())
         .args(&objects)
         .output()?;
     validate_output(output)?;
@@ -195,11 +199,14 @@ pub(crate) fn compile_c_modules(
         .files(source_files)
         .host(std::env::consts::OS)
         .includes(&include_dirs)
-        .include(&lua.include_dir)
         .opt_level(3)
         .out_dir(intermediate_dir)
         .shared_flag(true)
         .target(&host.to_string());
+
+    for arg in lua.compile_args() {
+        build.flag(&arg);
+    }
 
     // `cc::Build` has no `defines()` function, so we manually feed in the
     // definitions in a verbose loop
@@ -232,7 +239,7 @@ pub(crate) fn compile_c_modules(
         .args(["-shared", "-o"])
         .arg(parent.join(file))
         .arg(format!("-L{}", lua.lib_dir.to_string_lossy())) // TODO: In luarocks, this is behind a link_lua_explicitly config option Library directory
-        .arg(&lua.link_lua_arg)
+        .args(lua.link_args())
         .args(&objects)
         .args(libdir_args)
         .args(library_args)
