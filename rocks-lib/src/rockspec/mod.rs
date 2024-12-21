@@ -48,7 +48,7 @@ pub struct Rockspec {
     pub supported_platforms: PlatformSupport,
     pub dependencies: PerPlatform<Vec<PackageReq>>,
     pub build_dependencies: PerPlatform<Vec<PackageReq>>,
-    pub external_dependencies: PerPlatform<HashMap<String, ExternalDependency>>,
+    pub external_dependencies: PerPlatform<HashMap<String, ExternalDependencySpec>>,
     pub test_dependencies: PerPlatform<Vec<PackageReq>>,
     pub source: PerPlatform<RockSource>,
     pub build: PerPlatform<BuildSpec>,
@@ -377,7 +377,7 @@ mod tests {
         assert_eq!(rockspec.description, expected_description);
         assert_eq!(
             *rockspec.external_dependencies.default.get("FOO").unwrap(),
-            ExternalDependency::Library("foo".into())
+            ExternalDependencySpec::Library("foo".into())
         );
 
         let rockspec_content = "
@@ -438,7 +438,7 @@ mod tests {
         let busted = RemotePackage::parse("busted".into(), "2.2.0".into()).unwrap();
         assert_eq!(
             *rockspec.external_dependencies.default.get("FOO").unwrap(),
-            ExternalDependency::Header("foo.h".into())
+            ExternalDependencySpec::Header("foo.h".into())
         );
         assert!(rockspec
             .test_dependencies
@@ -799,7 +799,7 @@ mod tests {
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
         assert_eq!(
             *rockspec.external_dependencies.default.get("FOO").unwrap(),
-            ExternalDependency::Library("foo".into())
+            ExternalDependencySpec::Library("foo".into())
         );
         let per_platform = rockspec.external_dependencies.per_platform;
         assert_eq!(
@@ -807,35 +807,35 @@ mod tests {
                 .get(&PlatformIdentifier::Windows)
                 .and_then(|it| it.get("FOO"))
                 .unwrap(),
-            ExternalDependency::Library("foo.dll".into())
+            ExternalDependencySpec::Library("foo.dll".into())
         );
         assert_eq!(
             *per_platform
                 .get(&PlatformIdentifier::Unix)
                 .and_then(|it| it.get("FOO"))
                 .unwrap(),
-            ExternalDependency::Library("foo".into())
+            ExternalDependencySpec::Library("foo".into())
         );
         assert_eq!(
             *per_platform
                 .get(&PlatformIdentifier::Unix)
                 .and_then(|it| it.get("BAR"))
                 .unwrap(),
-            ExternalDependency::Header("bar.h".into())
+            ExternalDependencySpec::Header("bar.h".into())
         );
         assert_eq!(
             *per_platform
                 .get(&PlatformIdentifier::Linux)
                 .and_then(|it| it.get("BAR"))
                 .unwrap(),
-            ExternalDependency::Header("bar.h".into())
+            ExternalDependencySpec::Header("bar.h".into())
         );
         assert_eq!(
             *per_platform
                 .get(&PlatformIdentifier::Linux)
                 .and_then(|it| it.get("FOO"))
                 .unwrap(),
-            ExternalDependency::Library("foo.so".into())
+            ExternalDependencySpec::Library("foo.so".into())
         );
         let rockspec_content = "
         rockspec_format = '1.0'\n
