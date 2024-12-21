@@ -69,6 +69,7 @@
                   pkg-config
                   libxcrypt
                   cmakeMinimal
+                  zlib
                 ])
                 ++ self.checks.${system}.git-hooks-check.enabledPackages
                 ++ pkgs.rocks.buildInputs

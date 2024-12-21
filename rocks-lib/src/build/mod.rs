@@ -14,19 +14,23 @@ use crate::{
 pub(crate) mod utils;
 use cmake::CMakeError;
 use command::CommandError;
-// Make build utilities available as a submodule
+use external_dependency::{ExternalDependencyError, ExternalDependencyInfo};
+
 use indicatif::style::TemplateError;
 use luarocks::LuarocksBuildError;
 use make::MakeError;
 use rust_mlua::RustError;
 use thiserror::Error;
 use utils::recursive_copy_dir;
+
 mod builtin;
 mod cmake;
 mod command;
 mod luarocks;
 mod make;
 mod rust_mlua;
+
+pub mod external_dependency;
 pub mod variables;
 
 #[derive(Error, Debug)]
@@ -36,9 +40,11 @@ pub enum BuildError {
     #[error("failed to create spinner: {0}")]
     SpinnerFailure(#[from] TemplateError),
     #[error(transparent)]
-    CMakeError(#[from] CMakeError),
+    ExternalDependencyError(#[from] ExternalDependencyError),
     #[error("failed to compile build modules: {0}")]
     CompilationError(#[from] cc::Error),
+    #[error(transparent)]
+    CMakeError(#[from] CMakeError),
     #[error(transparent)]
     MakeError(#[from] MakeError),
     #[error(transparent)]
@@ -186,6 +192,10 @@ pub async fn build(
             rockspec.package, rockspec.version
         ))
     });
+
+    for (name, dep) in rockspec.external_dependencies.current_platform() {
+        let _ = ExternalDependencyInfo::detect(name, dep, config.external_deps())?;
+    }
 
     let lua_version = rockspec.lua_version_from_config(config)?;
 
