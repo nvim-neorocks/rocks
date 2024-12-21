@@ -1,4 +1,4 @@
-use crate::project::write_new::NewProject;
+use crate::project::NewProject;
 use std::{path::PathBuf, time::Duration};
 
 use build::Build;
@@ -210,9 +210,7 @@ async fn main() {
                 unpack::unpack_remote(unpack_data, config).await.unwrap()
             }
         },
-        Commands::New(project_data) => project::write_new::write_project_rockspec(project_data)
-            .await
-            .unwrap(),
+        Commands::New(project_data) => project::write_project_rockspec(project_data).await.unwrap(),
         Commands::Build(build_data) => build::build(build_data, config).await.unwrap(),
         Commands::List(list_data) => list::list_installed(list_data, config).unwrap(),
         Commands::Lua(run_lua) => run_lua::run_lua(run_lua, config).await.unwrap(),

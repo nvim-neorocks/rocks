@@ -1,6 +1,9 @@
 use eyre::eyre;
 use eyre::Result;
 use git2::Repository;
+use path_absolutize::Absolutize as _;
+use std::io;
+use std::path::Path;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -12,11 +15,11 @@ pub struct RepoMetadata {
     pub contributors: Vec<String>,
 }
 
-impl Default for RepoMetadata {
-    fn default() -> Self {
-        RepoMetadata {
-            name: std::env::current_dir()
-                .expect("unable to get current working directory")
+impl RepoMetadata {
+    pub fn default(path: &Path) -> io::Result<Self> {
+        Ok(RepoMetadata {
+            name: path
+                .absolutize()?
                 .file_name()
                 .unwrap_or_default()
                 .to_string_lossy()
@@ -28,14 +31,14 @@ impl Default for RepoMetadata {
                 .to_string_lossy()
                 .to_string()],
             labels: None,
-        }
+        })
     }
 }
 
 /// Retrieves metadata for a given directory
 pub async fn get_metadata_for(directory: Option<&PathBuf>) -> Result<Option<RepoMetadata>> {
     let repo = match directory {
-        Some(path) => Repository::discover(path)?,
+        Some(path) => Repository::open(path)?,
         None => Repository::open_from_env()?,
     };
 
