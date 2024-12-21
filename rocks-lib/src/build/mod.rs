@@ -11,6 +11,7 @@ use crate::{
     rockspec::{Build as _, BuildBackendSpec, LuaVersionError, Rockspec},
     tree::{RockLayout, Tree},
 };
+pub(crate) mod external_dependency;
 pub(crate) mod utils;
 use command::CommandError;
 // Make build utilities available as a submodule
