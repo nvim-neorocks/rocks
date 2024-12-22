@@ -28,14 +28,18 @@ pub struct Project {
 
 impl Project {
     pub fn current() -> Result<Option<Self>, ProjectError> {
-        Self::from(std::env::current_dir()?)
+        Self::from(&std::env::current_dir()?)
     }
 
-    pub fn from(start: PathBuf) -> Result<Option<Self>, ProjectError> {
+    pub fn from(start: impl AsRef<Path>) -> Result<Option<Self>, ProjectError> {
+        if !start.as_ref().exists() {
+            return Ok(None);
+        }
+
         match find_up_with(
             "project.rockspec",
             FindUpOptions {
-                cwd: &start,
+                cwd: start.as_ref(),
                 kind: FindUpKind::File,
             },
         )? {

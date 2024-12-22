@@ -26,6 +26,7 @@ uzers = "0.12.1"
 walkdir = "2.5.0"
 which = "7.0.0"
 indicatif = "0.17.8"
+path-absolutize = "3.1.1"
 
 [dependencies.rocks-lib]
 path = "../rocks-lib/"
