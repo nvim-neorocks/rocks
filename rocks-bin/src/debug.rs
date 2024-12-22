@@ -9,4 +9,6 @@ pub enum Debug {
     FetchRemote(UnpackRemote),
     /// Download a .src.rock from luarocks.org and unpack it.
     UnpackRemote(UnpackRemote),
+    /// View information about the current project.
+    Project,
 }

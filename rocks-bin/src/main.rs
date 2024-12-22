@@ -209,6 +209,7 @@ async fn main() {
             Debug::UnpackRemote(unpack_data) => {
                 unpack::unpack_remote(unpack_data, config).await.unwrap()
             }
+            Debug::Project => project::debug_project().unwrap(),
         },
         Commands::New(project_data) => project::write_project_rockspec(project_data).await.unwrap(),
         Commands::Build(build_data) => build::build(build_data, config).await.unwrap(),
