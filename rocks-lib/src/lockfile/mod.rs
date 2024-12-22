@@ -485,6 +485,26 @@ impl Lockfile {
 
         Ok(())
     }
+
+    pub(crate) fn list(&self) -> HashMap<PackageName, Vec<LocalPackage>> {
+        self.rocks()
+            .values()
+            .cloned()
+            .map(|locked_rock| (locked_rock.name().clone(), locked_rock))
+            .into_group_map()
+    }
+
+    pub(crate) fn has_rock(&self, req: &PackageReq) -> Option<LocalPackage> {
+        self.list()
+            .get(req.name())
+            .map(|packages| {
+                packages
+                    .iter()
+                    .rev()
+                    .find(|package| req.version_req().matches(package.version()))
+            })?
+            .cloned()
+    }
 }
 
 impl Drop for Lockfile {

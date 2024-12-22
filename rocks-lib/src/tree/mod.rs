@@ -131,16 +131,7 @@ impl Tree {
     }
 
     pub fn has_rock(&self, req: &PackageReq) -> Option<LocalPackage> {
-        self.list()
-            .ok()?
-            .get(req.name())
-            .map(|packages| {
-                packages
-                    .iter()
-                    .rev()
-                    .find(|package| req.version_req().matches(package.version()))
-            })?
-            .cloned()
+        self.lockfile().ok()?.has_rock(req)
     }
 
     pub fn has_rock_and<F>(&self, req: &PackageReq, filter: F) -> Option<LocalPackage>

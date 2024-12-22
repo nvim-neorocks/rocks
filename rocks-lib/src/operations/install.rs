@@ -83,6 +83,7 @@ async fn install_impl(
         packages,
         pin,
         Arc::new(manifest),
+        Arc::new(lockfile.clone()),
         config,
         progress_arc.clone(),
     )
