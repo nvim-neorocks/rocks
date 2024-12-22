@@ -1,33 +1,48 @@
-use std::{path::PathBuf, time::Duration};
+use crate::project::NewProject;
+use std::path::PathBuf;
 
+use build::Build;
 use clap::{Parser, Subcommand};
-use rocks::{
-    build::{self, Build},
-    debug::Debug,
-    download::{self, Download},
-    fetch, format,
-    info::{self, Info},
-    install::{self, Install},
-    install_lua,
-    list::{self, ListCmd},
-    outdated::{self, Outdated},
-    path::{self, Path},
-    pin::{self, ChangePin},
-    project::{self, NewProject},
-    purge,
-    remove::{self, Remove},
-    run::{self, Run},
-    run_lua::{self, RunLua},
-    search::{self, Search},
-    test::{self, Test},
-    unpack,
-    update::{self, Update},
-    upload::{self, Upload},
-};
-use rocks_lib::{
-    config::{ConfigBuilder, LuaVersion},
-    lockfile::PinnedState::{Pinned, Unpinned},
-};
+use debug::Debug;
+use download::Download;
+use info::Info;
+use install::Install;
+use list::ListCmd;
+use outdated::Outdated;
+use path::Path;
+use pin::ChangePin;
+use remove::Remove;
+use rocks_lib::config::LuaVersion;
+use run::Run;
+use run_lua::RunLua;
+use search::Search;
+use test::Test;
+use update::Update;
+use upload::Upload;
+
+pub mod build;
+pub mod debug;
+pub mod download;
+pub mod fetch;
+pub mod format;
+pub mod info;
+pub mod install;
+pub mod install_lua;
+pub mod list;
+pub mod outdated;
+pub mod path;
+pub mod pin;
+pub mod project;
+pub mod purge;
+pub mod remove;
+pub mod run;
+pub mod run_lua;
+pub mod search;
+pub mod test;
+pub mod unpack;
+pub mod update;
+pub mod upload;
+pub mod utils;
 
 /// A fast and efficient Lua package manager.
 #[derive(Parser)]
@@ -154,69 +169,4 @@ pub enum Commands {
     Upload(Upload),
     /// [UNIMPLEMENTED] Tell which file corresponds to a given module name.
     Which,
-}
-
-#[tokio::main(flavor = "multi_thread")]
-async fn main() {
-    let cli = Cli::parse();
-
-    let config = ConfigBuilder::new()
-        .dev(Some(cli.dev))
-        .lua_dir(cli.lua_dir)
-        .lua_version(cli.lua_version)
-        .namespace(cli.namespace)
-        .only_server(cli.only_server)
-        .only_sources(cli.only_sources)
-        .server(cli.server)
-        .tree(cli.tree)
-        .timeout(
-            cli.timeout
-                .map(|duration| Duration::from_secs(duration as u64)),
-        )
-        .no_project(Some(cli.no_project))
-        .verbose(Some(cli.verbose))
-        .build()
-        .unwrap();
-
-    match cli.command {
-        Commands::Search(search_data) => search::search(search_data, config).await.unwrap(),
-        Commands::Download(download_data) => {
-            download::download(download_data, config).await.unwrap()
-        }
-        Commands::Debug(debug) => match debug {
-            Debug::FetchRemote(unpack_data) => {
-                fetch::fetch_remote(unpack_data, config).await.unwrap()
-            }
-            Debug::Unpack(unpack_data) => unpack::unpack(unpack_data).await.unwrap(),
-            Debug::UnpackRemote(unpack_data) => {
-                unpack::unpack_remote(unpack_data, config).await.unwrap()
-            }
-            Debug::Project => project::debug_project().unwrap(),
-        },
-        Commands::New(project_data) => project::write_project_rockspec(project_data).await.unwrap(),
-        Commands::Build(build_data) => build::build(build_data, config).await.unwrap(),
-        Commands::List(list_data) => list::list_installed(list_data, config).unwrap(),
-        Commands::Lua(run_lua) => run_lua::run_lua(run_lua, config).await.unwrap(),
-        Commands::Install(install_data) => install::install(install_data, config).await.unwrap(),
-        Commands::Outdated(outdated) => outdated::outdated(outdated, config).await.unwrap(),
-        Commands::InstallLua => install_lua::install_lua(config).await.unwrap(),
-        Commands::Fmt => format::format().unwrap(),
-        Commands::Purge => purge::purge(config).await.unwrap(),
-        Commands::Remove(remove_args) => remove::remove(remove_args, config).await.unwrap(),
-        Commands::Run(run_args) => run::run(run_args, config).await.unwrap(),
-        Commands::Test(test) => test::test(test, config).await.unwrap(),
-        Commands::Update(_update_args) => update::update(config).await.unwrap(),
-        Commands::Info(info_data) => info::info(info_data, config).await.unwrap(),
-        Commands::Path(path_data) => path::path(path_data, config).await.unwrap(),
-        Commands::Pin(pin_data) => pin::set_pinned_state(pin_data, config, Pinned).unwrap(),
-        Commands::Unpin(pin_data) => pin::set_pinned_state(pin_data, config, Unpinned).unwrap(),
-        Commands::Upload(upload_data) => upload::upload(upload_data, config).await.unwrap(),
-        Commands::Add => unimplemented!(),
-        Commands::Config => unimplemented!(),
-        Commands::Doc => unimplemented!(),
-        Commands::Lint => unimplemented!(),
-        Commands::Pack => unimplemented!(),
-        Commands::Uninstall => unimplemented!(),
-        Commands::Which => unimplemented!(),
-    }
 }
