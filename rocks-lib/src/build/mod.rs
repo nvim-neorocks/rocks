@@ -20,6 +20,7 @@ use indicatif::style::TemplateError;
 use luarocks::LuarocksBuildError;
 use make::MakeError;
 use rust_mlua::RustError;
+use ssri::Integrity;
 use thiserror::Error;
 use utils::recursive_copy_dir;
 
@@ -41,6 +42,11 @@ pub enum BuildError {
     SpinnerFailure(#[from] TemplateError),
     #[error(transparent)]
     ExternalDependencyError(#[from] ExternalDependencyError),
+    #[error("source integrity mismatch.\nExpected: {expected},\nbut got: {actual}")]
+    SourceIntegrityMismatch {
+        expected: Integrity,
+        actual: Integrity,
+    },
     #[error("failed to compile build modules: {0}")]
     CompilationError(#[from] cc::Error),
     #[error(transparent)]
@@ -226,6 +232,15 @@ pub async fn build(
         rockspec: rockspec.hash()?,
         source: temp_dir.hash()?,
     };
+
+    if let Some(expected) = &rockspec.source.current_platform().integrity {
+        if expected.matches(&hashes.source).is_none() {
+            return Err(BuildError::SourceIntegrityMismatch {
+                expected: expected.clone(),
+                actual: hashes.source,
+            });
+        }
+    }
 
     let mut package = LocalPackage::from(
         &RemotePackage::new(rockspec.package.clone(), rockspec.version.clone()),
