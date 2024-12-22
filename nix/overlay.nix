@@ -33,6 +33,7 @@
         nativeCheckInputs = [
           cacert
           cargo-nextest
+          zlib # used for checking external dependencies
         ];
 
         preCheck = ''

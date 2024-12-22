@@ -1,4 +1,5 @@
 use directories::ProjectDirs;
+use external_deps::ExternalDependencySearchConfig;
 use std::{
     collections::HashMap, env, fmt::Display, io, path::PathBuf, str::FromStr, time::Duration,
 };
@@ -12,6 +13,8 @@ use crate::{
     package::{PackageVersion, PackageVersionReq},
     project::{Project, ProjectError},
 };
+
+pub mod external_deps;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LuaVersion {
@@ -156,6 +159,7 @@ pub struct Config {
     make: String,
     cmake: String,
     variables: HashMap<String, String>,
+    external_deps: ExternalDependencySearchConfig,
 
     cache_dir: PathBuf,
     data_dir: PathBuf,
@@ -251,6 +255,10 @@ impl Config {
         &self.variables
     }
 
+    pub fn external_deps(&self) -> &ExternalDependencySearchConfig {
+        &self.external_deps
+    }
+
     pub fn cache_dir(&self) -> &PathBuf {
         &self.cache_dir
     }
@@ -291,6 +299,7 @@ pub struct ConfigBuilder {
     make: Option<String>,
     cmake: Option<String>,
     variables: Option<HashMap<String, String>>,
+    external_deps: Option<ExternalDependencySearchConfig>,
 
     cache_dir: Option<PathBuf>,
     data_dir: Option<PathBuf>,
@@ -377,6 +386,13 @@ impl ConfigBuilder {
         Self { variables, ..self }
     }
 
+    pub fn external_deps(self, external_deps: Option<ExternalDependencySearchConfig>) -> Self {
+        Self {
+            external_deps,
+            ..self
+        }
+    }
+
     pub fn cache_dir(self, cache_dir: Option<PathBuf>) -> Self {
         Self { cache_dir, ..self }
     }
@@ -441,6 +457,7 @@ impl ConfigBuilder {
             make: self.make.unwrap_or("make".into()),
             cmake: self.cmake.unwrap_or("cmake".into()),
             variables: self.variables.unwrap_or(default_variables),
+            external_deps: self.external_deps.unwrap_or_default(),
             cache_dir,
             data_dir,
         })

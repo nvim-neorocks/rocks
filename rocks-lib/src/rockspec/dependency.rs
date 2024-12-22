@@ -1,4 +1,4 @@
-use std::{collections::HashMap, convert::Infallible};
+use std::{collections::HashMap, convert::Infallible, path::PathBuf};
 
 use serde::Deserialize;
 
@@ -7,14 +7,14 @@ use super::{PartialOverride, PerPlatform, PlatformOverridable};
 /// Can be defined in a [platform-agnostic](https://github.com/luarocks/luarocks/wiki/platform-agnostic-external-dependencies) manner
 #[derive(Debug, Deserialize, PartialEq, Clone)]
 #[serde(rename_all = "lowercase")]
-pub enum ExternalDependency {
+pub enum ExternalDependencySpec {
     /// A header file, e.g. "foo.h"
-    Header(String),
-    /// A library file, e.g. "foo.lib"
-    Library(String),
+    Header(PathBuf),
+    /// A library file, e.g. "libfoo.so"
+    Library(PathBuf),
 }
 
-impl PartialOverride for HashMap<String, ExternalDependency> {
+impl PartialOverride for HashMap<String, ExternalDependencySpec> {
     type Err = Infallible;
 
     fn apply_overrides(&self, override_map: &Self) -> Result<Self, Self::Err> {
@@ -29,7 +29,7 @@ impl PartialOverride for HashMap<String, ExternalDependency> {
     }
 }
 
-impl PlatformOverridable for HashMap<String, ExternalDependency> {
+impl PlatformOverridable for HashMap<String, ExternalDependencySpec> {
     type Err = Infallible;
 
     fn on_nil<T>() -> Result<super::PerPlatform<T>, <Self as PlatformOverridable>::Err>
