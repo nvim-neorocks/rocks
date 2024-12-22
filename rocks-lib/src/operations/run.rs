@@ -7,7 +7,7 @@ use crate::{
     manifest::{ManifestError, ManifestMetadata},
     package::{PackageReq, PackageVersionReqError},
     path::Paths,
-    progress::{MultiProgress, Progress},
+    progress::MultiProgress,
     tree::Tree,
 };
 use thiserror::Error;
@@ -65,7 +65,7 @@ pub async fn install_command(command: &str, config: &Config) -> Result<(), Insta
         PinnedState::Unpinned,
         &manifest,
         config,
-        &Progress::Progress(MultiProgress::new()),
+        MultiProgress::new_arc(),
     )
     .await?;
     Ok(())

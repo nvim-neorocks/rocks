@@ -1,4 +1,4 @@
-use std::{io, process::Command};
+use std::{io, process::Command, sync::Arc};
 
 use crate::{
     build::BuildBehaviour,
@@ -103,7 +103,7 @@ pub async fn ensure_busted(
     tree: &Tree,
     manifest: &ManifestMetadata,
     config: &Config,
-    progress: &Progress<MultiProgress>,
+    progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), InstallTestDependenciesError> {
     let busted_req = PackageReq::new("busted".into(), None)?;
 
@@ -128,7 +128,7 @@ pub async fn ensure_dependencies(
     tree: &Tree,
     manifest: &ManifestMetadata,
     config: &Config,
-    progress: &Progress<MultiProgress>,
+    progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), InstallTestDependenciesError> {
     let dependencies = rockspec
         .test_dependencies
