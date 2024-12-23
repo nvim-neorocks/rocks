@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use crate::{
     config::Config,
-    manifest::{ManifestError, ManifestMetadata},
+    manifest::{Manifest, ManifestError},
     package::{PackageName, PackageReq, PackageVersion, RemotePackage},
     progress::{Progress, ProgressBar},
     rockspec::{Rockspec, RockspecError},
@@ -34,7 +34,7 @@ pub enum DownloadRockspecError {
 
 pub async fn download_rockspec(
     package_req: &PackageReq,
-    manifest: &ManifestMetadata,
+    manifest: &Manifest,
     config: &Config,
     progress: &Progress<ProgressBar>,
 ) -> Result<Rockspec, SearchAndDownloadError> {
@@ -42,7 +42,7 @@ pub async fn download_rockspec(
 
     progress.map(|p| p.set_message(format!("📥 Downloading rockspec for {}", package_req)));
 
-    download_rockspec_impl(package, config).await
+    download_rockspec_impl(package).await
 }
 
 #[derive(Error, Debug)]
@@ -63,32 +63,31 @@ pub enum SearchAndDownloadError {
 
 pub async fn search_and_download_src_rock(
     package_req: &PackageReq,
-    manifest: &ManifestMetadata,
+    manifest: &Manifest,
     config: &Config,
     progress: &Progress<ProgressBar>,
 ) -> Result<DownloadedSrcRockBytes, SearchAndDownloadError> {
     let package = search_manifest(package_req, manifest, config, progress).await?;
-    Ok(download_src_rock(&package, config, progress).await?)
+    Ok(download_src_rock(&package, progress).await?)
 }
 
 #[derive(Error, Debug)]
 #[error("failed to download source rock: {0}")]
 pub struct DownloadSrcRockError(#[from] reqwest::Error);
 
-pub async fn download_src_rock(
-    package: &RemotePackage,
-    config: &Config,
+pub(crate) async fn download_src_rock(
+    remote_package: &RemotePackage,
     progress: &Progress<ProgressBar>,
 ) -> Result<DownloadedSrcRockBytes, DownloadSrcRockError> {
-    progress.map(|p| p.set_message(format!("📥 Downloading {}", package)));
+    progress.map(|p| p.set_message(format!("📥 Downloading {}", remote_package.package)));
 
-    download_src_rock_impl(package, config).await
+    download_src_rock_impl(remote_package).await
 }
 
 pub async fn download_to_file(
     package_req: &PackageReq,
     destination_dir: Option<PathBuf>,
-    manifest: &ManifestMetadata,
+    manifest: &Manifest,
     config: &Config,
     progress: &Progress<ProgressBar>,
 ) -> Result<DownloadedSrcRock, SearchAndDownloadError> {
@@ -123,7 +122,7 @@ pub enum SearchManifestError {
 
 async fn search_manifest(
     package_req: &PackageReq,
-    manifest: &ManifestMetadata,
+    manifest: &Manifest,
     config: &Config,
     progress: &Progress<ProgressBar>,
 ) -> Result<RemotePackage, SearchManifestError> {
@@ -134,24 +133,27 @@ async fn search_manifest(
 
 async fn search_manifest_impl(
     package_req: &PackageReq,
-    manifest: &ManifestMetadata,
+    manifest: &Manifest,
     config: &Config,
 ) -> Result<RemotePackage, SearchManifestError> {
-    if !manifest.has_rock(package_req.name()) {
+    if !manifest.metadata().has_rock(package_req.name()) {
         return Err(SearchManifestError::RockNotFound {
             name: package_req.name().clone(),
             server: config.server().clone(),
         });
     }
-    Ok(manifest.latest_match(package_req).unwrap())
+    Ok(RemotePackage {
+        package: manifest.metadata().latest_match(package_req).unwrap(),
+        server_url: manifest.server_url().into(),
+    })
 }
 
 async fn download_rockspec_impl(
-    package: RemotePackage,
-    config: &Config,
+    remote_package: RemotePackage,
 ) -> Result<Rockspec, SearchAndDownloadError> {
+    let package = &remote_package.package;
     let rockspec_name = format!("{}-{}.rockspec", package.name(), package.version());
-    let bytes = reqwest::get(format!("{}/{}", config.server(), rockspec_name))
+    let bytes = reqwest::get(format!("{}/{}", &remote_package.server_url, rockspec_name))
         .await
         .map_err(DownloadRockspecError::Request)?
         .bytes()
@@ -162,18 +164,18 @@ async fn download_rockspec_impl(
 }
 
 async fn download_src_rock_impl(
-    package: &RemotePackage,
-    config: &Config,
+    remote_package: &RemotePackage,
 ) -> Result<DownloadedSrcRockBytes, DownloadSrcRockError> {
+    let package = &remote_package.package;
     let full_rock_name = full_rock_name(package.name(), package.version());
 
-    let bytes = reqwest::get(format!("{}/{}", config.server(), full_rock_name))
+    let bytes = reqwest::get(format!("{}/{}", remote_package.server_url, full_rock_name))
         .await?
         .bytes()
         .await?;
     Ok(DownloadedSrcRockBytes {
-        name: package.name().to_owned(),
-        version: package.version().to_owned(),
+        name: package.name().clone(),
+        version: package.version().clone(),
         bytes,
         file_name: full_rock_name,
     })

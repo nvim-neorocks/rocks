@@ -15,12 +15,12 @@ pub use version::{
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]
 #[cfg_attr(feature = "lua", derive(mlua::FromLua))]
-pub struct RemotePackage {
+pub struct PackageSpec {
     name: PackageName,
     version: PackageVersion,
 }
 
-impl RemotePackage {
+impl PackageSpec {
     pub fn new(name: PackageName, version: PackageVersion) -> Self {
         Self { name, version }
     }
@@ -45,7 +45,7 @@ impl RemotePackage {
 }
 
 #[cfg(feature = "lua")]
-impl mlua::UserData for RemotePackage {
+impl mlua::UserData for PackageSpec {
     fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("name", |_, this| Ok(this.name.to_string()));
         fields.add_field_method_get("version", |_, this| Ok(this.version.to_string()));
@@ -55,6 +55,21 @@ impl mlua::UserData for RemotePackage {
         methods.add_method("to_package_req", |_, this, ()| {
             Ok(this.clone().into_package_req())
         })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct RemotePackage {
+    pub package: PackageSpec,
+    pub server_url: String,
+}
+
+impl RemotePackage {
+    pub fn new(package: PackageSpec, server_url: String) -> Self {
+        Self {
+            package,
+            server_url,
+        }
     }
 }
 
@@ -70,7 +85,7 @@ pub enum ParseRemotePackageError {
     },
 }
 
-impl FromStr for RemotePackage {
+impl FromStr for PackageSpec {
     type Err = ParseRemotePackageError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
@@ -120,7 +135,7 @@ impl PackageReq {
     }
     /// Evaluate whether the given package satisfies the package requirement
     /// given by `self`.
-    pub fn matches(&self, package: &RemotePackage) -> bool {
+    pub fn matches(&self, package: &PackageSpec) -> bool {
         self.name == package.name && self.version_req.matches(&package.version)
     }
 }
@@ -135,8 +150,8 @@ impl Display for PackageReq {
     }
 }
 
-impl From<RemotePackage> for PackageReq {
-    fn from(value: RemotePackage) -> Self {
+impl From<PackageSpec> for PackageReq {
+    fn from(value: PackageSpec) -> Self {
         value.into_package_req()
     }
 }
@@ -144,7 +159,7 @@ impl From<RemotePackage> for PackageReq {
 #[cfg(feature = "lua")]
 impl mlua::UserData for PackageReq {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("matches", |_, this, package: RemotePackage| {
+        methods.add_method("matches", |_, this, package: PackageSpec| {
             Ok(this.matches(&package))
         });
     }
@@ -265,19 +280,19 @@ mod tests {
 
     #[tokio::test]
     async fn parse_lua_package() {
-        let neorg = RemotePackage::parse("neorg".into(), "1.0.0".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "1.0.0".into()).unwrap();
         let expected_version = PackageVersion::parse("1.0.0").unwrap();
         assert_eq!(neorg.name().to_string(), "neorg");
         assert!(matches!(
             neorg.version().cmp(&expected_version),
             std::cmp::Ordering::Equal
         ));
-        let neorg = RemotePackage::parse("neorg".into(), "1.0".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "1.0".into()).unwrap();
         assert!(matches!(
             neorg.version().cmp(&expected_version),
             std::cmp::Ordering::Equal
         ));
-        let neorg = RemotePackage::parse("neorg".into(), "1".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "1".into()).unwrap();
         assert!(matches!(
             neorg.version().cmp(&expected_version),
             std::cmp::Ordering::Equal
@@ -287,11 +302,11 @@ mod tests {
     #[tokio::test]
     async fn parse_lua_package_req() {
         let mut package_req = PackageReq::new("foo".into(), Some("1.0.0".into())).unwrap();
-        assert!(package_req.matches(&RemotePackage::parse("foo".into(), "1.0.0".into()).unwrap()));
-        assert!(!package_req.matches(&RemotePackage::parse("bar".into(), "1.0.0".into()).unwrap()));
-        assert!(!package_req.matches(&RemotePackage::parse("foo".into(), "2.0.0".into()).unwrap()));
+        assert!(package_req.matches(&PackageSpec::parse("foo".into(), "1.0.0".into()).unwrap()));
+        assert!(!package_req.matches(&PackageSpec::parse("bar".into(), "1.0.0".into()).unwrap()));
+        assert!(!package_req.matches(&PackageSpec::parse("foo".into(), "2.0.0".into()).unwrap()));
         package_req = PackageReq::new("foo".into(), Some(">= 1.0.0".into())).unwrap();
-        assert!(package_req.matches(&RemotePackage::parse("foo".into(), "2.0.0".into()).unwrap()));
+        assert!(package_req.matches(&PackageSpec::parse("foo".into(), "2.0.0".into()).unwrap()));
         let package_req: PackageReq = "lua >= 5.1".parse().unwrap();
         assert_eq!(package_req.name.to_string(), "lua");
         let package_req: PackageReq = "lua>=5.1".parse().unwrap();
@@ -304,9 +319,9 @@ mod tests {
         assert_eq!(package_req.name.to_string(), "lfs");
         let package_req: PackageReq = "neorg 1.0.0".parse().unwrap();
         assert_eq!(package_req.name.to_string(), "neorg");
-        let neorg = RemotePackage::parse("neorg".into(), "1.0.0".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "1.0.0".into()).unwrap();
         assert!(package_req.matches(&neorg));
-        let neorg = RemotePackage::parse("neorg".into(), "2.0.0".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "2.0.0".into()).unwrap();
         assert!(!package_req.matches(&neorg));
         let package_req: PackageReq = "neorg 2.0.0".parse().unwrap();
         assert!(package_req.matches(&neorg));
@@ -317,44 +332,44 @@ mod tests {
         let package_req: PackageReq = "neorg &equals; 2.0.0".parse().unwrap();
         assert!(package_req.matches(&neorg));
         let package_req: PackageReq = "neorg >= 1.0, &lt; 2.0".parse().unwrap();
-        let neorg = RemotePackage::parse("neorg".into(), "1.5".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "1.5".into()).unwrap();
         assert!(package_req.matches(&neorg));
         let package_req: PackageReq = "neorg &gt; 1.0, &lt; 2.0".parse().unwrap();
-        let neorg = RemotePackage::parse("neorg".into(), "1.11.0".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "1.11.0".into()).unwrap();
         assert!(package_req.matches(&neorg));
-        let neorg = RemotePackage::parse("neorg".into(), "3.0.0".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "3.0.0".into()).unwrap();
         assert!(!package_req.matches(&neorg));
-        let neorg = RemotePackage::parse("neorg".into(), "0.5".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "0.5".into()).unwrap();
         assert!(!package_req.matches(&neorg));
         let package_req: PackageReq = "neorg ~> 1".parse().unwrap();
         assert!(!package_req.matches(&neorg));
-        let neorg = RemotePackage::parse("neorg".into(), "3".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "3".into()).unwrap();
         assert!(!package_req.matches(&neorg));
-        let neorg = RemotePackage::parse("neorg".into(), "1.5".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "1.5".into()).unwrap();
         assert!(package_req.matches(&neorg));
         let package_req: PackageReq = "neorg ~> 1.4".parse().unwrap();
-        let neorg = RemotePackage::parse("neorg".into(), "1.3".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "1.3".into()).unwrap();
         assert!(!package_req.matches(&neorg));
-        let neorg = RemotePackage::parse("neorg".into(), "1.5".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "1.5".into()).unwrap();
         assert!(!package_req.matches(&neorg));
-        let neorg = RemotePackage::parse("neorg".into(), "1.4.10".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "1.4.10".into()).unwrap();
         assert!(package_req.matches(&neorg));
-        let neorg = RemotePackage::parse("neorg".into(), "1.4".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "1.4".into()).unwrap();
         assert!(package_req.matches(&neorg));
         let package_req: PackageReq = "neorg ~> 1.0.5".parse().unwrap();
-        let neorg = RemotePackage::parse("neorg".into(), "1.0.4".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "1.0.4".into()).unwrap();
         assert!(!package_req.matches(&neorg));
-        let neorg = RemotePackage::parse("neorg".into(), "1.0.5".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "1.0.5".into()).unwrap();
         assert!(package_req.matches(&neorg));
-        let neorg = RemotePackage::parse("neorg".into(), "1.0.6".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "1.0.6".into()).unwrap();
         assert!(!package_req.matches(&neorg));
         // Testing incomplete version constraints
         let package_req: PackageReq = "lua-utils.nvim ~> 1.1-1".parse().unwrap();
-        let lua_utils = RemotePackage::parse("lua-utils.nvim".into(), "1.1.4".into()).unwrap();
+        let lua_utils = PackageSpec::parse("lua-utils.nvim".into(), "1.1.4".into()).unwrap();
         assert!(package_req.matches(&lua_utils));
-        let lua_utils = RemotePackage::parse("lua-utils.nvim".into(), "1.1.5".into()).unwrap();
+        let lua_utils = PackageSpec::parse("lua-utils.nvim".into(), "1.1.5".into()).unwrap();
         assert!(package_req.matches(&lua_utils));
-        let lua_utils = RemotePackage::parse("lua-utils.nvim".into(), "1.2-1".into()).unwrap();
+        let lua_utils = PackageSpec::parse("lua-utils.nvim".into(), "1.2-1".into()).unwrap();
         assert!(!package_req.matches(&lua_utils));
     }
 }

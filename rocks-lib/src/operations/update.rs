@@ -6,8 +6,8 @@ use crate::{
     build::BuildBehaviour,
     config::Config,
     lockfile::{LocalPackage, PinnedState},
-    manifest::ManifestMetadata,
-    package::{PackageReq, RemotePackage, RockConstraintUnsatisfied},
+    manifest::Manifest,
+    package::{PackageReq, PackageSpec, RockConstraintUnsatisfied},
     progress::{MultiProgress, Progress, ProgressBar},
 };
 
@@ -21,20 +21,20 @@ pub enum UpdateError {
     Install {
         #[source]
         error: InstallError,
-        package: RemotePackage,
+        package: PackageSpec,
     },
     #[error("failed to remove old rock ({package}) after update: {error}")]
     Remove {
         #[source]
         error: RemoveError,
-        package: RemotePackage,
+        package: PackageSpec,
     },
 }
 
 pub async fn update(
     package: LocalPackage,
     constraint: PackageReq,
-    manifest: &ManifestMetadata,
+    manifest: &Manifest,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), UpdateError> {

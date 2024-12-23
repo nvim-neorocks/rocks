@@ -6,7 +6,7 @@ use crate::{
     lockfile::{LocalPackage, LocalPackageHashes, LockConstraint, PinnedState},
     lua_installation::LuaInstallation,
     operations::{self, FetchSrcRockError},
-    package::RemotePackage,
+    package::PackageSpec,
     progress::{Progress, ProgressBar},
     rockspec::{Build as _, BuildBackendSpec, LuaVersionError, Rockspec},
     tree::{RockLayout, Tree},
@@ -212,7 +212,7 @@ pub async fn build(
     // Install the source in order to build.
     let rock_source = rockspec.source.current_platform();
     if let Err(err) = operations::fetch_src(temp_dir.path(), rock_source, progress).await {
-        let package = RemotePackage::new(rockspec.package.clone(), rockspec.version.clone());
+        let package = PackageSpec::new(rockspec.package.clone(), rockspec.version.clone());
         progress.map(|p| {
             p.println(format!(
                 "⚠️ WARNING: Failed to fetch source for {}: {}",
@@ -243,7 +243,7 @@ pub async fn build(
     }
 
     let mut package = LocalPackage::from(
-        &RemotePackage::new(rockspec.package.clone(), rockspec.version.clone()),
+        &PackageSpec::new(rockspec.package.clone(), rockspec.version.clone()),
         constraint,
         hashes,
     );

@@ -6,7 +6,7 @@ use thiserror::Error;
 
 use crate::{
     lockfile::{LocalPackage, PinnedState},
-    package::RemotePackage,
+    package::PackageSpec,
     tree::Tree,
 };
 
@@ -17,12 +17,12 @@ pub enum PinError {
     #[error("rock {rock} is already {}pinned!", if *.pin_state == PinnedState::Unpinned { "un" } else { "" })]
     PinStateUnchanged {
         pin_state: PinnedState,
-        rock: RemotePackage,
+        rock: PackageSpec,
     },
     #[error("cannot change pin state of {rock}, since a second version of {rock} is already installed with `pin: {}`", .pin_state.as_bool())]
     PinStateConflict {
         pin_state: PinnedState,
-        rock: RemotePackage,
+        rock: PackageSpec,
     },
     #[error(transparent)]
     Io(#[from] io::Error),

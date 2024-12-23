@@ -5,7 +5,7 @@ use rocks_lib::{
     build::BuildBehaviour,
     config::{Config, LuaVersion},
     lockfile::PinnedState,
-    manifest::ManifestMetadata,
+    manifest::Manifest,
     package::PackageReq,
     progress::MultiProgress,
     tree::Tree,
@@ -54,7 +54,7 @@ pub async fn install(data: Install, config: Config) -> Result<()> {
         })
         .collect_vec();
 
-    let manifest = ManifestMetadata::from_config(&config).await?;
+    let manifest = Manifest::from_config(config.server(), &config).await?;
 
     // TODO(vhyrro): If the tree doesn't exist then error out.
     rocks_lib::operations::install(packages, pin, &manifest, &config, MultiProgress::new_arc())

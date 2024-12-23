@@ -4,7 +4,7 @@ use crate::{
     build::BuildBehaviour,
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::PinnedState,
-    manifest::{ManifestError, ManifestMetadata},
+    manifest::{Manifest, ManifestError},
     package::{PackageReq, PackageVersionReqError},
     path::Paths,
     progress::MultiProgress,
@@ -59,7 +59,7 @@ pub enum InstallCmdError {
 /// This defaults to the local project tree if cwd is a project root.
 pub async fn install_command(command: &str, config: &Config) -> Result<(), InstallCmdError> {
     let package_req = PackageReq::new(command.into(), None)?;
-    let manifest = ManifestMetadata::from_config(config).await?;
+    let manifest = Manifest::from_config(config.server(), config).await?;
     super::install(
         vec![(BuildBehaviour::NoForce, package_req)],
         PinnedState::Unpinned,

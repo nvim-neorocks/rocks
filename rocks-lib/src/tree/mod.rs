@@ -239,7 +239,7 @@ mod tests {
         build::variables::HasVariables as _,
         config::LuaVersion,
         lockfile::{LocalPackage, LocalPackageHashes, LockConstraint},
-        package::{PackageName, PackageVersion, RemotePackage},
+        package::{PackageName, PackageSpec, PackageVersion},
         tree::RockLayout,
     };
 
@@ -266,7 +266,7 @@ mod tests {
         };
 
         let package = LocalPackage::from(
-            &RemotePackage::parse("neorg".into(), "8.0.0-1".into()).unwrap(),
+            &PackageSpec::parse("neorg".into(), "8.0.0-1".into()).unwrap(),
             LockConstraint::Unconstrained,
             mock_hashes.clone(),
         );
@@ -289,7 +289,7 @@ mod tests {
         );
 
         let package = LocalPackage::from(
-            &RemotePackage::parse("lua-cjson".into(), "2.1.0-1".into()).unwrap(),
+            &PackageSpec::parse("lua-cjson".into(), "2.1.0-1".into()).unwrap(),
             LockConstraint::Unconstrained,
             mock_hashes.clone(),
         );
@@ -364,7 +364,7 @@ mod tests {
 
         let neorg = tree
             .rock(&LocalPackage::from(
-                &RemotePackage::parse("neorg".into(), "8.0.0-1-1".into()).unwrap(),
+                &PackageSpec::parse("neorg".into(), "8.0.0-1-1".into()).unwrap(),
                 LockConstraint::Unconstrained,
                 mock_hashes.clone(),
             ))

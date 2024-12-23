@@ -3,7 +3,7 @@ use eyre::eyre;
 use eyre::Result;
 use rocks_lib::lockfile::PinnedState;
 use rocks_lib::operations;
-use rocks_lib::package::RemotePackage;
+use rocks_lib::package::PackageSpec;
 use rocks_lib::{
     config::{Config, LuaVersion},
     tree::Tree,
@@ -11,7 +11,7 @@ use rocks_lib::{
 
 #[derive(Args)]
 pub struct ChangePin {
-    package: RemotePackage,
+    package: PackageSpec,
 }
 
 pub fn set_pinned_state(data: ChangePin, config: Config, pin: PinnedState) -> Result<()> {

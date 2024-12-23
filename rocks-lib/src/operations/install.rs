@@ -7,7 +7,7 @@ use crate::{
     luarocks_installation::{
         InstallBuildDependenciesError, LuaRocksError, LuaRocksInstallError, LuaRocksInstallation,
     },
-    manifest::{ManifestError, ManifestMetadata},
+    manifest::{Manifest, ManifestError},
     package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress, ProgressBar},
     rockspec::{BuildBackendSpec, LuaVersionError},
@@ -45,7 +45,7 @@ pub enum InstallError {
 pub async fn install(
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
-    manifest: &ManifestMetadata,
+    manifest: &Manifest,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, InstallError>
@@ -70,7 +70,7 @@ where
 async fn install_impl(
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
-    manifest: ManifestMetadata,
+    manifest: Manifest,
     config: &Config,
     lockfile: &mut Lockfile,
     progress_arc: Arc<Progress<MultiProgress>>,

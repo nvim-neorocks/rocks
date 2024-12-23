@@ -9,7 +9,7 @@ use rocks_lib::{
     build::BuildBehaviour,
     config::Config,
     lockfile::{LockConstraint::Unconstrained, PinnedState},
-    manifest::ManifestMetadata,
+    manifest::Manifest,
     package::{PackageName, PackageReq},
     progress::MultiProgress,
     rockspec::Rockspec,
@@ -69,7 +69,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     let lua_version = rockspec.lua_version_from_config(&config)?;
 
     let tree = Tree::new(config.tree().clone(), lua_version)?;
-    let manifest = ManifestMetadata::from_config(&config).await?;
+    let manifest = Manifest::from_config(config.server(), &config).await?;
 
     let build_behaviour = match tree.has_rock_and(
         &PackageReq::new(
