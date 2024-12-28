@@ -1,7 +1,5 @@
 use std::{collections::HashMap, io};
 
-use itertools::Itertools;
-
 use crate::{lockfile::LocalPackage, package::PackageName};
 
 use super::Tree;
@@ -13,13 +11,7 @@ use super::Tree;
 
 impl Tree {
     pub fn list(&self) -> io::Result<HashMap<PackageName, Vec<LocalPackage>>> {
-        Ok(self
-            .lockfile()?
-            .rocks()
-            .values()
-            .cloned()
-            .map(|locked_rock| (locked_rock.name().clone(), locked_rock))
-            .into_group_map())
+        Ok(self.lockfile()?.list())
     }
 
     pub fn as_rock_list(&self) -> io::Result<Vec<LocalPackage>> {

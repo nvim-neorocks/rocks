@@ -155,6 +155,7 @@ impl LuaRocksInstallation {
             build_dependencies,
             pin,
             Arc::new(manifest),
+            Arc::new(lockfile.clone()),
             &self.config,
             progress_arc,
         )
