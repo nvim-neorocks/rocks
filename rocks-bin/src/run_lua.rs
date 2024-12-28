@@ -58,7 +58,7 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
     let paths = Paths::from_tree(tree)?;
     let status = match Command::new(&lua_cmd)
         .args(run_lua.args.unwrap_or_default())
-        .env("PATH", paths.path_appended().joined())
+        .env("PATH", paths.path_prepended().joined())
         .env("LUA_PATH", paths.package_path().joined())
         .env("LUA_CPATH", paths.package_cpath().joined())
         .status()

@@ -17,10 +17,10 @@ pub struct Path {
     #[command(subcommand)]
     cmd: Option<PathCmd>,
 
-    /// Append the rocks tree paths to the system paths.
+    /// Prepend the rocks tree paths to the system paths.
     #[clap(default_value_t = false)]
     #[arg(long)]
-    append: bool,
+    prepend: bool,
 }
 
 #[derive(Subcommand, PartialEq, Eq, Debug, Clone)]
@@ -77,23 +77,23 @@ pub async fn path(path_data: Path, config: Config) -> Result<()> {
     let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
     let paths = Paths::from_tree(tree)?;
     let cmd = path_data.cmd.unwrap_or_default();
-    let append = path_data.append;
+    let prepend = path_data.prepend;
     match cmd {
         PathCmd::Full(args) => {
             let mut result = String::new();
             let shell = args.shell;
-            let package_path = mk_package_path(&paths, append)?;
+            let package_path = mk_package_path(&paths, prepend)?;
             if !package_path.is_empty() {
                 result.push_str(format_export(&shell, "LUA_PATH", &package_path).as_str());
                 result.push('\n')
             }
-            let package_cpath = mk_package_cpath(&paths, append)?;
+            let package_cpath = mk_package_cpath(&paths, prepend)?;
             if !package_cpath.is_empty() {
                 result.push_str(format_export(&shell, "LUA_CPATH", &package_cpath).as_str());
                 result.push('\n')
             }
             if !args.no_bin {
-                let path = mk_bin_path(&paths, append)?;
+                let path = mk_bin_path(&paths, prepend)?;
                 if !path.is_empty() {
                     result.push_str(format_export(&shell, "PATH", &path).as_str());
                     result.push('\n')
@@ -101,41 +101,41 @@ pub async fn path(path_data: Path, config: Config) -> Result<()> {
             }
             println!("{}", &result);
         }
-        PathCmd::Lua => println!("{}", &mk_package_path(&paths, append)?),
-        PathCmd::C => println!("{}", &mk_package_cpath(&paths, append)?),
-        PathCmd::Bin => println!("{}", &mk_bin_path(&paths, append)?),
+        PathCmd::Lua => println!("{}", &mk_package_path(&paths, prepend)?),
+        PathCmd::C => println!("{}", &mk_package_cpath(&paths, prepend)?),
+        PathCmd::Bin => println!("{}", &mk_bin_path(&paths, prepend)?),
     }
     Ok(())
 }
 
-fn mk_package_path(paths: &Paths, append: bool) -> Result<PackagePath> {
-    let mut result = if append {
+fn mk_package_path(paths: &Paths, prepend: bool) -> Result<PackagePath> {
+    let mut result = if prepend {
         PackagePath::from_str(env::var("LUA_PATH").unwrap_or_default().as_str()).unwrap_or_default()
     } else {
         PackagePath::default()
     };
-    result.append(paths.package_path());
+    result.prepend(paths.package_path());
     Ok(result)
 }
 
-fn mk_package_cpath(paths: &Paths, append: bool) -> Result<PackagePath> {
-    let mut result = if append {
+fn mk_package_cpath(paths: &Paths, prepend: bool) -> Result<PackagePath> {
+    let mut result = if prepend {
         PackagePath::from_str(env::var("LUA_CPATH").unwrap_or_default().as_str())
             .unwrap_or_default()
     } else {
         PackagePath::default()
     };
-    result.append(paths.package_cpath());
+    result.prepend(paths.package_cpath());
     Ok(result)
 }
 
-fn mk_bin_path(paths: &Paths, append: bool) -> Result<BinPath> {
-    let mut result = if append {
+fn mk_bin_path(paths: &Paths, prepend: bool) -> Result<BinPath> {
+    let mut result = if prepend {
         BinPath::from_env()
     } else {
         BinPath::default()
     };
-    result.append(paths.path());
+    result.prepend(paths.path());
     Ok(result)
 }
 

@@ -266,7 +266,7 @@ variables = {{
         let output = Command::new("luarocks")
             .current_dir(cwd)
             .args(args)
-            .env("PATH", luarocks_paths.path_appended().joined())
+            .env("PATH", luarocks_paths.path_prepended().joined())
             .env("LUA_PATH", luarocks_paths.package_path().joined())
             .env("LUA_CPATH", luarocks_paths.package_cpath().joined())
             .env("HOME", temp_dir.into_path())

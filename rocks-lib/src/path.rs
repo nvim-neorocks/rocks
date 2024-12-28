@@ -55,10 +55,10 @@ impl Paths {
         &self.bin
     }
 
-    /// Get the `$PATH`, appended to the existing `$PATH` environment.
-    pub fn path_appended(&self) -> BinPath {
+    /// Get the `$PATH`, prepended to the existing `$PATH` environment.
+    pub fn path_prepended(&self) -> BinPath {
         let mut path = BinPath::from_env();
-        path.append(self.path());
+        path.prepend(self.path());
         path
     }
 }
@@ -67,8 +67,10 @@ impl Paths {
 pub struct PackagePath(Vec<PathBuf>);
 
 impl PackagePath {
-    pub fn append(&mut self, other: &Self) {
-        self.0.extend(other.0.to_owned())
+    pub fn prepend(&mut self, other: &Self) {
+        let mut new_vec = other.0.to_owned();
+        new_vec.append(&mut self.0);
+        self.0 = new_vec;
     }
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
@@ -108,8 +110,10 @@ impl BinPath {
     pub fn from_env() -> Self {
         Self::from_str(env::var("PATH").unwrap_or_default().as_str()).unwrap_or_default()
     }
-    pub fn append(&mut self, other: &Self) {
-        self.0.extend(other.0.to_owned())
+    pub fn prepend(&mut self, other: &Self) {
+        let mut new_vec = other.0.to_owned();
+        new_vec.append(&mut self.0);
+        self.0 = new_vec;
     }
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()

@@ -31,7 +31,7 @@ pub async fn run(run: Run, config: Config) -> Result<()> {
     let paths = Paths::from_tree(tree)?;
     unsafe {
         // safe as long as this is single-threaded
-        env::set_var("PATH", paths.path_appended().joined());
+        env::set_var("PATH", paths.path_prepended().joined());
     }
     if which(&run.command).is_err() {
         match project {
