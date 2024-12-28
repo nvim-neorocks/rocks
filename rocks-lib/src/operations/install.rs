@@ -7,9 +7,9 @@ use crate::{
     luarocks_installation::{
         InstallBuildDependenciesError, LuaRocksError, LuaRocksInstallError, LuaRocksInstallation,
     },
-    manifest::{Manifest, ManifestError},
     package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress, ProgressBar},
+    remote_package_db::RemotePackageDB,
     rockspec::{BuildBackendSpec, LuaVersionError},
     tree::Tree,
 };
@@ -36,8 +36,6 @@ pub enum InstallError {
     LuaRocksInstallError(#[from] LuaRocksInstallError),
     #[error("error installing LuaRocks build dependencies: {0}")]
     InstallBuildDependenciesError(#[from] InstallBuildDependenciesError),
-    #[error(transparent)]
-    ManifestError(#[from] ManifestError),
     #[error("failed to build {0}: {1}")]
     BuildError(PackageName, BuildError),
 }
@@ -45,7 +43,7 @@ pub enum InstallError {
 pub async fn install(
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
-    manifest: &Manifest,
+    package_db: &RemotePackageDB,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, InstallError>
@@ -57,7 +55,7 @@ where
     let result = install_impl(
         packages,
         pin,
-        manifest.clone(),
+        package_db.clone(),
         config,
         &mut lockfile,
         progress,
@@ -70,7 +68,7 @@ where
 async fn install_impl(
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
-    manifest: Manifest,
+    package_db: RemotePackageDB,
     config: &Config,
     lockfile: &mut Lockfile,
     progress_arc: Arc<Progress<MultiProgress>>,
@@ -82,7 +80,7 @@ async fn install_impl(
         tx,
         packages,
         pin,
-        Arc::new(manifest),
+        Arc::new(package_db),
         Arc::new(lockfile.clone()),
         config,
         progress_arc.clone(),

@@ -8,7 +8,7 @@ use tokio::{fs, io};
 
 use crate::{
     config::{Config, LuaVersion},
-    package::{PackageName, PackageReq, PackageSpec, PackageVersion},
+    package::{PackageName, PackageReq, PackageSpec, PackageVersion, RemotePackage},
 };
 
 #[derive(Error, Debug)]
@@ -92,7 +92,7 @@ async fn manifest_from_server(
 }
 
 #[derive(Clone)]
-pub struct ManifestMetadata {
+pub(crate) struct ManifestMetadata {
     pub repository: HashMap<PackageName, HashMap<PackageVersion, Vec<ManifestRockEntry>>>,
 }
 
@@ -135,14 +135,6 @@ impl ManifestMetadata {
         self.repository.contains_key(rock_name)
     }
 
-    pub fn available_versions(&self, rock_name: &PackageName) -> Option<Vec<&PackageVersion>> {
-        if !self.has_rock(rock_name) {
-            return None;
-        }
-
-        Some(self.repository[rock_name].keys().collect())
-    }
-
     pub fn latest_version(&self, rock_name: &PackageName) -> Option<&PackageVersion> {
         if !self.has_rock(rock_name) {
             return None;
@@ -170,7 +162,7 @@ impl ManifestMetadata {
 }
 
 #[derive(Clone)]
-pub struct Manifest {
+pub(crate) struct Manifest {
     server_url: String,
     metadata: ManifestMetadata,
 }
@@ -193,6 +185,16 @@ impl Manifest {
     }
     pub fn metadata(&self) -> &ManifestMetadata {
         &self.metadata
+    }
+    pub fn search(&self, package_req: &PackageReq) -> Option<RemotePackage> {
+        if !self.metadata().has_rock(package_req.name()) {
+            None
+        } else {
+            Some(RemotePackage {
+                package: self.metadata().latest_match(package_req).unwrap(),
+                server_url: self.server_url().into(),
+            })
+        }
     }
 }
 

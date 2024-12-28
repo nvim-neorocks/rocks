@@ -5,8 +5,8 @@ use eyre::Result;
 use itertools::Itertools;
 use rocks_lib::{
     config::{Config, LuaVersion},
-    manifest::Manifest,
     progress::{MultiProgress, ProgressBar},
+    remote_package_db::RemotePackageDB,
     tree::Tree,
 };
 use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
@@ -25,7 +25,7 @@ pub async fn outdated(outdated_data: Outdated, config: Config) -> Result<()> {
 
     let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
 
-    let manifest = Manifest::from_config(config.server(), &config).await?;
+    let package_db = RemotePackageDB::from_config(&config).await?;
 
     // NOTE: This will display all installed versions and each possible upgrade.
     // However, this should also take into account dependency constraints made by other rocks.
@@ -36,7 +36,7 @@ pub async fn outdated(outdated_data: Outdated, config: Config) -> Result<()> {
         .iter()
         .filter_map(|rock| {
             rock.to_package()
-                .has_update(manifest.metadata())
+                .has_update(&package_db)
                 .expect("TODO")
                 .map(|version| (rock, version))
         })

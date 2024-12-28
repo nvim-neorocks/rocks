@@ -146,7 +146,7 @@ pub struct NoValidHomeDirectory;
 pub struct Config {
     enable_development_rockspecs: bool,
     server: String,
-    only_server: Option<String>,
+    extra_servers: Vec<String>,
     only_sources: Option<String>,
     namespace: String,
     lua_dir: PathBuf,
@@ -201,8 +201,8 @@ impl Config {
         &self.server
     }
 
-    pub fn only_server(&self) -> Option<&String> {
-        self.only_server.as_ref()
+    pub fn extra_servers(&self) -> &Vec<String> {
+        self.extra_servers.as_ref()
     }
 
     pub fn only_sources(&self) -> Option<&String> {
@@ -286,7 +286,7 @@ pub enum ConfigError {
 pub struct ConfigBuilder {
     enable_development_rockspecs: Option<bool>,
     server: Option<String>,
-    only_server: Option<String>,
+    extra_servers: Option<Vec<String>>,
     only_sources: Option<String>,
     namespace: Option<String>,
     lua_dir: Option<PathBuf>,
@@ -321,10 +321,9 @@ impl ConfigBuilder {
         Self { server, ..self }
     }
 
-    pub fn only_server(self, server: Option<String>) -> Self {
+    pub fn extra_servers(self, extra_servers: Option<Vec<String>>) -> Self {
         Self {
-            only_server: server.clone(),
-            server,
+            extra_servers,
             ..self
         }
     }
@@ -433,7 +432,7 @@ impl ConfigBuilder {
             server: self
                 .server
                 .unwrap_or_else(|| "https://luarocks.org/".to_string()),
-            only_server: self.only_server,
+            extra_servers: self.extra_servers.unwrap_or_default(),
             only_sources: self.only_sources,
             namespace: self.namespace.unwrap_or_default(),
             lua_dir: self.lua_dir.unwrap_or_else(|| data_dir.join("lua")),

@@ -4,10 +4,9 @@ use bytes::Bytes;
 use thiserror::Error;
 
 use crate::{
-    config::Config,
-    manifest::{Manifest, ManifestError},
     package::{PackageName, PackageReq, PackageVersion, RemotePackage},
     progress::{Progress, ProgressBar},
+    remote_package_db::{RemotePackageDB, SearchError},
     rockspec::{Rockspec, RockspecError},
 };
 
@@ -34,21 +33,18 @@ pub enum DownloadRockspecError {
 
 pub async fn download_rockspec(
     package_req: &PackageReq,
-    manifest: &Manifest,
-    config: &Config,
+    package_db: &RemotePackageDB,
     progress: &Progress<ProgressBar>,
 ) -> Result<Rockspec, SearchAndDownloadError> {
-    let package = search_manifest(package_req, manifest, config, progress).await?;
-
+    let package = package_db.find(package_req, progress)?;
     progress.map(|p| p.set_message(format!("📥 Downloading rockspec for {}", package_req)));
-
     download_rockspec_impl(package).await
 }
 
 #[derive(Error, Debug)]
 pub enum SearchAndDownloadError {
     #[error(transparent)]
-    Search(#[from] SearchManifestError),
+    Search(#[from] SearchError),
     #[error(transparent)]
     Download(#[from] DownloadSrcRockError),
     #[error(transparent)]
@@ -63,11 +59,10 @@ pub enum SearchAndDownloadError {
 
 pub async fn search_and_download_src_rock(
     package_req: &PackageReq,
-    manifest: &Manifest,
-    config: &Config,
+    package_db: &RemotePackageDB,
     progress: &Progress<ProgressBar>,
 ) -> Result<DownloadedSrcRockBytes, SearchAndDownloadError> {
-    let package = search_manifest(package_req, manifest, config, progress).await?;
+    let package = package_db.find(package_req, progress)?;
     Ok(download_src_rock(&package, progress).await?)
 }
 
@@ -87,13 +82,12 @@ pub(crate) async fn download_src_rock(
 pub async fn download_to_file(
     package_req: &PackageReq,
     destination_dir: Option<PathBuf>,
-    manifest: &Manifest,
-    config: &Config,
+    package_db: &RemotePackageDB,
     progress: &Progress<ProgressBar>,
 ) -> Result<DownloadedSrcRock, SearchAndDownloadError> {
     progress.map(|p| p.set_message(format!("📥 Downloading {}", package_req)));
 
-    let rock = search_and_download_src_rock(package_req, manifest, config, progress).await?;
+    let rock = search_and_download_src_rock(package_req, package_db, progress).await?;
     let full_rock_name = full_rock_name(&rock.name, &rock.version);
     tokio::fs::write(
         destination_dir
@@ -107,44 +101,6 @@ pub async fn download_to_file(
         name: rock.name.to_owned(),
         version: rock.version.to_owned(),
         path: full_rock_name.into(),
-    })
-}
-
-#[derive(Error, Debug)]
-pub enum SearchManifestError {
-    #[error(transparent)]
-    Mlua(#[from] mlua::Error),
-    #[error("rock '{name}' does not exist on {server}'s manifest")]
-    RockNotFound { name: PackageName, server: String },
-    #[error("error when pulling manifest: {0}")]
-    Manifest(#[from] ManifestError),
-}
-
-async fn search_manifest(
-    package_req: &PackageReq,
-    manifest: &Manifest,
-    config: &Config,
-    progress: &Progress<ProgressBar>,
-) -> Result<RemotePackage, SearchManifestError> {
-    progress.map(|p| p.set_message("🔎 Searching manifest..."));
-
-    search_manifest_impl(package_req, manifest, config).await
-}
-
-async fn search_manifest_impl(
-    package_req: &PackageReq,
-    manifest: &Manifest,
-    config: &Config,
-) -> Result<RemotePackage, SearchManifestError> {
-    if !manifest.metadata().has_rock(package_req.name()) {
-        return Err(SearchManifestError::RockNotFound {
-            name: package_req.name().clone(),
-            server: config.server().clone(),
-        });
-    }
-    Ok(RemotePackage {
-        package: manifest.metadata().latest_match(package_req).unwrap(),
-        server_url: manifest.server_url().into(),
     })
 }
 

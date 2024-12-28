@@ -7,9 +7,9 @@ use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
 
 use rocks_lib::{
     config::Config,
-    manifest::Manifest,
     package::{PackageName, PackageReq, PackageVersion},
     progress::{MultiProgress, ProgressBar},
+    remote_package_db::RemotePackageDB,
 };
 
 #[derive(Args)]
@@ -30,39 +30,20 @@ pub async fn search(data: Search, config: Config) -> Result<()> {
 
     let formatting = TreeFormatting::dir_tree(FormatCharacters::box_chars());
 
-    let manifest = Manifest::from_config(config.server(), &config).await?;
+    let package_db = RemotePackageDB::from_config(&config).await?;
 
     let lua_package_req = data.lua_package_req;
 
-    let rock_to_version_map: HashMap<&PackageName, Vec<&PackageVersion>> = manifest
-        .metadata()
-        .repository
-        .iter()
-        .filter_map(|(name, elements)| {
-            if name
-                .to_string()
-                .contains(&lua_package_req.name().to_string())
-            {
-                Some((
-                    name,
-                    elements
-                        .keys()
-                        .filter(|version| lua_package_req.version_req().matches(version))
-                        .sorted_by(|a, b| Ord::cmp(b, a))
-                        .collect_vec(),
-                ))
-            } else {
-                None
-            }
-        })
-        .collect();
+    let result = package_db.search(&lua_package_req);
 
     bar.finish_and_clear();
 
     if data.porcelain {
+        let rock_to_version_map: HashMap<&PackageName, Vec<&PackageVersion>> =
+            HashMap::from_iter(result);
         println!("{}", serde_json::to_string(&rock_to_version_map)?);
     } else {
-        for (key, versions) in rock_to_version_map.into_iter().sorted() {
+        for (key, versions) in result.into_iter().sorted() {
             let mut tree = StringTreeNode::new(key.to_string().to_owned());
 
             for version in versions {

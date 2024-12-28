@@ -10,9 +10,9 @@ use crate::{
     build::BuildBehaviour,
     config::Config,
     lockfile::{LocalPackageId, LocalPackageSpec, LockConstraint, Lockfile, PinnedState},
-    manifest::Manifest,
     package::{PackageReq, PackageVersionReq},
     progress::{MultiProgress, Progress},
+    remote_package_db::RemotePackageDB,
     rockspec::Rockspec,
 };
 
@@ -30,7 +30,7 @@ pub(crate) async fn get_all_dependencies(
     tx: UnboundedSender<PackageInstallSpec>,
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
-    manifest: Arc<Manifest>,
+    package_db: Arc<RemotePackageDB>,
     lockfile: Arc<Lockfile>,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
@@ -45,14 +45,14 @@ pub(crate) async fn get_all_dependencies(
             .map(|(build_behaviour, package)| {
                 let config = config.clone();
                 let tx = tx.clone();
-                let manifest = Arc::clone(&manifest);
+                let package_db = Arc::clone(&package_db);
                 let progress = Arc::clone(&progress);
                 let lockfile = Arc::clone(&lockfile);
 
                 tokio::spawn(async move {
                     let bar = progress.map(|p| p.new_bar());
 
-                    let rockspec = download_rockspec(&package, &manifest, &config, &bar)
+                    let rockspec = download_rockspec(&package, &package_db, &bar)
                         .await
                         .unwrap();
 
@@ -75,7 +75,7 @@ pub(crate) async fn get_all_dependencies(
                         tx.clone(),
                         dependencies,
                         pin,
-                        manifest,
+                        package_db,
                         lockfile,
                         &config,
                         progress,

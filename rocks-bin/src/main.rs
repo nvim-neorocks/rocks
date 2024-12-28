@@ -43,10 +43,10 @@ pub struct Cli {
     #[arg(long, value_name = "server")]
     pub server: Option<String>,
 
-    /// Fetch rocks/rockspecs from this server only (overrides
-    /// any entries in the config file).
-    #[arg(long, value_name = "server")]
-    pub only_server: Option<String>,
+    /// Fetch rocks/rockspecs from this server in addition to the main server
+    /// (overrides any entries in the config file).
+    #[arg(long, value_name = "extra-server")]
+    pub extra_servers: Option<Vec<String>>,
 
     /// Restrict downloads to paths matching the given URL.
     #[arg(long, value_name = "url")]
@@ -165,7 +165,7 @@ async fn main() {
         .lua_dir(cli.lua_dir)
         .lua_version(cli.lua_version)
         .namespace(cli.namespace)
-        .only_server(cli.only_server)
+        .extra_servers(cli.extra_servers)
         .only_sources(cli.only_sources)
         .server(cli.server)
         .tree(cli.tree)

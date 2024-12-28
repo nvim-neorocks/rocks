@@ -2,9 +2,9 @@ use clap::Args;
 use eyre::Result;
 use rocks_lib::{
     config::{Config, LuaVersion},
-    manifest::Manifest,
     package::{PackageName, PackageSpec, PackageVersion},
     progress::{MultiProgress, Progress},
+    remote_package_db::RemotePackageDB,
     tree::Tree,
 };
 
@@ -17,14 +17,11 @@ pub struct Remove {
 }
 
 pub async fn remove(remove_args: Remove, config: Config) -> Result<()> {
-    let manifest = Manifest::from_config(config.server(), &config).await?;
+    let package_db = RemotePackageDB::from_config(&config).await?;
 
     let target_version = remove_args
         .version
-        .or(manifest
-            .metadata()
-            .latest_version(&remove_args.name)
-            .cloned())
+        .or(package_db.latest_version(&remove_args.name).cloned())
         .unwrap();
 
     let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;

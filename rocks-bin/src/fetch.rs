@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use eyre::Result;
 use rocks_lib::{
     config::Config,
-    manifest::Manifest,
     progress::{MultiProgress, Progress},
+    remote_package_db::RemotePackageDB,
 };
 
 use crate::unpack::UnpackRemote;
@@ -13,9 +13,9 @@ pub async fn fetch_remote(data: UnpackRemote, config: Config) -> Result<()> {
     let package_req = data.package_req;
     let progress = MultiProgress::new();
     let bar = Progress::Progress(progress.new_bar());
-    let manifest = Manifest::from_config(config.server(), &config).await?;
+    let package_db = RemotePackageDB::from_config(&config).await?;
     let rockspec =
-        rocks_lib::operations::download_rockspec(&package_req, &manifest, &config, &bar).await?;
+        rocks_lib::operations::download_rockspec(&package_req, &package_db, &bar).await?;
 
     let destination = data
         .path

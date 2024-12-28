@@ -10,6 +10,7 @@ pub mod package;
 pub mod path;
 pub mod progress;
 pub mod project;
+pub mod remote_package_db;
 pub mod rockspec;
 pub mod tree;
 pub mod upload;
