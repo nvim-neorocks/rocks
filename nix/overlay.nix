@@ -14,6 +14,7 @@
 
         nativeBuildInputs = [
           pkg-config
+          installShellFiles
         ];
 
         buildInputs =
@@ -34,7 +35,13 @@
           cacert
           cargo-nextest
           zlib # used for checking external dependencies
+          lua
         ];
+
+        postBuild = ''
+          cargo xtask dist-man
+          cargo xtask dist-completions
+        '';
 
         preCheck = ''
           export HOME=$(realpath .)
@@ -47,6 +54,11 @@
           runHook postCheck
         '';
 
+        postInstall = ''
+          installManPage target/dist/rocks.1
+          installShellCompletion target/dist/rocks.{bash,fish} --zsh target/dist/_rocks
+        '';
+
         env = {
           # disable vendored packages
           LIBGIT2_NO_VENDOR = 1;
@@ -54,6 +66,8 @@
         };
 
         inherit buildType;
+
+        meta.mainProgram = "rocks";
       };
 in {
   rocks = mk-rocks {};

@@ -2,6 +2,7 @@
 members = [
     "rocks-lib",
     "rocks-bin",
+    "xtask",
     # "rocks-lua",
 ]
 resolver = "2"

@@ -1,0 +1,13 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+clap = { version = "4.5.23", features = ["derive"] }
+clap_complete = "4.5.40"
+clap_mangen = "0.2.24"
+
+[dependencies.rocks]
+path = "../rocks-bin"
