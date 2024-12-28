@@ -1848,9 +1848,9 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "lets_find_up"
-version = "0.0.3"
+version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b91a14fb0b4300e025486cc8bc096c7173c2c615ce8f9c6da7829a4af3f5afbd"
+checksum = "e8052b3d5cfa8bae8af3b44aae11a43e9fa48ce0ae477c4a39733a8deff34059"
 
 [[package]]
 name = "libc"
