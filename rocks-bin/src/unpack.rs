@@ -4,7 +4,7 @@ use clap::Args;
 use eyre::Result;
 use rocks_lib::{
     config::Config,
-    manifest::ManifestMetadata,
+    manifest::Manifest,
     package::PackageReq,
     progress::{MultiProgress, Progress},
 };
@@ -49,7 +49,7 @@ and type `rocks make` to build.",
 
 pub async fn unpack_remote(data: UnpackRemote, config: Config) -> Result<()> {
     let package_req = data.package_req;
-    let manifest = ManifestMetadata::from_config(&config).await?;
+    let manifest = Manifest::from_config(config.server(), &config).await?;
     let progress = MultiProgress::new();
     let bar = Progress::Progress(progress.new_bar());
     let rock =

@@ -8,7 +8,7 @@ use tokio::{fs, io};
 
 use crate::{
     config::{Config, LuaVersion},
-    package::{PackageName, PackageReq, PackageVersion, RemotePackage},
+    package::{PackageName, PackageReq, PackageSpec, PackageVersion},
 };
 
 #[derive(Error, Debug)]
@@ -24,7 +24,7 @@ pub enum ManifestFromServerError {
 }
 
 async fn manifest_from_server(
-    url: String,
+    url: &str,
     config: &Config,
 ) -> Result<String, ManifestFromServerError> {
     let manifest_filename = "manifest".to_string()
@@ -131,13 +131,6 @@ impl ManifestMetadata {
         Ok(manifest)
     }
 
-    pub async fn from_config(config: &Config) -> Result<Self, ManifestError> {
-        let manifest =
-            crate::manifest::manifest_from_server(config.server().clone(), config).await?;
-
-        Ok(Self::new(&manifest)?)
-    }
-
     pub fn has_rock(&self, rock_name: &PackageName) -> bool {
         self.repository.contains_key(rock_name)
     }
@@ -158,7 +151,7 @@ impl ManifestMetadata {
         self.repository[rock_name].keys().sorted().last()
     }
 
-    pub fn latest_match(&self, lua_package_req: &PackageReq) -> Option<RemotePackage> {
+    pub fn latest_match(&self, lua_package_req: &PackageReq) -> Option<PackageSpec> {
         if !self.has_rock(lua_package_req.name()) {
             return None;
         }
@@ -169,10 +162,37 @@ impl ManifestMetadata {
             .rev()
             .find(|version| lua_package_req.version_req().matches(version))?;
 
-        Some(RemotePackage::new(
+        Some(PackageSpec::new(
             lua_package_req.name().to_owned(),
             version.to_owned(),
         ))
+    }
+}
+
+#[derive(Clone)]
+pub struct Manifest {
+    server_url: String,
+    metadata: ManifestMetadata,
+}
+
+impl Manifest {
+    pub fn new(server_url: &str, metadata: ManifestMetadata) -> Self {
+        Self {
+            server_url: server_url.into(),
+            metadata,
+        }
+    }
+
+    pub async fn from_config(server_url: &str, config: &Config) -> Result<Self, ManifestError> {
+        let manifest = crate::manifest::manifest_from_server(server_url, config).await?;
+        let metadata = ManifestMetadata::new(&manifest)?;
+        Ok(Self::new(server_url, metadata))
+    }
+    pub fn server_url(&self) -> &String {
+        &self.server_url
+    }
+    pub fn metadata(&self) -> &ManifestMetadata {
+        &self.metadata
     }
 }
 
@@ -249,7 +269,7 @@ mod tests {
             .lua_version(Some(crate::config::LuaVersion::LuaJIT))
             .build()
             .unwrap();
-        manifest_from_server(url_str, &config).await.unwrap();
+        manifest_from_server(&url_str, &config).await.unwrap();
     }
 
     #[tokio::test]
@@ -266,7 +286,7 @@ mod tests {
             .build()
             .unwrap();
 
-        manifest_from_server(url_str, &config).await.unwrap();
+        manifest_from_server(&url_str, &config).await.unwrap();
     }
 
     #[tokio::test]
@@ -285,7 +305,7 @@ mod tests {
             .lua_version(Some(crate::config::LuaVersion::Lua51))
             .build()
             .unwrap();
-        let result = manifest_from_server(url_str, &config).await.unwrap();
+        let result = manifest_from_server(&url_str, &config).await.unwrap();
         assert_eq!(result, manifest_content);
     }
 

@@ -15,7 +15,7 @@ use crate::{
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{LocalPackage, LocalPackageId, LockConstraint, PinnedState},
     lua_installation::LuaInstallation,
-    manifest::{ManifestError, ManifestMetadata},
+    manifest::{Manifest, ManifestError},
     operations::{get_all_dependencies, SearchAndDownloadError},
     package::PackageReq,
     path::Paths,
@@ -129,7 +129,7 @@ impl LuaRocksInstallation {
     ) -> Result<(), InstallBuildDependenciesError> {
         let progress = Arc::clone(&progress_arc);
         let mut lockfile = self.tree.lockfile()?;
-        let manifest = ManifestMetadata::from_config(&self.config).await?;
+        let manifest = Manifest::from_config(self.config.server(), &self.config).await?;
         let build_dependencies = match rockspec.rockspec_format {
             Some(RockspecFormat::_1_0 | RockspecFormat::_2_0) => {
                 // XXX: rockspec formats < 3.0 don't support `build_dependencies`,

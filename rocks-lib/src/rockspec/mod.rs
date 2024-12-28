@@ -275,7 +275,7 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use crate::package::RemotePackage;
+    use crate::package::PackageSpec;
     use crate::rockspec::PlatformIdentifier;
 
     use super::*;
@@ -423,19 +423,19 @@ mod tests {
         assert!(!rockspec
             .supported_platforms
             .is_supported(&PlatformIdentifier::Windows));
-        let neorg = RemotePackage::parse("neorg".into(), "6.0.0".into()).unwrap();
+        let neorg = PackageSpec::parse("neorg".into(), "6.0.0".into()).unwrap();
         assert!(rockspec
             .dependencies
             .default
             .into_iter()
             .any(|dep| dep.matches(&neorg)));
-        let foo = RemotePackage::parse("foo".into(), "1.0.0".into()).unwrap();
+        let foo = PackageSpec::parse("foo".into(), "1.0.0".into()).unwrap();
         assert!(rockspec
             .build_dependencies
             .default
             .into_iter()
             .any(|dep| dep.matches(&foo)));
-        let busted = RemotePackage::parse("busted".into(), "2.2.0".into()).unwrap();
+        let busted = PackageSpec::parse("busted".into(), "2.2.0".into()).unwrap();
         assert_eq!(
             *rockspec.external_dependencies.default.get("FOO").unwrap(),
             ExternalDependencySpec::Header("foo.h".into())
@@ -736,9 +736,9 @@ mod tests {
         "
         .to_string();
         let rockspec = Rockspec::new(&rockspec_content).unwrap();
-        let neorg_override = RemotePackage::parse("neorg".into(), "5.0.0".into()).unwrap();
-        let toml_edit = RemotePackage::parse("toml-edit".into(), "1.0.0".into()).unwrap();
-        let toml = RemotePackage::parse("toml".into(), "1.0.0".into()).unwrap();
+        let neorg_override = PackageSpec::parse("neorg".into(), "5.0.0".into()).unwrap();
+        let toml_edit = PackageSpec::parse("toml-edit".into(), "1.0.0".into()).unwrap();
+        let toml = PackageSpec::parse("toml".into(), "1.0.0".into()).unwrap();
         assert_eq!(rockspec.dependencies.default.len(), 2);
         let per_platform = &rockspec.dependencies.per_platform;
         assert_eq!(

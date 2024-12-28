@@ -2,7 +2,7 @@ use clap::Args;
 use eyre::Result;
 use rocks_lib::{
     config::Config,
-    manifest::ManifestMetadata,
+    manifest::Manifest,
     package::PackageReq,
     progress::{MultiProgress, Progress},
 };
@@ -13,7 +13,7 @@ pub struct Download {
 }
 
 pub async fn download(dl_data: Download, config: Config) -> Result<()> {
-    let manifest = ManifestMetadata::from_config(&config).await?;
+    let manifest = Manifest::from_config(config.server(), &config).await?;
     let progress = MultiProgress::new();
     let bar = Progress::Progress(progress.new_bar());
 

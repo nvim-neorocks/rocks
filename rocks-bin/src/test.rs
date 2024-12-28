@@ -2,7 +2,7 @@ use clap::Args;
 use eyre::{OptionExt, Result};
 use rocks_lib::{
     config::Config,
-    manifest::ManifestMetadata,
+    manifest::Manifest,
     operations::{ensure_busted, ensure_dependencies, run_tests, TestEnv},
     progress::MultiProgress,
     project::Project,
@@ -26,7 +26,7 @@ pub async fn test(test: Test, config: Config) -> Result<()> {
         Ok(lua_version) => Ok(lua_version),
         Err(_) => rockspec.test_lua_version().ok_or_eyre("lua version not set! Please provide a version through `--lua-version <ver>` or add it to your rockspec's dependencies"),
     }?;
-    let manifest = ManifestMetadata::from_config(&config).await?;
+    let manifest = Manifest::from_config(config.server(), &config).await?;
     let test_config = config.with_lua_version(lua_version);
     let tree = Tree::new(
         test_config.tree().clone(),

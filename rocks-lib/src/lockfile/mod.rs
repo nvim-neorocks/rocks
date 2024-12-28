@@ -9,8 +9,7 @@ use ssri::Integrity;
 use thiserror::Error;
 
 use crate::package::{
-    PackageName, PackageReq, PackageVersion, PackageVersionReq, PackageVersionReqError,
-    RemotePackage,
+    PackageName, PackageReq, PackageSpec, PackageVersion, PackageVersionReq, PackageVersionReqError,
 };
 
 #[cfg(feature = "lua")]
@@ -158,12 +157,12 @@ impl LocalPackageSpec {
         self.dependencies.iter().collect()
     }
 
-    pub fn to_package(&self) -> RemotePackage {
-        RemotePackage::new(self.name.clone(), self.version.clone())
+    pub fn to_package(&self) -> PackageSpec {
+        PackageSpec::new(self.name.clone(), self.version.clone())
     }
 
     pub fn into_package_req(self) -> PackageReq {
-        RemotePackage::new(self.name, self.version).into_package_req()
+        PackageSpec::new(self.name, self.version).into_package_req()
     }
 }
 
@@ -245,7 +244,7 @@ impl FromLua for LocalPackage {
 
 impl LocalPackage {
     pub fn from(
-        package: &RemotePackage,
+        package: &PackageSpec,
         constraint: LockConstraint,
         hashes: LocalPackageHashes,
     ) -> Self {
@@ -289,7 +288,7 @@ impl LocalPackage {
         &self.hashes
     }
 
-    pub fn to_package(&self) -> RemotePackage {
+    pub fn to_package(&self) -> PackageSpec {
         self.spec.to_package()
     }
 
@@ -537,7 +536,7 @@ mod tests {
     use assert_fs::fixture::PathCopy;
     use insta::{assert_json_snapshot, sorted_redaction};
 
-    use crate::{config::LuaVersion::Lua51, package::RemotePackage, tree::Tree};
+    use crate::{config::LuaVersion::Lua51, package::PackageSpec, tree::Tree};
 
     #[test]
     fn parse_lockfile() {
@@ -575,7 +574,7 @@ mod tests {
         let tree = Tree::new(temp.to_path_buf(), Lua51).unwrap();
         let mut lockfile = tree.lockfile().unwrap();
 
-        let test_package = RemotePackage::parse("test1".to_string(), "0.1.0".to_string()).unwrap();
+        let test_package = PackageSpec::parse("test1".to_string(), "0.1.0".to_string()).unwrap();
         let test_local_package = LocalPackage::from(
             &test_package,
             crate::lockfile::LockConstraint::Unconstrained,
@@ -584,7 +583,7 @@ mod tests {
         lockfile.add(&test_local_package);
 
         let test_dep_package =
-            RemotePackage::parse("test2".to_string(), "0.1.0".to_string()).unwrap();
+            PackageSpec::parse("test2".to_string(), "0.1.0".to_string()).unwrap();
         let mut test_local_dep_package = LocalPackage::from(
             &test_dep_package,
             crate::lockfile::LockConstraint::Constrained(">= 1.0.0".parse().unwrap()),

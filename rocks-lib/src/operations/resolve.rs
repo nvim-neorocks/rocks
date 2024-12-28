@@ -10,7 +10,7 @@ use crate::{
     build::BuildBehaviour,
     config::Config,
     lockfile::{LocalPackageId, LocalPackageSpec, LockConstraint, PinnedState},
-    manifest::ManifestMetadata,
+    manifest::Manifest,
     package::{PackageReq, PackageVersionReq},
     progress::{MultiProgress, Progress},
     rockspec::Rockspec,
@@ -30,7 +30,7 @@ pub(crate) async fn get_all_dependencies(
     tx: UnboundedSender<PackageInstallSpec>,
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
-    manifest: Arc<ManifestMetadata>,
+    manifest: Arc<Manifest>,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackageId>, SearchAndDownloadError> {
