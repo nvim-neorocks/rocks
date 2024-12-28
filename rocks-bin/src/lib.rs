@@ -21,6 +21,7 @@ use update::Update;
 use upload::Upload;
 
 pub mod build;
+pub mod check;
 pub mod debug;
 pub mod download;
 pub mod fetch;
@@ -110,6 +111,8 @@ pub enum Commands {
     Add,
     /// Build/compile a rock.
     Build(Build),
+    /// Runs `luacheck` in the current project.
+    Check,
     /// [UNIMPLEMENTED] Query information about Rocks's configuration.
     Config,
     /// Various debugging utilities.

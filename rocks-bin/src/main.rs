@@ -3,6 +3,7 @@ use std::{path::PathBuf, time::Duration};
 use clap::{Parser, Subcommand};
 use rocks::{
     build::{self, Build},
+    check,
     debug::Debug,
     download::{self, Download},
     fetch, format,
@@ -95,6 +96,8 @@ pub enum Commands {
     Add,
     /// Build/compile a rock.
     Build(Build),
+    /// Runs `luacheck` in the current project.
+    Check,
     /// [UNIMPLEMENTED] Query information about Rocks's configuration.
     Config,
     /// Various debugging utilities.
@@ -211,6 +214,7 @@ async fn main() {
         Commands::Pin(pin_data) => pin::set_pinned_state(pin_data, config, Pinned).unwrap(),
         Commands::Unpin(pin_data) => pin::set_pinned_state(pin_data, config, Unpinned).unwrap(),
         Commands::Upload(upload_data) => upload::upload(upload_data, config).await.unwrap(),
+        Commands::Check => check::check(config).await.unwrap(),
         Commands::Add => unimplemented!(),
         Commands::Config => unimplemented!(),
         Commands::Doc => unimplemented!(),

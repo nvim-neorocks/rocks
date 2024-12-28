@@ -71,7 +71,7 @@ impl Project {
     }
 
     pub fn tree(&self, lua_version: LuaVersion) -> io::Result<Tree> {
-        Tree::new(self.root.clone(), lua_version)
+        Tree::new(self.root.join(".rocks"), lua_version)
     }
 }
 
