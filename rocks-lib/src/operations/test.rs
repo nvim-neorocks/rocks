@@ -57,7 +57,7 @@ where
     let mut command = command
         .current_dir(project.root())
         .args(test_args)
-        .env("PATH", paths.path_appended().joined())
+        .env("PATH", paths.path_prepended().joined())
         .env("LUA_PATH", paths.package_path().joined())
         .env("LUA_CPATH", paths.package_cpath().joined());
     if let TestEnv::Pure = env {

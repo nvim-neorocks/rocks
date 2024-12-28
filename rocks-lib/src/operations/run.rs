@@ -32,7 +32,7 @@ pub async fn run(command: &str, args: Vec<String>, config: Config) -> Result<(),
     let paths = Paths::from_tree(tree)?;
     let status = match Command::new(command)
         .args(args)
-        .env("PATH", paths.path_appended().joined())
+        .env("PATH", paths.path_prepended().joined())
         .env("LUA_PATH", paths.package_path().joined())
         .env("LUA_CPATH", paths.package_cpath().joined())
         .status()
