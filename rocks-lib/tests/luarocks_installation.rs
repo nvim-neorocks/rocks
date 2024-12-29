@@ -8,7 +8,7 @@ use rocks_lib::progress::{MultiProgress, Progress, ProgressBar};
 use rocks_lib::{
     config::{ConfigBuilder, LuaVersion},
     lua_installation::LuaInstallation,
-    luarocks_installation::LuaRocksInstallation,
+    luarocks::luarocks_installation::LuaRocksInstallation,
 };
 
 #[tokio::test]
