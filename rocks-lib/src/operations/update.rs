@@ -6,9 +6,9 @@ use crate::{
     build::BuildBehaviour,
     config::Config,
     lockfile::{LocalPackage, PinnedState},
-    manifest::Manifest,
     package::{PackageReq, PackageSpec, RockConstraintUnsatisfied},
     progress::{MultiProgress, Progress, ProgressBar},
+    remote_package_db::RemotePackageDB,
 };
 
 use super::{install, remove, InstallError, RemoveError};
@@ -34,7 +34,7 @@ pub enum UpdateError {
 pub async fn update(
     package: LocalPackage,
     constraint: PackageReq,
-    manifest: &Manifest,
+    package_db: &RemotePackageDB,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), UpdateError> {
@@ -42,7 +42,7 @@ pub async fn update(
 
     let latest_version = package
         .to_package()
-        .has_update_with(&constraint, manifest)?;
+        .has_update_with(&constraint, package_db)?;
 
     if latest_version.is_some() && package.pinned() == PinnedState::Unpinned {
         // TODO(vhyrro): There's a slight dissonance in the API here.
@@ -54,7 +54,7 @@ pub async fn update(
         install(
             vec![(BuildBehaviour::NoForce, constraint)],
             PinnedState::Unpinned,
-            manifest,
+            package_db,
             config,
             progress,
         )

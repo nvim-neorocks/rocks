@@ -15,11 +15,11 @@ use crate::{
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{LocalPackage, LocalPackageId, LockConstraint, PinnedState},
     lua_installation::LuaInstallation,
-    manifest::{Manifest, ManifestError},
     operations::{get_all_dependencies, SearchAndDownloadError},
     package::PackageReq,
     path::Paths,
     progress::{MultiProgress, Progress, ProgressBar},
+    remote_package_db::{RemotePackageDB, RemotePackageDBError},
     rockspec::{Rockspec, RockspecFormat},
     tree::Tree,
 };
@@ -37,8 +37,6 @@ pub enum LuaRocksInstallError {
     #[error(transparent)]
     Io(#[from] io::Error),
     #[error(transparent)]
-    ManifestError(#[from] ManifestError),
-    #[error(transparent)]
     BuildError(#[from] BuildError),
 }
 
@@ -47,7 +45,7 @@ pub enum InstallBuildDependenciesError {
     #[error(transparent)]
     Io(#[from] io::Error),
     #[error(transparent)]
-    ManifestError(#[from] ManifestError),
+    RemotePackageDBError(#[from] RemotePackageDBError),
     #[error(transparent)]
     SearchAndDownloadError(#[from] SearchAndDownloadError),
     #[error(transparent)]
@@ -98,7 +96,7 @@ impl LuaRocksInstallation {
     }
 
     pub async fn ensure_installed(
-        self: &LuaRocksInstallation,
+        &self,
         progress: &Progress<ProgressBar>,
     ) -> Result<(), LuaRocksInstallError> {
         let mut lockfile = self.tree.lockfile()?;
@@ -122,14 +120,14 @@ impl LuaRocksInstallation {
     }
 
     pub async fn install_build_dependencies(
-        self,
+        &self,
         build_backend: &str,
         rockspec: &Rockspec,
         progress_arc: Arc<Progress<MultiProgress>>,
     ) -> Result<(), InstallBuildDependenciesError> {
         let progress = Arc::clone(&progress_arc);
         let mut lockfile = self.tree.lockfile()?;
-        let manifest = Manifest::from_config(self.config.server(), &self.config).await?;
+        let package_db = RemotePackageDB::from_config(&self.config).await?;
         let build_dependencies = match rockspec.rockspec_format {
             Some(RockspecFormat::_1_0 | RockspecFormat::_2_0) => {
                 // XXX: rockspec formats < 3.0 don't support `build_dependencies`,
@@ -154,7 +152,7 @@ impl LuaRocksInstallation {
             tx,
             build_dependencies,
             pin,
-            Arc::new(manifest),
+            Arc::new(package_db),
             Arc::new(lockfile.clone()),
             &self.config,
             progress_arc,

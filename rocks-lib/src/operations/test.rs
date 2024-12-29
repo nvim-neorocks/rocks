@@ -4,11 +4,11 @@ use crate::{
     build::BuildBehaviour,
     config::Config,
     lockfile::PinnedState,
-    manifest::Manifest,
     package::{PackageName, PackageReq, PackageVersionReqError},
     path::Paths,
     progress::{MultiProgress, Progress},
     project::Project,
+    remote_package_db::RemotePackageDB,
     rockspec::Rockspec,
     tree::Tree,
 };
@@ -101,7 +101,7 @@ pub enum InstallTestDependenciesError {
 /// This defaults to the local project tree if cwd is a project root.
 pub async fn ensure_busted(
     tree: &Tree,
-    manifest: &Manifest,
+    package_db: &RemotePackageDB,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), InstallTestDependenciesError> {
@@ -111,7 +111,7 @@ pub async fn ensure_busted(
         install(
             vec![(BuildBehaviour::NoForce, busted_req)],
             PinnedState::Unpinned,
-            manifest,
+            package_db,
             config,
             progress,
         )
@@ -126,7 +126,7 @@ pub async fn ensure_busted(
 pub async fn ensure_dependencies(
     rockspec: &Rockspec,
     tree: &Tree,
-    manifest: &Manifest,
+    package_db: &RemotePackageDB,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), InstallTestDependenciesError> {
@@ -149,7 +149,7 @@ pub async fn ensure_dependencies(
     install(
         dependencies,
         PinnedState::Unpinned,
-        manifest,
+        package_db,
         config,
         progress,
     )

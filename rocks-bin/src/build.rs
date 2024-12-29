@@ -9,9 +9,9 @@ use rocks_lib::{
     build::BuildBehaviour,
     config::Config,
     lockfile::{LockConstraint::Unconstrained, PinnedState},
-    manifest::Manifest,
     package::{PackageName, PackageReq},
     progress::MultiProgress,
+    remote_package_db::RemotePackageDB,
     rockspec::Rockspec,
     tree::Tree,
 };
@@ -69,7 +69,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     let lua_version = rockspec.lua_version_from_config(&config)?;
 
     let tree = Tree::new(config.tree().clone(), lua_version)?;
-    let manifest = Manifest::from_config(config.server(), &config).await?;
+    let package_db = RemotePackageDB::from_config(&config).await?;
 
     let build_behaviour = match tree.has_rock_and(
         &PackageReq::new(
@@ -114,7 +114,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     rocks_lib::operations::install(
         dependencies_to_install,
         pin,
-        &manifest,
+        &package_db,
         &config,
         progress_arc,
     )

@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use thiserror::Error;
 
-use crate::manifest::{Manifest, ManifestMetadata};
+use crate::remote_package_db::RemotePackageDB;
 
 use super::{version::PackageVersion, PackageName, PackageReq, PackageSpec, PackageVersionReq};
 
@@ -22,9 +22,9 @@ impl PackageSpec {
     /// Returns the latest version if found.
     pub fn has_update(
         &self,
-        metadata: &ManifestMetadata,
+        package_db: &RemotePackageDB,
     ) -> Result<Option<PackageVersion>, RockNotFound> {
-        let latest_version = metadata
+        let latest_version = package_db
             .latest_version(&self.name)
             .ok_or_else(|| RockNotFound(self.name.clone()))?;
 
@@ -40,15 +40,15 @@ impl PackageSpec {
     pub fn has_update_with(
         &self,
         constraint: &PackageReq,
-        manifest: &Manifest,
+        package_db: &RemotePackageDB,
     ) -> Result<Option<PackageVersion>, RockConstraintUnsatisfied> {
-        let latest_version = manifest
-            .metadata()
-            .latest_match(constraint)
-            .ok_or_else(|| RockConstraintUnsatisfied {
-                name: self.name.clone(),
-                constraint: constraint.version_req.clone(),
-            })?;
+        let latest_version =
+            package_db
+                .latest_match(constraint)
+                .ok_or_else(|| RockConstraintUnsatisfied {
+                    name: self.name.clone(),
+                    constraint: constraint.version_req.clone(),
+                })?;
 
         if self.version < latest_version.version {
             Ok(Some(latest_version.version))
@@ -68,7 +68,10 @@ impl Display for PackageSpec {
 mod test {
     use std::path::PathBuf;
 
-    use crate::{manifest::ManifestMetadata, package::PackageSpec};
+    use crate::{
+        manifest::{Manifest, ManifestMetadata},
+        package::PackageSpec,
+    };
 
     #[test]
     fn rock_has_update() {
@@ -76,12 +79,13 @@ mod test {
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/manifest-5.1");
         let content = String::from_utf8(std::fs::read(&test_manifest_path).unwrap()).unwrap();
         let metadata = ManifestMetadata::new(&content).unwrap();
+        let package_db = Manifest::new("example.com", metadata).into();
 
         let test_package =
             PackageSpec::parse("lua-cjson".to_string(), "2.0.0".to_string()).unwrap();
 
         assert_eq!(
-            test_package.has_update(&metadata).unwrap(),
+            test_package.has_update(&package_db).unwrap(),
             Some("2.1.0-1".parse().unwrap())
         );
     }

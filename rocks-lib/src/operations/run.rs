@@ -4,10 +4,10 @@ use crate::{
     build::BuildBehaviour,
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::PinnedState,
-    manifest::{Manifest, ManifestError},
     package::{PackageReq, PackageVersionReqError},
     path::Paths,
     progress::MultiProgress,
+    remote_package_db::{RemotePackageDB, RemotePackageDBError},
     tree::Tree,
 };
 use thiserror::Error;
@@ -52,18 +52,18 @@ pub async fn run(command: &str, args: Vec<String>, config: Config) -> Result<(),
 pub enum InstallCmdError {
     InstallError(#[from] InstallError),
     PackageVersionReqError(#[from] PackageVersionReqError),
-    ManifestError(#[from] ManifestError),
+    RemotePackageDBError(#[from] RemotePackageDBError),
 }
 
 /// Ensure that a command is installed.
 /// This defaults to the local project tree if cwd is a project root.
 pub async fn install_command(command: &str, config: &Config) -> Result<(), InstallCmdError> {
     let package_req = PackageReq::new(command.into(), None)?;
-    let manifest = Manifest::from_config(config.server(), config).await?;
+    let package_db = RemotePackageDB::from_config(config).await?;
     super::install(
         vec![(BuildBehaviour::NoForce, package_req)],
         PinnedState::Unpinned,
-        &manifest,
+        &package_db,
         config,
         MultiProgress::new_arc(),
     )
