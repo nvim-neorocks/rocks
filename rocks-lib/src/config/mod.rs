@@ -4,6 +4,7 @@ use std::{
     collections::HashMap, env, fmt::Display, io, path::PathBuf, str::FromStr, time::Duration,
 };
 use thiserror::Error;
+use url::Url;
 
 use crate::{
     build::{
@@ -145,8 +146,8 @@ pub struct NoValidHomeDirectory;
 #[derive(Debug, Clone)]
 pub struct Config {
     enable_development_rockspecs: bool,
-    server: String,
-    extra_servers: Vec<String>,
+    server: Url,
+    extra_servers: Vec<Url>,
     only_sources: Option<String>,
     namespace: String,
     lua_dir: PathBuf,
@@ -197,11 +198,11 @@ impl Config {
         self.enable_development_rockspecs
     }
 
-    pub fn server(&self) -> &String {
+    pub fn server(&self) -> &Url {
         &self.server
     }
 
-    pub fn extra_servers(&self) -> &Vec<String> {
+    pub fn extra_servers(&self) -> &Vec<Url> {
         self.extra_servers.as_ref()
     }
 
@@ -285,8 +286,8 @@ pub enum ConfigError {
 #[derive(Default)]
 pub struct ConfigBuilder {
     enable_development_rockspecs: Option<bool>,
-    server: Option<String>,
-    extra_servers: Option<Vec<String>>,
+    server: Option<Url>,
+    extra_servers: Option<Vec<Url>>,
     only_sources: Option<String>,
     namespace: Option<String>,
     lua_dir: Option<PathBuf>,
@@ -317,11 +318,11 @@ impl ConfigBuilder {
         }
     }
 
-    pub fn server(self, server: Option<String>) -> Self {
+    pub fn server(self, server: Option<Url>) -> Self {
         Self { server, ..self }
     }
 
-    pub fn extra_servers(self, extra_servers: Option<Vec<String>>) -> Self {
+    pub fn extra_servers(self, extra_servers: Option<Vec<Url>>) -> Self {
         Self {
             extra_servers,
             ..self
@@ -431,7 +432,7 @@ impl ConfigBuilder {
             enable_development_rockspecs: self.enable_development_rockspecs.unwrap_or(false),
             server: self
                 .server
-                .unwrap_or_else(|| "https://luarocks.org/".to_string()),
+                .unwrap_or_else(|| Url::parse("https://luarocks.org/").unwrap()),
             extra_servers: self.extra_servers.unwrap_or_default(),
             only_sources: self.only_sources,
             namespace: self.namespace.unwrap_or_default(),

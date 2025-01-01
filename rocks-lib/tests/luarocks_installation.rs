@@ -16,6 +16,7 @@ async fn luarocks_make() {
     let dir = TempDir::new().unwrap();
     let config = ConfigBuilder::new()
         .tree(Some(dir.path().into()))
+        .luarocks_tree(Some(TempDir::new().unwrap().path().into()))
         .build()
         .unwrap();
     let luarocks = LuaRocksInstallation::new(&config).unwrap();

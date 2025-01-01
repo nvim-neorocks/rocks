@@ -22,7 +22,8 @@ pub async fn info(data: Info, config: Config) -> Result<()> {
 
     let rockspec = Download::new(&data.package, &config, &bar)
         .download_rockspec()
-        .await?;
+        .await?
+        .rockspec;
 
     bar.map(|b| b.finish_and_clear());
 
