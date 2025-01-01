@@ -13,6 +13,7 @@ use crate::{
     package::{PackageReq, PackageVersionReq},
     progress::{MultiProgress, Progress},
     remote_package_db::RemotePackageDB,
+    remote_package_source::RemotePackageSource,
     rockspec::Rockspec,
 };
 
@@ -23,6 +24,7 @@ pub(crate) struct PackageInstallSpec {
     pub build_behaviour: BuildBehaviour,
     pub rockspec: Rockspec,
     pub spec: LocalPackageSpec,
+    pub source: RemotePackageSource,
 }
 
 #[async_recursion]
@@ -52,10 +54,11 @@ pub(crate) async fn get_all_dependencies(
                 tokio::spawn(async move {
                     let bar = progress.map(|p| p.new_bar());
 
-                    let rockspec = Download::new(&package, &config, &bar)
+                    let rockspec_download = Download::new(&package, &config, &bar)
                         .package_db(&package_db)
                         .download_rockspec()
                         .await?;
+                    let rockspec = rockspec_download.rockspec;
 
                     let constraint =
                         if *package.version_req() == PackageVersionReq::SemVer(VersionReq::STAR) {
@@ -95,6 +98,7 @@ pub(crate) async fn get_all_dependencies(
                         build_behaviour,
                         spec: local_spec.clone(),
                         rockspec,
+                        source: rockspec_download.source,
                     };
 
                     tx.send(install_spec).unwrap();
