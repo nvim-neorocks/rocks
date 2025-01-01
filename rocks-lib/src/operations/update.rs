@@ -11,7 +11,7 @@ use crate::{
     remote_package_db::RemotePackageDB,
 };
 
-use super::{install, remove, InstallError, RemoveError};
+use super::{remove, Install, InstallError, RemoveError};
 
 #[derive(Error, Debug)]
 pub enum UpdateError {
@@ -34,7 +34,7 @@ pub enum UpdateError {
 pub async fn update(
     package: LocalPackage,
     constraint: PackageReq,
-    package_db: &RemotePackageDB,
+    package_db: RemotePackageDB,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), UpdateError> {
@@ -42,7 +42,7 @@ pub async fn update(
 
     let latest_version = package
         .to_package()
-        .has_update_with(&constraint, package_db)?;
+        .has_update_with(&constraint, &package_db)?;
 
     if latest_version.is_some() && package.pinned() == PinnedState::Unpinned {
         // TODO(vhyrro): There's a slight dissonance in the API here.
@@ -51,18 +51,16 @@ pub async fn update(
         // which would then allow us to just pass a `ProgressBar` instead.
 
         // Install the newest package.
-        install(
-            vec![(BuildBehaviour::NoForce, constraint)],
-            PinnedState::Unpinned,
-            package_db,
-            config,
-            progress,
-        )
-        .await
-        .map_err(|error| UpdateError::Install {
-            error,
-            package: package.to_package(),
-        })?;
+        Install::new(config)
+            .package(BuildBehaviour::NoForce, constraint)
+            .package_db(package_db)
+            .progress(progress)
+            .install()
+            .await
+            .map_err(|error| UpdateError::Install {
+                error,
+                package: package.to_package(),
+            })?;
 
         // Remove the old package
         remove(package.clone(), config, &bar)
