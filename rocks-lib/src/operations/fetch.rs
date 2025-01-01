@@ -18,6 +18,7 @@ use crate::package::PackageSpec;
 use crate::package::RemotePackage;
 use crate::progress::Progress;
 use crate::progress::ProgressBar;
+use crate::remote_package_source::RemotePackageSource;
 use crate::{rockspec::RockSource, rockspec::RockSourceSpec};
 
 use super::DownloadSrcRockError;
@@ -140,7 +141,8 @@ pub async fn fetch_src_rock(
     config: &Config,
     progress: &Progress<ProgressBar>,
 ) -> Result<(), FetchSrcRockError> {
-    let remote_package = RemotePackage::new(package.clone(), config.server().clone());
+    let source = RemotePackageSource::LuarocksServer(config.server().clone());
+    let remote_package = RemotePackage::new(package.clone(), source);
     let src_rock = operations::download_src_rock(&remote_package, progress).await?;
     let cursor = Cursor::new(src_rock.bytes);
     let mime_type = infer::get(cursor.get_ref()).map(|file_type| file_type.mime_type());
