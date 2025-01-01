@@ -3,19 +3,16 @@ use std::{io, process::Command, sync::Arc};
 use crate::{
     build::BuildBehaviour,
     config::Config,
-    lockfile::PinnedState,
     package::{PackageName, PackageReq, PackageVersionReqError},
     path::Paths,
     progress::{MultiProgress, Progress},
     project::Project,
-    remote_package_db::RemotePackageDB,
     rockspec::Rockspec,
     tree::Tree,
 };
-use itertools::Itertools;
 use thiserror::Error;
 
-use super::{install, InstallError};
+use super::{Install, InstallError};
 
 pub enum TestEnv {
     Pure,
@@ -101,21 +98,17 @@ pub enum InstallTestDependenciesError {
 /// This defaults to the local project tree if cwd is a project root.
 pub async fn ensure_busted(
     tree: &Tree,
-    package_db: &RemotePackageDB,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), InstallTestDependenciesError> {
     let busted_req = PackageReq::new("busted".into(), None)?;
 
     if tree.has_rock(&busted_req).is_none() {
-        install(
-            vec![(BuildBehaviour::NoForce, busted_req)],
-            PinnedState::Unpinned,
-            package_db,
-            config,
-            progress,
-        )
-        .await?;
+        Install::new(config)
+            .package(BuildBehaviour::NoForce, busted_req)
+            .progress(progress)
+            .install()
+            .await?;
     }
 
     Ok(())
@@ -126,7 +119,6 @@ pub async fn ensure_busted(
 pub async fn ensure_dependencies(
     rockspec: &Rockspec,
     tree: &Tree,
-    package_db: &RemotePackageDB,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), InstallTestDependenciesError> {
@@ -143,17 +135,13 @@ pub async fn ensure_dependencies(
                 None
             };
             build_behaviour.map(|it| (it, req.to_owned()))
-        })
-        .collect_vec();
+        });
 
-    install(
-        dependencies,
-        PinnedState::Unpinned,
-        package_db,
-        config,
-        progress,
-    )
-    .await?;
+    Install::new(config)
+        .packages(dependencies)
+        .progress(progress)
+        .install()
+        .await?;
 
     Ok(())
 }

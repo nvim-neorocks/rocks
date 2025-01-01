@@ -9,7 +9,7 @@ use crate::{
     },
     package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress, ProgressBar},
-    remote_package_db::RemotePackageDB,
+    remote_package_db::{RemotePackageDB, RemotePackageDBError},
     rockspec::{BuildBackendSpec, LuaVersionError},
     tree::Tree,
 };
@@ -19,6 +19,81 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use super::{resolve::get_all_dependencies, SearchAndDownloadError};
+
+/// A rocks package installer, providing fine-grained control
+/// over how packages should be installed.
+/// Can install multiple packages in parallel.
+pub struct Install<'a> {
+    config: &'a Config,
+    package_db: Option<RemotePackageDB>,
+    packages: Vec<(BuildBehaviour, PackageReq)>,
+    pin: PinnedState,
+    progress: Option<Arc<Progress<MultiProgress>>>,
+}
+
+impl<'a> Install<'a> {
+    /// Construct a new installer.
+    pub fn new(config: &'a Config) -> Self {
+        Self {
+            config,
+            package_db: None,
+            packages: Vec::new(),
+            pin: PinnedState::default(),
+            progress: None,
+        }
+    }
+
+    /// Sets the package database to use for searching for packages.
+    /// Instantiated from the config if not set.
+    pub fn package_db(self, package_db: RemotePackageDB) -> Self {
+        Self {
+            package_db: Some(package_db),
+            ..self
+        }
+    }
+
+    /// Specify packages to install, along with each package's build behaviour.
+    pub fn packages<I>(self, packages: I) -> Self
+    where
+        I: IntoIterator<Item = (BuildBehaviour, PackageReq)>,
+    {
+        Self {
+            packages: self.packages.into_iter().chain(packages).collect_vec(),
+            ..self
+        }
+    }
+
+    /// Add a package to the set of packages to install.
+    pub fn package(self, behaviour: BuildBehaviour, package: PackageReq) -> Self {
+        self.packages(std::iter::once((behaviour, package)))
+    }
+
+    pub fn pin(self, pin: PinnedState) -> Self {
+        Self { pin, ..self }
+    }
+
+    /// Pass a `MultiProgress` to this installer.
+    /// By default, a new one will be created.
+    pub fn progress(self, progress: Arc<Progress<MultiProgress>>) -> Self {
+        Self {
+            progress: Some(progress),
+            ..self
+        }
+    }
+
+    /// Install the packages.
+    pub async fn install(self) -> Result<Vec<LocalPackage>, InstallError> {
+        let package_db = match self.package_db {
+            Some(db) => db,
+            None => RemotePackageDB::from_config(self.config).await?,
+        };
+        let progress = match self.progress {
+            Some(p) => p,
+            None => MultiProgress::new_arc(),
+        };
+        install(self.packages, self.pin, package_db, self.config, progress).await
+    }
+}
 
 #[derive(Error, Debug)]
 pub enum InstallError {
@@ -38,12 +113,14 @@ pub enum InstallError {
     InstallBuildDependenciesError(#[from] InstallBuildDependenciesError),
     #[error("failed to build {0}: {1}")]
     BuildError(PackageName, BuildError),
+    #[error("error initialising remote package DB: {0}")]
+    RemotePackageDB(#[from] RemotePackageDBError),
 }
 
-pub async fn install(
+async fn install(
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
-    package_db: &RemotePackageDB,
+    package_db: RemotePackageDB,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, InstallError>
@@ -52,15 +129,7 @@ where
     let lua_version = LuaVersion::from(config)?;
     let tree = Tree::new(config.tree().clone(), lua_version)?;
     let mut lockfile = tree.lockfile()?;
-    let result = install_impl(
-        packages,
-        pin,
-        package_db.clone(),
-        config,
-        &mut lockfile,
-        progress,
-    )
-    .await;
+    let result = install_impl(packages, pin, package_db, config, &mut lockfile, progress).await;
     lockfile.flush()?;
     result
 }
