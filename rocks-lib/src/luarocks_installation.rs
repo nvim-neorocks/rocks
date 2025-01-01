@@ -11,7 +11,7 @@ use tempdir::TempDir;
 use thiserror::Error;
 
 use crate::{
-    build::{build, BuildBehaviour, BuildError},
+    build::{Build, BuildBehaviour, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{LocalPackage, LocalPackageId, LockConstraint, PinnedState},
     lua_installation::LuaInstallation,
@@ -104,15 +104,12 @@ impl LuaRocksInstallation {
             PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into())).unwrap();
         if self.tree.has_rock(&luarocks_req).is_none() {
             let rockspec = Rockspec::new(LUAROCKS_ROCKSPEC).unwrap();
-            let pkg = build(
-                rockspec,
-                PinnedState::Unpinned,
-                LockConstraint::Constrained(luarocks_req.version_req().clone()),
-                BuildBehaviour::NoForce,
-                &self.config,
-                progress,
-            )
-            .await?;
+            let pkg = Build::new(rockspec, &self.config, progress)
+                .constraint(LockConstraint::Constrained(
+                    luarocks_req.version_req().clone(),
+                ))
+                .build()
+                .await?;
             lockfile.add(&pkg);
         }
         lockfile.flush()?;
@@ -174,15 +171,11 @@ impl LuaRocksInstallation {
             let config = self.config.clone();
             tokio::spawn(async move {
                 let rockspec = install_spec.rockspec;
-                let pkg = crate::build::build(
-                    rockspec,
-                    pin,
-                    install_spec.spec.constraint(),
-                    install_spec.build_behaviour,
-                    &config,
-                    &bar,
-                )
-                .await?;
+                let pkg = Build::new(rockspec, &config, &bar)
+                    .constraint(install_spec.spec.constraint())
+                    .behaviour(install_spec.build_behaviour)
+                    .build()
+                    .await?;
 
                 bar.map(|b| b.finish_and_clear());
 

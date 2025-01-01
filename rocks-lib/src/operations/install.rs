@@ -1,7 +1,7 @@
 use std::{collections::HashMap, io, sync::Arc};
 
 use crate::{
-    build::{BuildBehaviour, BuildError},
+    build::{Build, BuildBehaviour, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{LocalPackage, LocalPackageId, Lockfile, PinnedState},
     luarocks_installation::{
@@ -117,16 +117,13 @@ async fn install_impl(
                     .await?;
             }
 
-            let pkg = crate::build::build(
-                rockspec,
-                pin,
-                install_spec.spec.constraint(),
-                install_spec.build_behaviour,
-                &config,
-                &bar,
-            )
-            .await
-            .map_err(|err| InstallError::BuildError(package, err))?;
+            let pkg = Build::new(rockspec, &config, &bar)
+                .pin(pin)
+                .constraint(install_spec.spec.constraint())
+                .behaviour(install_spec.build_behaviour)
+                .build()
+                .await
+                .map_err(|err| InstallError::BuildError(package, err))?;
 
             bar.map(|b| b.finish_and_clear());
 
