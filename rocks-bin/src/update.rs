@@ -27,7 +27,7 @@ pub async fn update(config: Config) -> Result<()> {
                     package.name().to_string(),
                     package.constraint().to_string_opt(),
                 )?,
-                &package_db,
+                package_db.clone(),
                 &config,
                 progress.clone(),
             )

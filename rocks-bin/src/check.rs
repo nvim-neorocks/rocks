@@ -3,25 +3,20 @@ use rocks_lib::{
     build::BuildBehaviour,
     config::{Config, LuaVersion},
     lockfile::PinnedState::Pinned,
-    operations::{self, install},
+    operations::{self, Install},
     progress::MultiProgress,
     project::Project,
-    remote_package_db::RemotePackageDB,
 };
 
 pub async fn check(config: Config) -> Result<()> {
     let project = Project::current()?.ok_or_eyre("Not in a project!")?;
 
-    let db = RemotePackageDB::from_config(&config).await?;
-
-    install(
-        vec![(BuildBehaviour::NoForce, "luacheck".parse()?)],
-        Pinned,
-        &db,
-        &config,
-        MultiProgress::new_arc(),
-    )
-    .await?;
+    Install::new(&config)
+        .package(BuildBehaviour::NoForce, "luacheck".parse()?)
+        .pin(Pinned)
+        .progress(MultiProgress::new_arc())
+        .install()
+        .await?;
 
     operations::run(
         "luacheck",

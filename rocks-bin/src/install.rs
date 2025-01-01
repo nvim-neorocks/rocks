@@ -1,13 +1,12 @@
 use eyre::Result;
 use inquire::Confirm;
-use itertools::Itertools;
 use rocks_lib::{
     build::BuildBehaviour,
     config::{Config, LuaVersion},
     lockfile::PinnedState,
+    operations,
     package::PackageReq,
     progress::MultiProgress,
-    remote_package_db::RemotePackageDB,
     tree::Tree,
 };
 
@@ -31,40 +30,32 @@ pub async fn install(data: Install, config: Config) -> Result<()> {
     let lua_version = LuaVersion::from(&config)?;
     let tree = Tree::new(config.tree().clone(), lua_version)?;
 
-    let packages = data
-        .package_req
-        .into_iter()
-        .filter_map(|req| {
-            let build_behaviour: Option<BuildBehaviour> =
-                match tree.has_rock_and(&req, |rock| pin == rock.pinned()) {
-                    Some(_) if !data.force => {
-                        if Confirm::new(&format!("Package {} already exists. Overwrite?", req))
-                            .with_default(false)
-                            .prompt()
-                            .expect("Error prompting for reinstall")
-                        {
-                            Some(BuildBehaviour::Force)
-                        } else {
-                            None
-                        }
+    let packages = data.package_req.into_iter().filter_map(|req| {
+        let build_behaviour: Option<BuildBehaviour> =
+            match tree.has_rock_and(&req, |rock| pin == rock.pinned()) {
+                Some(_) if !data.force => {
+                    if Confirm::new(&format!("Package {} already exists. Overwrite?", req))
+                        .with_default(false)
+                        .prompt()
+                        .expect("Error prompting for reinstall")
+                    {
+                        Some(BuildBehaviour::Force)
+                    } else {
+                        None
                     }
-                    _ => Some(BuildBehaviour::from(data.force)),
-                };
-            build_behaviour.map(|it| (it, req))
-        })
-        .collect_vec();
-
-    let package_db = RemotePackageDB::from_config(&config).await?;
+                }
+                _ => Some(BuildBehaviour::from(data.force)),
+            };
+        build_behaviour.map(|it| (it, req))
+    });
 
     // TODO(vhyrro): If the tree doesn't exist then error out.
-    rocks_lib::operations::install(
-        packages,
-        pin,
-        &package_db,
-        &config,
-        MultiProgress::new_arc(),
-    )
-    .await?;
+    operations::Install::new(&config)
+        .packages(packages)
+        .pin(pin)
+        .progress(MultiProgress::new_arc())
+        .install()
+        .await?;
 
     Ok(())
 }

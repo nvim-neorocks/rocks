@@ -5,7 +5,6 @@ use rocks_lib::{
     operations::{ensure_busted, run_tests, TestEnv},
     progress::MultiProgress,
     project::Project,
-    remote_package_db::RemotePackageDB,
     tree::Tree,
 };
 
@@ -18,8 +17,7 @@ async fn run_busted_test() {
     let _ = std::fs::remove_dir_all(&tree_root);
     let config = ConfigBuilder::new().tree(Some(tree_root)).build().unwrap();
     let tree = Tree::new(config.tree().clone(), config.lua_version().unwrap().clone()).unwrap();
-    let package_db = RemotePackageDB::from_config(&config).await.unwrap();
-    ensure_busted(&tree, &package_db, &config, MultiProgress::new_arc())
+    ensure_busted(&tree, &config, MultiProgress::new_arc())
         .await
         .unwrap();
     run_tests(project, Vec::new(), TestEnv::Pure, config)
