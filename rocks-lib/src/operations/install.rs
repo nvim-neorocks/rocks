@@ -190,6 +190,7 @@ async fn install_impl(
                 .pin(pin)
                 .constraint(install_spec.spec.constraint())
                 .behaviour(install_spec.build_behaviour)
+                .source(install_spec.source)
                 .build()
                 .await
                 .map_err(|err| InstallError::BuildError(package, err))?;
