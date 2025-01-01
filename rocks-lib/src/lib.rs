@@ -15,6 +15,8 @@ pub mod rockspec;
 pub mod tree;
 pub mod upload;
 
+pub(crate) mod remote_package_source;
+
 /// An internal string describing the server-side API version that we support.
 /// Whenever we connect to a server (like `luarocks.org`), we ensure that these
 /// two versions match (meaning we can safely communicate with the server).

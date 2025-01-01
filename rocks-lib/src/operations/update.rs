@@ -131,7 +131,7 @@ async fn update(
             .install()
             .await?;
         Remove::new(config)
-            .packages(packages.into_iter().map(|package| package.0))
+            .packages(packages.into_iter().map(|package| package.0.id()))
             .progress(progress)
             .remove()
             .await?;
