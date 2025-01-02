@@ -26,7 +26,7 @@ pub async fn info(data: Info, config: Config) -> Result<()> {
 
     bar.map(|b| b.finish_and_clear());
 
-    if tree.has_rock(&data.package).is_some() {
+    if tree.match_rocks(&data.package)?.is_found() {
         println!("Currently installed in {}", tree.root().display());
     }
 

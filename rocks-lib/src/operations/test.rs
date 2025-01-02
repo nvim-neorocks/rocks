@@ -92,6 +92,8 @@ where
 #[derive(Error, Debug)]
 pub enum InstallTestDependenciesError {
     #[error(transparent)]
+    IoError(#[from] io::Error),
+    #[error(transparent)]
     InstallError(#[from] InstallError),
     #[error(transparent)]
     PackageVersionReqError(#[from] PackageVersionReqError),
@@ -107,7 +109,7 @@ pub async fn ensure_busted(
 ) -> Result<(), InstallTestDependenciesError> {
     let busted_req = PackageReq::new("busted".into(), None)?;
 
-    if tree.has_rock(&busted_req).is_none() {
+    if !tree.match_rocks(&busted_req)?.is_found() {
         install(
             vec![(BuildBehaviour::NoForce, busted_req)],
             PinnedState::Unpinned,
@@ -137,7 +139,10 @@ pub async fn ensure_dependencies(
         .chain(rockspec.dependencies.current_platform())
         .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
         .filter_map(|req| {
-            let build_behaviour = if tree.has_rock(req).is_some() {
+            let build_behaviour = if tree
+                .match_rocks(req)
+                .is_ok_and(|matches| matches.is_found())
+            {
                 Some(BuildBehaviour::Force)
             } else {
                 None
