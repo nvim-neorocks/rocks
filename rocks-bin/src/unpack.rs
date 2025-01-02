@@ -4,9 +4,9 @@ use clap::Args;
 use eyre::Result;
 use rocks_lib::{
     config::Config,
+    operations,
     package::PackageReq,
     progress::{MultiProgress, Progress},
-    remote_package_db::RemotePackageDB,
 };
 
 #[derive(Args)]
@@ -49,10 +49,10 @@ and type `rocks make` to build.",
 
 pub async fn unpack_remote(data: UnpackRemote, config: Config) -> Result<()> {
     let package_req = data.package_req;
-    let package_db = RemotePackageDB::from_config(&config).await?;
     let progress = MultiProgress::new();
     let bar = Progress::Progress(progress.new_bar());
-    let rock = rocks_lib::operations::search_and_download_src_rock(&package_req, &package_db, &bar)
+    let rock = operations::Download::new(&package_req, &config, &bar)
+        .search_and_download_src_rock()
         .await?;
     let cursor = Cursor::new(rock.bytes);
 
