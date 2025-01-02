@@ -5,7 +5,6 @@ use rocks_lib::{
     operations::{ensure_busted, ensure_dependencies, run_tests, TestEnv},
     progress::MultiProgress,
     project::Project,
-    remote_package_db::RemotePackageDB,
     tree::Tree,
 };
 
@@ -26,7 +25,6 @@ pub async fn test(test: Test, config: Config) -> Result<()> {
         Ok(lua_version) => Ok(lua_version),
         Err(_) => rockspec.test_lua_version().ok_or_eyre("lua version not set! Please provide a version through `--lua-version <ver>` or add it to your rockspec's dependencies"),
     }?;
-    let package_db = RemotePackageDB::from_config(&config).await?;
     let test_config = config.with_lua_version(lua_version);
     let tree = Tree::new(
         test_config.tree().clone(),
@@ -34,8 +32,8 @@ pub async fn test(test: Test, config: Config) -> Result<()> {
     )?;
     let progress = MultiProgress::new_arc();
     // TODO(#204): Only ensure busted if running with busted (e.g. a .busted directory exists)
-    ensure_busted(&tree, &package_db, &test_config, progress.clone()).await?;
-    ensure_dependencies(rockspec, &tree, &package_db, &test_config, progress).await?;
+    ensure_busted(&tree, &test_config, progress.clone()).await?;
+    ensure_dependencies(rockspec, &tree, &test_config, progress).await?;
     let test_args = test.test_args.unwrap_or_default();
     let test_env = if test.impure {
         TestEnv::Impure

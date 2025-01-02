@@ -3,11 +3,10 @@ use std::{io, process::Command};
 use crate::{
     build::BuildBehaviour,
     config::{Config, LuaVersion, LuaVersionUnset},
-    lockfile::PinnedState,
+    operations::Install,
     package::{PackageReq, PackageVersionReqError},
     path::Paths,
-    progress::MultiProgress,
-    remote_package_db::{RemotePackageDB, RemotePackageDBError},
+    remote_package_db::RemotePackageDBError,
     tree::Tree,
 };
 use thiserror::Error;
@@ -59,14 +58,9 @@ pub enum InstallCmdError {
 /// This defaults to the local project tree if cwd is a project root.
 pub async fn install_command(command: &str, config: &Config) -> Result<(), InstallCmdError> {
     let package_req = PackageReq::new(command.into(), None)?;
-    let package_db = RemotePackageDB::from_config(config).await?;
-    super::install(
-        vec![(BuildBehaviour::NoForce, package_req)],
-        PinnedState::Unpinned,
-        &package_db,
-        config,
-        MultiProgress::new_arc(),
-    )
-    .await?;
+    Install::new(config)
+        .package(BuildBehaviour::NoForce, package_req)
+        .install()
+        .await?;
     Ok(())
 }
