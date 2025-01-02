@@ -9,9 +9,50 @@ use crate::{
     remote_package_db::RemotePackageDBError,
     tree::Tree,
 };
+use itertools::Itertools;
 use thiserror::Error;
 
 use super::InstallError;
+
+/// Rocks package runner, providing fine-grained control
+/// over how a package should be run.
+pub struct Run<'a> {
+    command: String,
+    args: Vec<String>,
+    config: &'a Config,
+}
+
+impl<'a> Run<'a> {
+    /// Construct a new runner.
+    pub fn new(command: &str, config: &'a Config) -> Self {
+        Self {
+            command: command.into(),
+            args: Vec::new(),
+            config,
+        }
+    }
+
+    /// Specify packages to install, along with each package's build behaviour.
+    pub fn args<I>(self, args: I) -> Self
+    where
+        I: IntoIterator<Item = String>,
+    {
+        Self {
+            args: self.args.into_iter().chain(args).collect_vec(),
+            ..self
+        }
+    }
+
+    /// Add a package to the set of packages to install.
+    pub fn arg(self, arg: &str) -> Self {
+        self.args(std::iter::once(arg.into()))
+    }
+
+    /// Run the package.
+    pub async fn run(self) -> Result<(), RunError> {
+        run(&self.command, self.args, self.config).await
+    }
+}
 
 #[derive(Error, Debug)]
 pub enum RunError {
@@ -25,8 +66,8 @@ pub enum RunError {
     Io(#[from] io::Error),
 }
 
-pub async fn run(command: &str, args: Vec<String>, config: Config) -> Result<(), RunError> {
-    let lua_version = LuaVersion::from(&config)?;
+async fn run(command: &str, args: Vec<String>, config: &Config) -> Result<(), RunError> {
+    let lua_version = LuaVersion::from(config)?;
     let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
     let paths = Paths::from_tree(tree)?;
     let status = match Command::new(command)
