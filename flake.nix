@@ -63,6 +63,7 @@
               buildInputs =
                 (with pkgs; [
                   rust-analyzer
+                  ra-multiplex
                   cargo-nextest
                   lua_pkg
                   # Needed for integration test builds
