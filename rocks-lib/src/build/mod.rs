@@ -34,6 +34,63 @@ mod rust_mlua;
 pub mod external_dependency;
 pub mod variables;
 
+/// A rocks package builder, providing fine-grained control
+/// over how a package should be built.
+pub struct Build<'a> {
+    rockspec: Rockspec,
+    config: &'a Config,
+    progress: &'a Progress<ProgressBar>,
+    pin: PinnedState,
+    constraint: LockConstraint,
+    behaviour: BuildBehaviour,
+}
+
+impl<'a> Build<'a> {
+    /// Construct a new builder.
+    pub fn new(
+        rockspec: Rockspec,
+        config: &'a Config,
+        progress: &'a Progress<ProgressBar>,
+    ) -> Self {
+        Self {
+            rockspec,
+            config,
+            progress,
+            pin: PinnedState::default(),
+            constraint: LockConstraint::default(),
+            behaviour: BuildBehaviour::default(),
+        }
+    }
+
+    /// Sets the pinned state of the package to be built.
+    pub fn pin(self, pin: PinnedState) -> Self {
+        Self { pin, ..self }
+    }
+
+    /// Sets the lock constraint of the package to be built.
+    pub fn constraint(self, constraint: LockConstraint) -> Self {
+        Self { constraint, ..self }
+    }
+
+    /// Sets the build behaviour of the package to be built.
+    pub fn behaviour(self, behaviour: BuildBehaviour) -> Self {
+        Self { behaviour, ..self }
+    }
+
+    /// Builds the package.
+    pub async fn build(self) -> Result<LocalPackage, BuildError> {
+        build(
+            self.rockspec,
+            self.pin,
+            self.constraint,
+            self.behaviour,
+            self.config,
+            self.progress,
+        )
+        .await
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum BuildError {
     #[error("IO operation failed: {0}")]
@@ -75,6 +132,12 @@ pub enum BuildError {
 pub enum BuildBehaviour {
     NoForce,
     Force,
+}
+
+impl Default for BuildBehaviour {
+    fn default() -> Self {
+        Self::NoForce
+    }
 }
 
 impl From<bool> for BuildBehaviour {
@@ -184,7 +247,7 @@ async fn install(
     Ok(())
 }
 
-pub async fn build(
+async fn build(
     rockspec: Rockspec,
     pinned: PinnedState,
     constraint: LockConstraint,

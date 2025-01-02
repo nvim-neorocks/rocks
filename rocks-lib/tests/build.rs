@@ -1,9 +1,8 @@
 use std::path::PathBuf;
 
 use rocks_lib::{
-    build::{self, BuildBehaviour::Force},
+    build::{Build, BuildBehaviour::Force},
     config::{ConfigBuilder, LuaVersion},
-    lockfile::{LockConstraint::Unconstrained, PinnedState::Unpinned},
     progress::{MultiProgress, Progress},
     rockspec::Rockspec,
 };
@@ -26,16 +25,11 @@ async fn builtin_build() {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    build::build(
-        rockspec,
-        Unpinned,
-        Unconstrained,
-        Force,
-        &config,
-        &Progress::Progress(bar),
-    )
-    .await
-    .unwrap();
+    Build::new(rockspec, &config, &Progress::Progress(bar))
+        .behaviour(Force)
+        .build()
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -56,16 +50,11 @@ async fn make_build() {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    build::build(
-        rockspec,
-        Unpinned,
-        Unconstrained,
-        Force,
-        &config,
-        &Progress::Progress(bar),
-    )
-    .await
-    .unwrap();
+    Build::new(rockspec, &config, &Progress::Progress(bar))
+        .behaviour(Force)
+        .build()
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -98,14 +87,9 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    build::build(
-        rockspec,
-        Unpinned,
-        Unconstrained,
-        Force,
-        &config,
-        &Progress::Progress(bar),
-    )
-    .await
-    .unwrap();
+    Build::new(rockspec, &config, &Progress::Progress(bar))
+        .behaviour(Force)
+        .build()
+        .await
+        .unwrap();
 }

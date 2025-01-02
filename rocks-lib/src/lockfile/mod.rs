@@ -21,6 +21,12 @@ pub enum PinnedState {
     Pinned,
 }
 
+impl Default for PinnedState {
+    fn default() -> Self {
+        Self::Unpinned
+    }
+}
+
 impl From<bool> for PinnedState {
     fn from(value: bool) -> Self {
         if value {
@@ -355,6 +361,12 @@ impl mlua::UserData for LocalPackageHashes {
 pub enum LockConstraint {
     Unconstrained,
     Constrained(PackageVersionReq),
+}
+
+impl Default for LockConstraint {
+    fn default() -> Self {
+        Self::Unconstrained
+    }
 }
 
 impl LockConstraint {

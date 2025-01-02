@@ -6,9 +6,9 @@ use std::{path::PathBuf, sync::Arc};
 use clap::Args;
 use eyre::Result;
 use rocks_lib::{
-    build::BuildBehaviour,
+    build::{self, BuildBehaviour},
     config::Config,
-    lockfile::{LockConstraint::Unconstrained, PinnedState},
+    lockfile::PinnedState,
     package::{PackageName, PackageReq},
     progress::MultiProgress,
     remote_package_db::RemotePackageDB,
@@ -120,15 +120,11 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     )
     .await?;
 
-    rocks_lib::build::build(
-        rockspec,
-        pin,
-        Unconstrained,
-        build_behaviour,
-        &config,
-        &progress.map(|p| p.new_bar()),
-    )
-    .await?;
+    build::Build::new(rockspec, &config, &progress.map(|p| p.new_bar()))
+        .pin(pin)
+        .behaviour(build_behaviour)
+        .build()
+        .await?;
 
     Ok(())
 }
