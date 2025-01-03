@@ -12,6 +12,49 @@ use serde::Deserialize;
 use serde_enum_str::Serialize_enum_str;
 use thiserror::Error;
 
+/// A rocks package uploader, providing fine-grained control
+/// over how a package should be uploaded.
+pub struct ProjectUpload<'a> {
+    project: Project,
+    api_key: Option<ApiKey>,
+    sign_protocol: SignatureProtocol,
+    config: &'a Config,
+}
+
+impl<'a> ProjectUpload<'a> {
+    /// Construct a new package uploader.
+    pub fn new(project: Project, config: &'a Config) -> Self {
+        Self {
+            project,
+            api_key: None,
+            sign_protocol: SignatureProtocol::default(),
+            config,
+        }
+    }
+
+    /// Set the luarocks API key.
+    pub fn api_key(self, api_key: ApiKey) -> Self {
+        Self {
+            api_key: Some(api_key),
+            ..self
+        }
+    }
+
+    /// Set the signature protocol.
+    pub fn sign_protocol(self, sign_protocol: SignatureProtocol) -> Self {
+        Self {
+            sign_protocol,
+            ..self
+        }
+    }
+
+    /// Upload a package to a luarocks server.
+    pub async fn upload_to_luarocks(self) -> Result<(), UploadError> {
+        let api_key = self.api_key.unwrap_or(ApiKey::new()?);
+        upload_from_project(&self.project, &api_key, self.sign_protocol, self.config).await
+    }
+}
+
 #[derive(Deserialize, Debug)]
 pub struct VersionCheckResponse {
     version: String,
@@ -51,6 +94,7 @@ pub enum UploadError {
     Signature(#[from] gpgme::Error),
     ToolCheck(#[from] ToolCheckError),
     UserCheck(#[from] UserCheckError),
+    ApiKayUnspecified(#[from] ApiKeyUnspecified),
 }
 
 pub struct ApiKey(String);
@@ -125,7 +169,7 @@ impl From<SignatureProtocol> for gpgme::Protocol {
     }
 }
 
-pub async fn upload_from_project(
+async fn upload_from_project(
     project: &Project,
     api_key: &ApiKey,
     protocol: SignatureProtocol,

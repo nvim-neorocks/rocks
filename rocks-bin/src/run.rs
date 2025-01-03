@@ -39,7 +39,9 @@ pub async fn run(run: Run, config: Config) -> Result<()> {
             None => install_command(&run.command, &config).await?,
         }
     };
-    let args = run.args.unwrap_or_default();
-    operations::run(&run.command, args, config).await?;
+    operations::Run::new(&run.command, &config)
+        .args(run.args.unwrap_or_default())
+        .run()
+        .await?;
     Ok(())
 }

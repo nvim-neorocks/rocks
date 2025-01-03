@@ -3,7 +3,7 @@ use eyre::Result;
 use rocks_lib::{
     config::Config,
     project::Project,
-    upload::{upload_from_project, ApiKey, SignatureProtocol},
+    upload::{ProjectUpload, SignatureProtocol},
 };
 
 #[derive(Args)]
@@ -15,7 +15,10 @@ pub struct Upload {
 pub async fn upload(data: Upload, config: Config) -> Result<()> {
     let project = Project::current()?.unwrap();
 
-    upload_from_project(&project, &ApiKey::new()?, data.sign_protocol, &config).await?;
+    ProjectUpload::new(project, &config)
+        .sign_protocol(data.sign_protocol)
+        .upload_to_luarocks()
+        .await?;
 
     Ok(())
 }
