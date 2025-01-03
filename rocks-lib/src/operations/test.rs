@@ -10,17 +10,91 @@ use crate::{
     rockspec::Rockspec,
     tree::Tree,
 };
+use itertools::Itertools;
 use thiserror::Error;
 
 use super::{Install, InstallError};
 
+pub struct Test<'a> {
+    project: Project,
+    config: &'a Config,
+    args: Vec<String>,
+    env: TestEnv,
+    progress: Option<Arc<Progress<MultiProgress>>>,
+}
+
+/// A rocks project test runner, providing fine-grained control
+/// over how tests should be run.
+impl<'a> Test<'a> {
+    /// Construct a new test runner.
+    pub fn new(project: Project, config: &'a Config) -> Self {
+        Self {
+            project,
+            config,
+            args: Vec::new(),
+            env: TestEnv::default(),
+            progress: None,
+        }
+    }
+
+    /// Pass arguments to the test executable.
+    pub fn args<I>(self, args: I) -> Self
+    where
+        I: IntoIterator<Item = String> + Send,
+    {
+        Self {
+            args: self.args.into_iter().chain(args).collect_vec(),
+            ..self
+        }
+    }
+
+    /// Pass an argument to the test executable.
+    pub fn arg(self, arg: String) -> Self {
+        self.args(std::iter::once(arg))
+    }
+
+    /// Define the environment in which to run the tests.
+    pub fn env(self, env: TestEnv) -> Self {
+        Self { env, ..self }
+    }
+
+    /// Pass a `MultiProgress` to this runner.
+    /// By default, a new one will be created.
+    pub fn progress(self, progress: Arc<Progress<MultiProgress>>) -> Self {
+        Self {
+            progress: Some(progress),
+            ..self
+        }
+    }
+
+    /// Run the test suite
+    pub async fn run(self) -> Result<(), RunTestsError> {
+        let progress = match self.progress {
+            Some(p) => p,
+            None => MultiProgress::new_arc(),
+        };
+        run_tests(self.project, self.args, self.env, self.config, progress).await
+    }
+}
+
 pub enum TestEnv {
+    /// An environment that is isolated from `HOME` and `XDG` base directories (default).
     Pure,
+    /// An impure environment in which `HOME` and `XDG` base directories can influence
+    /// the test results.
     Impure,
+}
+
+impl Default for TestEnv {
+    fn default() -> Self {
+        Self::Pure
+    }
 }
 
 #[derive(Error, Debug)]
 pub enum RunTestsError {
+    #[error(transparent)]
+    InstallTestDependencies(#[from] InstallTestDependenciesError),
     #[error("tests failed!")]
     TestFailure,
     #[error("failed to execute `{0}`: {1}")]
@@ -31,23 +105,27 @@ pub enum RunTestsError {
     Io(#[from] io::Error),
 }
 
-pub async fn run_tests<I>(
+async fn run_tests<I>(
     project: Project,
     test_args: I,
     env: TestEnv,
-    config: Config,
+    config: &Config,
+    progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), RunTestsError>
 where
     I: IntoIterator<Item = String> + Send,
 {
     let rockspec = project.rockspec();
-    let lua_version = match rockspec.lua_version_from_config(&config) {
+    let lua_version = match rockspec.lua_version_from_config(config) {
         Ok(lua_version) => Ok(lua_version),
         Err(_) => rockspec
             .test_lua_version()
             .ok_or(RunTestsError::LuaVersionUnset),
     }?;
     let tree = Tree::new(config.tree().clone(), lua_version)?;
+    // TODO(#204): Only ensure busted if running with busted (e.g. a .busted directory exists)
+    ensure_busted(&tree, config, progress.clone()).await?;
+    ensure_dependencies(rockspec, &tree, config, progress).await?;
     let tree_root = &tree.root().clone();
     let paths = Paths::from_tree(tree)?;
     let mut command = Command::new("busted");
@@ -116,7 +194,7 @@ pub async fn ensure_busted(
 
 /// Ensure dependencies and test dependencies are installed
 /// This defaults to the local project tree if cwd is a project root.
-pub async fn ensure_dependencies(
+async fn ensure_dependencies(
     rockspec: &Rockspec,
     tree: &Tree,
     config: &Config,
