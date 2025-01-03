@@ -38,7 +38,7 @@ pub mod variables;
 /// A rocks package builder, providing fine-grained control
 /// over how a package should be built.
 pub struct Build<'a> {
-    rockspec: Rockspec,
+    rockspec: &'a Rockspec,
     config: &'a Config,
     progress: &'a Progress<ProgressBar>,
     pin: PinnedState,
@@ -50,7 +50,7 @@ pub struct Build<'a> {
 impl<'a> Build<'a> {
     /// Construct a new builder.
     pub fn new(
-        rockspec: Rockspec,
+        rockspec: &'a Rockspec,
         config: &'a Config,
         progress: &'a Progress<ProgressBar>,
     ) -> Self {
@@ -263,7 +263,7 @@ async fn install(
 }
 
 async fn build(
-    rockspec: Rockspec,
+    rockspec: &Rockspec,
     pinned: PinnedState,
     constraint: LockConstraint,
     behaviour: BuildBehaviour,
@@ -341,9 +341,9 @@ async fn build(
                 None => temp_dir.path().into(),
             };
 
-            run_build(&rockspec, &output_paths, &lua, config, &build_dir, progress).await?;
+            run_build(rockspec, &output_paths, &lua, config, &build_dir, progress).await?;
 
-            install(&rockspec, &tree, &output_paths, &lua, &build_dir, progress).await?;
+            install(rockspec, &tree, &output_paths, &lua, &build_dir, progress).await?;
 
             for directory in &rockspec.build.current_platform().copy_directories {
                 recursive_copy_dir(&build_dir.join(directory), &output_paths.etc)?;

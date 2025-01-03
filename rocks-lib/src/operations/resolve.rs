@@ -13,18 +13,15 @@ use crate::{
     package::{PackageReq, PackageVersionReq},
     progress::{MultiProgress, Progress},
     remote_package_db::RemotePackageDB,
-    remote_package_source::RemotePackageSource,
-    rockspec::Rockspec,
 };
 
-use super::{Download, SearchAndDownloadError};
+use super::{Download, RemoteRockDownload, SearchAndDownloadError};
 
 #[derive(Clone, Debug)]
 pub(crate) struct PackageInstallSpec {
     pub build_behaviour: BuildBehaviour,
-    pub rockspec: Rockspec,
+    pub downloaded_rock: RemoteRockDownload,
     pub spec: LocalPackageSpec,
-    pub source: RemotePackageSource,
 }
 
 #[async_recursion]
@@ -54,11 +51,10 @@ pub(crate) async fn get_all_dependencies(
                 tokio::spawn(async move {
                     let bar = progress.map(|p| p.new_bar());
 
-                    let rockspec_download = Download::new(&package, &config, &bar)
+                    let downloaded_rock = Download::new(&package, &config, &bar)
                         .package_db(&package_db)
-                        .download_rockspec()
+                        .download_remote_rock()
                         .await?;
-                    let rockspec = rockspec_download.rockspec;
 
                     let constraint =
                         if *package.version_req() == PackageVersionReq::SemVer(VersionReq::STAR) {
@@ -67,7 +63,8 @@ pub(crate) async fn get_all_dependencies(
                             LockConstraint::Constrained(package.version_req().clone())
                         };
 
-                    let dependencies = rockspec
+                    let dependencies = downloaded_rock
+                        .rockspec()
                         .dependencies
                         .current_platform()
                         .iter()
@@ -86,6 +83,7 @@ pub(crate) async fn get_all_dependencies(
                     )
                     .await?;
 
+                    let rockspec = downloaded_rock.rockspec();
                     let local_spec = LocalPackageSpec::new(
                         &rockspec.package,
                         &rockspec.version,
@@ -97,8 +95,7 @@ pub(crate) async fn get_all_dependencies(
                     let install_spec = PackageInstallSpec {
                         build_behaviour,
                         spec: local_spec.clone(),
-                        rockspec,
-                        source: rockspec_download.source,
+                        downloaded_rock,
                     };
 
                     tx.send(install_spec).unwrap();

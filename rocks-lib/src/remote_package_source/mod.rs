@@ -12,16 +12,39 @@ const PLUS: &str = "+";
 /// The source of a remote package.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub(crate) enum RemotePackageSource {
-    LuarocksServer(Url),
+    LuarocksRockspec(Url),
+    LuarocksSrcRock(Url),
+    LuarocksBinaryRock(Url),
     RockspecContent(String),
     #[cfg(test)]
     Test,
 }
 
+impl RemotePackageSource {
+    pub(crate) unsafe fn url(self) -> Url {
+        match self {
+            Self::LuarocksRockspec(url)
+            | Self::LuarocksSrcRock(url)
+            | Self::LuarocksBinaryRock(url) => url,
+            Self::RockspecContent(_) => panic!("tried to get URL from RockspecContent"),
+            #[cfg(test)]
+            Self::Test => unimplemented!(),
+        }
+    }
+}
+
 impl Display for RemotePackageSource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
-            RemotePackageSource::LuarocksServer(url) => format!("luarocks{}{}", PLUS, url).fmt(f),
+            RemotePackageSource::LuarocksRockspec(url) => {
+                format!("luarocks_rockspec{}{}", PLUS, url).fmt(f)
+            }
+            RemotePackageSource::LuarocksSrcRock(url) => {
+                format!("luarocks_src_rock{}{}", PLUS, url).fmt(f)
+            }
+            RemotePackageSource::LuarocksBinaryRock(url) => {
+                format!("luarocks_rock{}{}", PLUS, url).fmt(f)
+            }
             RemotePackageSource::RockspecContent(content) => {
                 format!("rockspec{}{}", PLUS, content).fmt(f)
             }
@@ -60,7 +83,15 @@ impl TryFrom<String> for RemotePackageSource {
             if let Some(str) = value.get(pos + 1..) {
                 let remote_source_type = value[..pos].into();
                 match remote_source_type {
-                    "luarocks" => Ok(RemotePackageSource::LuarocksServer(Url::parse(str)?)),
+                    "luarocks_rockspec" => {
+                        Ok(RemotePackageSource::LuarocksRockspec(Url::parse(str)?))
+                    }
+                    "luarocks_src_rock" => {
+                        Ok(RemotePackageSource::LuarocksSrcRock(Url::parse(str)?))
+                    }
+                    "luarocks_rock" => {
+                        Ok(RemotePackageSource::LuarocksBinaryRock(Url::parse(str)?))
+                    }
                     "rockspec" => Ok(RemotePackageSource::RockspecContent(str.into())),
                     _ => Err(RemotePackageSourceError::UnknownRemoteSourceType(
                         remote_source_type.into(),
@@ -101,8 +132,14 @@ source = {
 
     #[test]
     fn luarocks_source_roundtrip() {
-        let source =
-            RemotePackageSource::LuarocksServer(Url::parse("https://luarocks.org/").unwrap());
+        let url = Url::parse("https://luarocks.org/").unwrap();
+        let source = RemotePackageSource::LuarocksRockspec(url.clone());
+        let roundtripped = RemotePackageSource::try_from(format!("{}", source)).unwrap();
+        assert_eq!(source, roundtripped);
+        let source = RemotePackageSource::LuarocksSrcRock(url.clone());
+        let roundtripped = RemotePackageSource::try_from(format!("{}", source)).unwrap();
+        assert_eq!(source, roundtripped);
+        let source = RemotePackageSource::LuarocksBinaryRock(url);
         let roundtripped = RemotePackageSource::try_from(format!("{}", source)).unwrap();
         assert_eq!(source, roundtripped)
     }

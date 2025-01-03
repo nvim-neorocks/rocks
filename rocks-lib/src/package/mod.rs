@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use mlua::FromLua;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use std::{fmt::Display, str::FromStr};
+use std::{cmp::Ordering, fmt::Display, str::FromStr};
 use thiserror::Error;
 
 mod outdated;
@@ -69,6 +69,55 @@ pub(crate) struct RemotePackage {
 impl RemotePackage {
     pub fn new(package: PackageSpec, source: RemotePackageSource) -> Self {
         Self { package, source }
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+pub(crate) enum RemotePackageType {
+    Rockspec,
+    Src,
+    Binary,
+}
+
+impl Ord for RemotePackageType {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Priority: binary > rockspec > src
+        match (self, other) {
+            (Self::Binary, Self::Binary)
+            | (Self::Rockspec, Self::Rockspec)
+            | (Self::Src, Self::Src) => Ordering::Equal,
+
+            (Self::Binary, _) => Ordering::Greater,
+            (_, Self::Binary) => Ordering::Less,
+            (Self::Rockspec, Self::Src) => Ordering::Greater,
+            (Self::Src, Self::Rockspec) => Ordering::Less,
+        }
+    }
+}
+
+impl PartialOrd for RemotePackageType {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[derive(Clone)]
+pub struct RemotePackageTypeFilterSpec {
+    /// Include Rockspec
+    pub rockspec: bool,
+    /// Include Src
+    pub src: bool,
+    /// Include Binary
+    pub binary: bool,
+}
+
+impl Default for RemotePackageTypeFilterSpec {
+    fn default() -> Self {
+        Self {
+            rockspec: true,
+            src: true,
+            binary: true,
+        }
     }
 }
 
@@ -370,5 +419,22 @@ mod tests {
         assert!(package_req.matches(&lua_utils));
         let lua_utils = PackageSpec::parse("lua-utils.nvim".into(), "1.2-1".into()).unwrap();
         assert!(!package_req.matches(&lua_utils));
+    }
+
+    #[tokio::test]
+    pub async fn remote_package_type_priorities() {
+        let rock_types = vec![
+            RemotePackageType::Binary,
+            RemotePackageType::Src,
+            RemotePackageType::Rockspec,
+        ];
+        assert_eq!(
+            rock_types.into_iter().sorted().collect_vec(),
+            vec![
+                RemotePackageType::Src,
+                RemotePackageType::Rockspec,
+                RemotePackageType::Binary,
+            ]
+        );
     }
 }

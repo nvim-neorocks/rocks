@@ -3,9 +3,13 @@ use std::{collections::HashMap, io, sync::Arc};
 use crate::{
     build::{Build, BuildBehaviour, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
-    lockfile::{LocalPackage, LocalPackageId, Lockfile, PinnedState},
-    luarocks_installation::{
-        InstallBuildDependenciesError, LuaRocksError, LuaRocksInstallError, LuaRocksInstallation,
+    lockfile::{LocalPackage, LocalPackageId, LockConstraint, Lockfile, PinnedState},
+    luarocks::{
+        install_binary_rock::{BinaryRockInstall, InstallBinaryRockError},
+        luarocks_installation::{
+            InstallBuildDependenciesError, LuaRocksError, LuaRocksInstallError,
+            LuaRocksInstallation,
+        },
     },
     package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress, ProgressBar},
@@ -14,11 +18,14 @@ use crate::{
     tree::Tree,
 };
 
+use bytes::Bytes;
 use futures::future::join_all;
 use itertools::Itertools;
 use thiserror::Error;
 
-use super::{resolve::get_all_dependencies, SearchAndDownloadError};
+use super::{
+    resolve::get_all_dependencies, DownloadedRockspec, RemoteRockDownload, SearchAndDownloadError,
+};
 
 /// A rocks package installer, providing fine-grained control
 /// over how packages should be installed.
@@ -115,6 +122,8 @@ pub enum InstallError {
     BuildError(PackageName, BuildError),
     #[error("error initialising remote package DB: {0}")]
     RemotePackageDB(#[from] RemotePackageDBError),
+    #[error("failed to install pre-built rock {0}: {1}")]
+    InstallBinaryRockError(PackageName, InstallBinaryRockError),
 }
 
 async fn install(
@@ -142,7 +151,6 @@ async fn install_impl(
     lockfile: &mut Lockfile,
     progress_arc: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, InstallError> {
-    let progress = Arc::clone(&progress_arc);
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
     get_all_dependencies(
@@ -164,38 +172,51 @@ async fn install_impl(
 
     let installed_packages = join_all(all_packages.clone().into_values().map(|install_spec| {
         let progress_arc = progress_arc.clone();
-        let package = install_spec.rockspec.package.clone();
-
-        let bar = progress.map(|p| {
-            p.add(ProgressBar::from(format!(
-                "💻 Installing {}",
-                install_spec.rockspec.package,
-            )))
-        });
+        let downloaded_rock = install_spec.downloaded_rock;
         let config = config.clone();
 
         tokio::spawn(async move {
-            let rockspec = install_spec.rockspec;
+            let rockspec = downloaded_rock.rockspec();
             if let Some(BuildBackendSpec::LuaRock(build_backend)) =
                 &rockspec.build.current_platform().build_backend
             {
                 let luarocks = LuaRocksInstallation::new(&config)?;
-                luarocks.ensure_installed(&bar).await?;
                 luarocks
-                    .install_build_dependencies(build_backend, &rockspec, progress_arc)
+                    .install_build_dependencies(build_backend, rockspec, progress_arc.clone())
                     .await?;
             }
 
-            let pkg = Build::new(rockspec, &config, &bar)
-                .pin(pin)
-                .constraint(install_spec.spec.constraint())
-                .behaviour(install_spec.build_behaviour)
-                .source(install_spec.source)
-                .build()
-                .await
-                .map_err(|err| InstallError::BuildError(package, err))?;
-
-            bar.map(|b| b.finish_and_clear());
+            let pkg = match downloaded_rock {
+                RemoteRockDownload::RockspecOnly { rockspec_download } => {
+                    install_rockspec(
+                        rockspec_download,
+                        install_spec.spec.constraint(),
+                        install_spec.build_behaviour,
+                        pin,
+                        &config,
+                        progress_arc,
+                    )
+                    .await?
+                }
+                RemoteRockDownload::BinaryRock {
+                    rockspec_download,
+                    packed_rock,
+                } => {
+                    install_binary_rock(
+                        rockspec_download,
+                        packed_rock,
+                        install_spec.spec.constraint(),
+                        install_spec.build_behaviour,
+                        pin,
+                        &config,
+                        progress_arc,
+                    )
+                    .await?
+                }
+                RemoteRockDownload::SrcRock { .. } => todo!(
+                    "rocks does not yet support installing .src.rock packages without a rockspec"
+                ),
+            };
 
             Ok::<_, InstallError>((pkg.id(), pkg))
         })
@@ -224,4 +245,79 @@ async fn install_impl(
     });
 
     Ok(installed_packages.into_values().collect_vec())
+}
+
+async fn install_rockspec(
+    rockspec_download: DownloadedRockspec,
+    constraint: LockConstraint,
+    behaviour: BuildBehaviour,
+    pin: PinnedState,
+    config: &Config,
+    progress_arc: Arc<Progress<MultiProgress>>,
+) -> Result<LocalPackage, InstallError> {
+    let progress = Arc::clone(&progress_arc);
+    let rockspec = rockspec_download.rockspec;
+    let source = rockspec_download.source;
+    let package = rockspec.package.clone();
+    let bar = progress.map(|p| p.add(ProgressBar::from(format!("💻 Installing {}", &package,))));
+
+    if let Some(BuildBackendSpec::LuaRock(build_backend)) =
+        &rockspec.build.current_platform().build_backend
+    {
+        let luarocks = LuaRocksInstallation::new(config)?;
+        luarocks.ensure_installed(&bar).await?;
+        luarocks
+            .install_build_dependencies(build_backend, &rockspec, progress_arc)
+            .await?;
+    }
+
+    let pkg = Build::new(&rockspec, config, &bar)
+        .pin(pin)
+        .constraint(constraint)
+        .behaviour(behaviour)
+        .source(source)
+        .build()
+        .await
+        .map_err(|err| InstallError::BuildError(package, err))?;
+
+    bar.map(|b| b.finish_and_clear());
+
+    Ok(pkg)
+}
+
+async fn install_binary_rock(
+    rockspec_download: DownloadedRockspec,
+    packed_rock: Bytes,
+    constraint: LockConstraint,
+    behaviour: BuildBehaviour,
+    pin: PinnedState,
+    config: &Config,
+    progress_arc: Arc<Progress<MultiProgress>>,
+) -> Result<LocalPackage, InstallError> {
+    let progress = Arc::clone(&progress_arc);
+    let rockspec = rockspec_download.rockspec;
+    let package = rockspec.package.clone();
+    let bar = progress.map(|p| {
+        p.add(ProgressBar::from(format!(
+            "💻 Installing {} (pre-built)",
+            &package,
+        )))
+    });
+    let pkg = BinaryRockInstall::new(
+        &rockspec,
+        rockspec_download.source,
+        packed_rock,
+        config,
+        &bar,
+    )
+    .pin(pin)
+    .constraint(constraint)
+    .behaviour(behaviour)
+    .install()
+    .await
+    .map_err(|err| InstallError::InstallBinaryRockError(package, err))?;
+
+    bar.map(|b| b.finish_and_clear());
+
+    Ok(pkg)
 }

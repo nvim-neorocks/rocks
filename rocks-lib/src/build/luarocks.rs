@@ -3,7 +3,7 @@ use std::{io, path::Path};
 use crate::{
     config::Config,
     lua_installation::LuaInstallation,
-    luarocks_installation::{ExecLuaRocksError, LuaRocksError, LuaRocksInstallation},
+    luarocks::luarocks_installation::{ExecLuaRocksError, LuaRocksError, LuaRocksInstallation},
     progress::{Progress, ProgressBar},
     rockspec::Rockspec,
     tree::RockLayout,

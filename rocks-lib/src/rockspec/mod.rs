@@ -28,11 +28,11 @@ use crate::{
 
 #[derive(Error, Debug)]
 pub enum RockspecError {
-    #[error(transparent)]
+    #[error("could not parse rockspec: {0}")]
     MLua(#[from] mlua::Error),
     #[error("{}copy_directories cannot contain the rockspec name", ._0.as_ref().map(|p| format!("{p}: ")).unwrap_or_default())]
     CopyDirectoriesContainRockspecName(Option<String>),
-    #[error(transparent)]
+    #[error("could not parse rockspec: {0}")]
     LuaTable(#[from] LuaTableError),
 }
 

@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use ssri::{Algorithm, Integrity, IntegrityOpts};
 use std::fs::File;
 use std::io::{self, Read};
@@ -36,6 +37,14 @@ impl HasIntegrity for Path {
 impl HasIntegrity for TempDir {
     fn hash(&self) -> io::Result<Integrity> {
         self.path().hash()
+    }
+}
+
+impl HasIntegrity for Bytes {
+    fn hash(&self) -> io::Result<Integrity> {
+        let mut integrity_opts = IntegrityOpts::new().algorithm(Algorithm::Sha256);
+        integrity_opts.input(self);
+        Ok(integrity_opts.result())
     }
 }
 

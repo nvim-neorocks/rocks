@@ -43,7 +43,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    pub async fn unpack_rock() {
+    pub async fn test_unpack_src_rock() {
         let test_rock_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("resources")
             .join("test")

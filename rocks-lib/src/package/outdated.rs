@@ -44,7 +44,7 @@ impl PackageSpec {
     ) -> Result<Option<PackageVersion>, RockConstraintUnsatisfied> {
         let latest_version =
             package_db
-                .latest_match(constraint)
+                .latest_match(constraint, None)
                 .ok_or_else(|| RockConstraintUnsatisfied {
                     name: self.name.clone(),
                     constraint: constraint.version_req.clone(),
