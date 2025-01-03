@@ -5,10 +5,12 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 use thiserror::Error;
 use tokio::{fs, io};
+use url::Url;
 
 use crate::{
     config::{Config, LuaVersion},
     package::{PackageName, PackageReq, PackageSpec, PackageVersion, RemotePackage},
+    remote_package_source::RemotePackageSource,
 };
 
 #[derive(Error, Debug)]
@@ -24,7 +26,7 @@ pub enum ManifestFromServerError {
 }
 
 async fn manifest_from_server(
-    url: &str,
+    url: &Url,
     config: &Config,
 ) -> Result<String, ManifestFromServerError> {
     let manifest_filename = "manifest".to_string()
@@ -46,7 +48,9 @@ async fn manifest_from_server(
                 }))
             .map(|s| format!("-{}", s))
             .unwrap_or_default();
-    let url = url.trim_end_matches('/').to_string() + "/" + &manifest_filename;
+    let url = url
+        .join(&manifest_filename)
+        .expect("could not parse the manifest URL");
 
     // Stores a path to the manifest cache (this allows us to operate on a manifest without
     // needing to pull it from the luarocks servers each time).
@@ -62,7 +66,7 @@ async fn manifest_from_server(
         let last_modified_local: SystemTime = metadata.modified()?;
 
         // Ask the server for the last modified date of its manifest.
-        let response = client.head(&url).send().await?;
+        let response = client.head(url.clone()).send().await?;
 
         if let Some(last_modified_header) = response.headers().get("Last-Modified") {
             let server_last_modified = httpdate::parse_http_date(last_modified_header.to_str()?)?;
@@ -71,7 +75,7 @@ async fn manifest_from_server(
             if server_last_modified > last_modified_local {
                 // Since we only pulled in the headers previously we must now request the entire
                 // manifest from scratch.
-                let new_manifest_content = client.get(&url).send().await?.text().await?;
+                let new_manifest_content = client.get(url).send().await?.text().await?;
                 fs::write(&cache, &new_manifest_content).await?;
 
                 return Ok(new_manifest_content);
@@ -163,24 +167,24 @@ impl ManifestMetadata {
 
 #[derive(Clone)]
 pub(crate) struct Manifest {
-    server_url: String,
+    server_url: Url,
     metadata: ManifestMetadata,
 }
 
 impl Manifest {
-    pub fn new(server_url: &str, metadata: ManifestMetadata) -> Self {
+    pub fn new(server_url: Url, metadata: ManifestMetadata) -> Self {
         Self {
-            server_url: server_url.into(),
+            server_url,
             metadata,
         }
     }
 
-    pub async fn from_config(server_url: &str, config: &Config) -> Result<Self, ManifestError> {
-        let manifest = crate::manifest::manifest_from_server(server_url, config).await?;
+    pub async fn from_config(server_url: Url, config: &Config) -> Result<Self, ManifestError> {
+        let manifest = crate::manifest::manifest_from_server(&server_url, config).await?;
         let metadata = ManifestMetadata::new(&manifest)?;
         Ok(Self::new(server_url, metadata))
     }
-    pub fn server_url(&self) -> &String {
+    pub fn server_url(&self) -> &Url {
         &self.server_url
     }
     pub fn metadata(&self) -> &ManifestMetadata {
@@ -190,10 +194,10 @@ impl Manifest {
         if !self.metadata().has_rock(package_req.name()) {
             None
         } else {
-            Some(RemotePackage {
-                package: self.metadata().latest_match(package_req).unwrap(),
-                server_url: self.server_url().into(),
-            })
+            Some(RemotePackage::new(
+                self.metadata().latest_match(package_req).unwrap(),
+                RemotePackageSource::LuarocksServer(self.server_url().clone()),
+            ))
         }
     }
 }
@@ -271,7 +275,9 @@ mod tests {
             .lua_version(Some(crate::config::LuaVersion::LuaJIT))
             .build()
             .unwrap();
-        manifest_from_server(&url_str, &config).await.unwrap();
+        manifest_from_server(&Url::parse(&url_str).unwrap(), &config)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -288,7 +294,9 @@ mod tests {
             .build()
             .unwrap();
 
-        manifest_from_server(&url_str, &config).await.unwrap();
+        manifest_from_server(&Url::parse(&url_str).unwrap(), &config)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -307,7 +315,9 @@ mod tests {
             .lua_version(Some(crate::config::LuaVersion::Lua51))
             .build()
             .unwrap();
-        let result = manifest_from_server(&url_str, &config).await.unwrap();
+        let result = manifest_from_server(&Url::parse(&url_str).unwrap(), &config)
+            .await
+            .unwrap();
         assert_eq!(result, manifest_content);
     }
 

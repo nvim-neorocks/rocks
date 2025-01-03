@@ -11,6 +11,7 @@ use reqwest::{
 use serde::Deserialize;
 use serde_enum_str::Serialize_enum_str;
 use thiserror::Error;
+use url::Url;
 
 /// A rocks package uploader, providing fine-grained control
 /// over how a package should be uploaded.
@@ -62,6 +63,8 @@ pub struct VersionCheckResponse {
 
 #[derive(Error, Debug)]
 pub enum ToolCheckError {
+    #[error("error parsing tool check URL: {0}")]
+    ParseError(#[from] url::ParseError),
     #[error(transparent)]
     Request(#[from] reqwest::Error),
     #[error("`rocks` is out of date with {0}'s expected tool version! `rocks` is at version {TOOL_VERSION}, server is at {server_version}", server_version = _1.version)]
@@ -70,6 +73,8 @@ pub enum ToolCheckError {
 
 #[derive(Error, Debug)]
 pub enum UserCheckError {
+    #[error("error parsing user check URL: {0}")]
+    ParseError(#[from] url::ParseError),
     #[error(transparent)]
     Request(#[from] reqwest::Error),
     #[error("invalid API key provided")]
@@ -78,16 +83,23 @@ pub enum UserCheckError {
 
 #[derive(Error, Debug)]
 #[error("could not check rock status on server: {0}")]
-pub struct RockCheckError(#[from] reqwest::Error);
+pub enum RockCheckError {
+    #[error(transparent)]
+    ParseError(#[from] url::ParseError),
+    #[error(transparent)]
+    Request(#[from] reqwest::Error),
+}
 
 #[derive(Error, Debug)]
 #[error(transparent)]
 pub enum UploadError {
+    #[error("error parsing upload URL: {0}")]
+    ParseError(#[from] url::ParseError),
     Lua(#[from] mlua::Error),
     Request(#[from] reqwest::Error),
     RockCheck(#[from] RockCheckError),
     #[error("rock already exists on server: {0}")]
-    RockExists(String),
+    RockExists(Url),
     #[error("unable to read rockspec: {0}")]
     RockspecRead(#[from] std::io::Error),
     #[error("{0}.\nHINT: If you'd like to skip the signing step supply `--sign-protocol none` to the CLI")]
@@ -231,7 +243,7 @@ async fn upload_from_project(
     };
 
     client
-        .post(helpers::url_for_method(config.server(), api_key, "upload"))
+        .post(helpers::url_for_method(config.server(), api_key, "upload")?)
         .multipart(multipart)
         .send()
         .await?;
@@ -245,23 +257,28 @@ mod helpers {
     use crate::upload::RockCheckError;
     use crate::upload::{ToolCheckError, UserCheckError};
     use reqwest::Client;
+    use url::Url;
 
-    pub(crate) fn url_for_method(server: &str, api_key: &ApiKey, endpoint: &str) -> String {
-        format!(
-            "{}{}/{}/{}",
-            server,
-            "api/1",
-            unsafe { api_key.get() },
-            endpoint
-        )
+    pub(crate) fn url_for_method(
+        server_url: &Url,
+        api_key: &ApiKey,
+        endpoint: &str,
+    ) -> Result<Url, url::ParseError> {
+        let api_key = unsafe { api_key.get() };
+        server_url
+            .join("api/1")
+            .expect("error constructing 'api/1' path")
+            .join(api_key)?
+            .join(endpoint)
     }
 
     pub(crate) async fn ensure_tool_version(
         client: &Client,
-        server: &str,
+        server_url: &Url,
     ) -> Result<(), ToolCheckError> {
+        let url = server_url.join("api/tool_version")?;
         let response: VersionCheckResponse = client
-            .post(format!("{}{}", server, "api/tool_version"))
+            .post(url)
             .json(&("current", TOOL_VERSION))
             .send()
             .await?
@@ -271,17 +288,20 @@ mod helpers {
         if response.version == TOOL_VERSION {
             Ok(())
         } else {
-            Err(ToolCheckError::ToolOutdated(server.to_string(), response))
+            Err(ToolCheckError::ToolOutdated(
+                server_url.to_string(),
+                response,
+            ))
         }
     }
 
     pub(crate) async fn ensure_user_exists(
         client: &Client,
         api_key: &ApiKey,
-        server: &str,
+        server_url: &Url,
     ) -> Result<(), UserCheckError> {
         client
-            .get(url_for_method(server, api_key, "status"))
+            .get(url_for_method(server_url, api_key, "status")?)
             .send()
             .await?
             .error_for_status()?;
@@ -294,10 +314,10 @@ mod helpers {
         api_key: &ApiKey,
         name: &PackageName,
         version: &PackageVersion,
-        server: &str,
+        server: &Url,
     ) -> Result<bool, RockCheckError> {
         Ok(client
-            .get(url_for_method(server, api_key, "check_rockspec"))
+            .get(url_for_method(server, api_key, "check_rockspec")?)
             .query(&(
                 ("package", name.to_string()),
                 ("version", version.to_string()),

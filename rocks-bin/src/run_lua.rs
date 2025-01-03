@@ -113,6 +113,8 @@ Options:
 
 #[cfg(test)]
 mod test {
+    use std::path::PathBuf;
+
     use rocks_lib::config::ConfigBuilder;
 
     use super::*;
@@ -123,7 +125,12 @@ mod test {
             args: Some(vec!["-v".into()]),
             ..RunLua::default()
         };
-        let config = ConfigBuilder::new().build().unwrap();
+        let temp: PathBuf = assert_fs::TempDir::new().unwrap().path().into();
+        let config = ConfigBuilder::new()
+            .tree(Some(temp.clone()))
+            .luarocks_tree(Some(temp))
+            .build()
+            .unwrap();
         run_lua(args, config).await.unwrap()
     }
 }

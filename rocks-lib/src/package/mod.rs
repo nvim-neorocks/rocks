@@ -12,6 +12,8 @@ pub use version::{
     PackageVersion, PackageVersionParseError, PackageVersionReq, PackageVersionReqError,
 };
 
+use crate::remote_package_source::RemotePackageSource;
+
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]
 #[cfg_attr(feature = "lua", derive(mlua::FromLua))]
@@ -61,15 +63,12 @@ impl mlua::UserData for PackageSpec {
 #[derive(Clone, Debug)]
 pub(crate) struct RemotePackage {
     pub package: PackageSpec,
-    pub server_url: String,
+    pub source: RemotePackageSource,
 }
 
 impl RemotePackage {
-    pub fn new(package: PackageSpec, server_url: String) -> Self {
-        Self {
-            package,
-            server_url,
-        }
+    pub fn new(package: PackageSpec, source: RemotePackageSource) -> Self {
+        Self { package, source }
     }
 }
 

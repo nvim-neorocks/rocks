@@ -11,6 +11,7 @@ use thiserror::Error;
 use crate::package::{
     PackageName, PackageReq, PackageSpec, PackageVersion, PackageVersionReq, PackageVersionReqError,
 };
+use crate::remote_package_source::RemotePackageSource;
 
 #[cfg(feature = "lua")]
 use mlua::{ExternalResult as _, FromLua};
@@ -110,6 +111,13 @@ impl Display for LocalPackageId {
     }
 }
 
+#[cfg(feature = "lua")]
+impl mlua::IntoLua for LocalPackageId {
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        self.0.into_lua(lua)
+    }
+}
+
 impl LocalPackageSpec {
     pub fn new(
         name: &PackageName,
@@ -176,6 +184,7 @@ impl LocalPackageSpec {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LocalPackage {
     pub(crate) spec: LocalPackageSpec,
+    source: RemotePackageSource,
     hashes: LocalPackageHashes,
 }
 
@@ -187,6 +196,7 @@ struct LocalPackageIntermediate {
     pinned: PinnedState,
     dependencies: Vec<LocalPackageId>,
     constraint: Option<String>,
+    source: RemotePackageSource,
     hashes: LocalPackageHashes,
 }
 
@@ -203,6 +213,7 @@ impl TryFrom<LocalPackageIntermediate> for LocalPackage {
                 value.dependencies,
                 &value.pinned,
             ),
+            source: value.source,
             hashes: value.hashes,
         })
     }
@@ -216,6 +227,7 @@ impl From<&LocalPackage> for LocalPackageIntermediate {
             pinned: value.spec.pinned,
             dependencies: value.spec.dependencies.clone(),
             constraint: value.spec.constraint.clone(),
+            source: value.source.clone(),
             hashes: value.hashes.clone(),
         }
     }
@@ -249,9 +261,10 @@ impl FromLua for LocalPackage {
 }
 
 impl LocalPackage {
-    pub fn from(
+    pub(crate) fn from(
         package: &PackageSpec,
         constraint: LockConstraint,
+        source: RemotePackageSource,
         hashes: LocalPackageHashes,
     ) -> Self {
         Self {
@@ -262,6 +275,7 @@ impl LocalPackage {
                 Vec::default(),
                 &PinnedState::Unpinned,
             ),
+            source,
             hashes,
         }
     }
@@ -318,7 +332,7 @@ impl mlua::UserData for LocalPackage {
                 .collect_vec())
         });
         fields.add_field_method_get("constraint", |_, this| Ok(this.spec.constraint.clone()));
-        fields.add_field_method_get("id", |_, this| Ok(this.id().0));
+        fields.add_field_method_get("id", |_, this| Ok(this.id()));
     }
 
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
@@ -455,8 +469,12 @@ impl Lockfile {
         }
     }
 
-    pub fn remove(&mut self, target: &LocalPackage) {
-        self.rocks.remove(&target.id());
+    pub(crate) fn remove(&mut self, target: &LocalPackage) {
+        self.remove_by_id(&target.id())
+    }
+
+    pub(crate) fn remove_by_id(&mut self, target: &LocalPackageId) {
+        self.rocks.remove(target);
     }
 
     pub fn version(&self) -> &String {
@@ -610,6 +628,7 @@ mod tests {
         let test_local_package = LocalPackage::from(
             &test_package,
             crate::lockfile::LockConstraint::Unconstrained,
+            RemotePackageSource::Test,
             mock_hashes.clone(),
         );
         lockfile.add(&test_local_package);
@@ -619,6 +638,7 @@ mod tests {
         let mut test_local_dep_package = LocalPackage::from(
             &test_dep_package,
             crate::lockfile::LockConstraint::Constrained(">= 1.0.0".parse().unwrap()),
+            RemotePackageSource::Test,
             mock_hashes.clone(),
         );
         test_local_dep_package.spec.pinned = PinnedState::Pinned;

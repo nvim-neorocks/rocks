@@ -8,6 +8,7 @@ use crate::{
     operations::{self, FetchSrcRockError},
     package::PackageSpec,
     progress::{Progress, ProgressBar},
+    remote_package_source::RemotePackageSource,
     rockspec::{Build as _, BuildBackendSpec, LuaVersionError, Rockspec},
     tree::{RockLayout, Tree},
 };
@@ -43,6 +44,7 @@ pub struct Build<'a> {
     pin: PinnedState,
     constraint: LockConstraint,
     behaviour: BuildBehaviour,
+    source: Option<RemotePackageSource>,
 }
 
 impl<'a> Build<'a> {
@@ -59,6 +61,7 @@ impl<'a> Build<'a> {
             pin: PinnedState::default(),
             constraint: LockConstraint::default(),
             behaviour: BuildBehaviour::default(),
+            source: None,
         }
     }
 
@@ -77,13 +80,25 @@ impl<'a> Build<'a> {
         Self { behaviour, ..self }
     }
 
+    /// Sets the remote source of the package to be built.
+    pub(crate) fn source(self, source: RemotePackageSource) -> Self {
+        Self {
+            source: Some(source),
+            ..self
+        }
+    }
+
     /// Builds the package.
     pub async fn build(self) -> Result<LocalPackage, BuildError> {
+        let source = self.source.unwrap_or_else(|| {
+            RemotePackageSource::RockspecContent(self.rockspec.raw_content.clone())
+        });
         build(
             self.rockspec,
             self.pin,
             self.constraint,
             self.behaviour,
+            source,
             self.config,
             self.progress,
         )
@@ -252,6 +267,7 @@ async fn build(
     pinned: PinnedState,
     constraint: LockConstraint,
     behaviour: BuildBehaviour,
+    source: RemotePackageSource,
     config: &Config,
     progress: &Progress<ProgressBar>,
 ) -> Result<LocalPackage, BuildError> {
@@ -308,6 +324,7 @@ async fn build(
     let mut package = LocalPackage::from(
         &PackageSpec::new(rockspec.package.clone(), rockspec.version.clone()),
         constraint,
+        source,
         hashes,
     );
     package.spec.pinned = pinned;

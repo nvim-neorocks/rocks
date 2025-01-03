@@ -5,7 +5,7 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use crate::{
-    lockfile::{LocalPackage, PinnedState},
+    lockfile::{LocalPackageId, PinnedState},
     package::PackageSpec,
     tree::Tree,
 };
@@ -14,6 +14,8 @@ use crate::{
 
 #[derive(Error, Debug)]
 pub enum PinError {
+    #[error("package with ID {0} not found in lockfile")]
+    PackageNotFound(LocalPackageId),
     #[error("rock {rock} is already {}pinned!", if *.pin_state == PinnedState::Unpinned { "un" } else { "" })]
     PinStateUnchanged {
         pin_state: PinnedState,
@@ -31,10 +33,16 @@ pub enum PinError {
 }
 
 pub fn set_pinned_state(
-    package: &mut LocalPackage,
+    package_id: &LocalPackageId,
     tree: &Tree,
     pin: PinnedState,
 ) -> Result<(), PinError> {
+    let mut lockfile = tree.lockfile()?;
+    let mut package = lockfile
+        .get(package_id)
+        .ok_or_else(|| PinError::PackageNotFound(package_id.clone()))?
+        .clone();
+
     if pin == package.pinned() {
         return Err(PinError::PinStateUnchanged {
             pin_state: package.pinned(),
@@ -42,9 +50,8 @@ pub fn set_pinned_state(
         });
     }
 
-    let mut lockfile = tree.lockfile()?;
     let old_package = package.clone();
-    let items = std::fs::read_dir(tree.root_for(package))?
+    let items = std::fs::read_dir(tree.root_for(&package))?
         .filter_map(Result::ok)
         .map(|dir| dir.path())
         .collect_vec();
@@ -58,14 +65,14 @@ pub fn set_pinned_state(
         });
     }
 
-    let new_root = tree.root_for(package);
+    let new_root = tree.root_for(&package);
 
     std::fs::create_dir_all(&new_root)?;
 
     fs_extra::move_items(&items, new_root, &CopyOptions::new())?;
 
     lockfile.remove(&old_package);
-    lockfile.add(package);
+    lockfile.add(&package);
     lockfile.flush()?;
 
     Ok(())

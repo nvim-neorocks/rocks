@@ -16,7 +16,8 @@ pub async fn fetch_remote(data: UnpackRemote, config: Config) -> Result<()> {
 
     let rockspec = Download::new(&package_req, &config, &bar)
         .download_rockspec()
-        .await?;
+        .await?
+        .rockspec;
 
     let destination = data
         .path

@@ -29,6 +29,7 @@ use rocks_lib::{
     config::{ConfigBuilder, LuaVersion},
     lockfile::PinnedState::{Pinned, Unpinned},
 };
+use url::Url;
 
 /// A fast and efficient Lua package manager.
 #[derive(Parser)]
@@ -42,12 +43,12 @@ pub struct Cli {
     /// Fetch rocks/rockspecs from this server (takes priority
     /// over config file).
     #[arg(long, value_name = "server")]
-    pub server: Option<String>,
+    pub server: Option<Url>,
 
     /// Fetch rocks/rockspecs from this server in addition to the main server
     /// (overrides any entries in the config file).
     #[arg(long, value_name = "extra-server")]
-    pub extra_servers: Option<Vec<String>>,
+    pub extra_servers: Option<Vec<Url>>,
 
     /// Restrict downloads to paths matching the given URL.
     #[arg(long, value_name = "url")]

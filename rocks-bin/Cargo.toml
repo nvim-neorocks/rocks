@@ -27,6 +27,10 @@ walkdir = "2.5.0"
 which = "7.0.0"
 indicatif = "0.17.8"
 path-absolutize = "3.1.1"
+url = "2.5.4"
+
+[dev-dependencies]
+assert_fs = "1.1.2"
 
 [dependencies.rocks-lib]
 path = "../rocks-lib/"

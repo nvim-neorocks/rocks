@@ -4,7 +4,7 @@ use crate::{
         variables::{self, HasVariables},
     },
     config::LuaVersion,
-    lockfile::{LocalPackage, Lockfile},
+    lockfile::{LocalPackage, LocalPackageId, Lockfile},
     package::PackageReq,
 };
 use std::{io, path::PathBuf};
@@ -138,7 +138,7 @@ impl Tree {
                     .iter()
                     .rev()
                     .filter(|package| req.version_req().matches(package.version()))
-                    .cloned()
+                    .map(|package| package.id())
                     .collect_vec();
 
                 Ok(match found_packages.len() {
@@ -163,7 +163,7 @@ impl Tree {
                     .filter(|package| {
                         req.version_req().matches(package.version()) && filter(package)
                     })
-                    .cloned()
+                    .map(|package| package.id())
                     .collect_vec();
 
                 Ok(match found_packages.len() {
@@ -255,8 +255,8 @@ impl mlua::UserData for Tree {
 #[derive(Clone, Debug)]
 pub enum RockMatches {
     NotFound(PackageReq),
-    Single(LocalPackage),
-    Many(Vec<LocalPackage>),
+    Single(LocalPackageId),
+    Many(Vec<LocalPackageId>),
 }
 
 // Loosely mimic the Option<T> functions.
@@ -326,6 +326,7 @@ mod tests {
         config::LuaVersion,
         lockfile::{LocalPackage, LocalPackageHashes, LockConstraint},
         package::{PackageName, PackageSpec, PackageVersion},
+        remote_package_source::RemotePackageSource,
         tree::RockLayout,
     };
 
@@ -354,6 +355,7 @@ mod tests {
         let package = LocalPackage::from(
             &PackageSpec::parse("neorg".into(), "8.0.0-1".into()).unwrap(),
             LockConstraint::Unconstrained,
+            RemotePackageSource::Test,
             mock_hashes.clone(),
         );
 
@@ -377,6 +379,7 @@ mod tests {
         let package = LocalPackage::from(
             &PackageSpec::parse("lua-cjson".into(), "2.1.0-1".into()).unwrap(),
             LockConstraint::Unconstrained,
+            RemotePackageSource::Test,
             mock_hashes.clone(),
         );
 
@@ -452,6 +455,7 @@ mod tests {
             .rock(&LocalPackage::from(
                 &PackageSpec::parse("neorg".into(), "8.0.0-1-1".into()).unwrap(),
                 LockConstraint::Unconstrained,
+                RemotePackageSource::Test,
                 mock_hashes.clone(),
             ))
             .unwrap();

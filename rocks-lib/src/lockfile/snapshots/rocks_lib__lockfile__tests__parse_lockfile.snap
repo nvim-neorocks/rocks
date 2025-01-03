@@ -1,7 +1,8 @@
 ---
 source: rocks-lib/src/lockfile/mod.rs
-assertion_line: 244
+assertion_line: 603
 expression: lockfile
+snapshot_kind: text
 ---
 {
   "version": "1.0.0",
@@ -12,6 +13,7 @@ expression: lockfile
       "pinned": false,
       "dependencies": [],
       "constraint": null,
+      "source": "luarocks+https://luarocks.org/",
       "hashes": {
         "rockspec": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek=",
         "source": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
@@ -25,6 +27,7 @@ expression: lockfile
         "48ec344951668eca0e0a4ff284d804a11e4e709194df3191a72ed8fac89cf2e0"
       ],
       "constraint": null,
+      "source": "luarocks+https://luarocks.org/",
       "hashes": {
         "rockspec": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek=",
         "source": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
@@ -38,6 +41,7 @@ expression: lockfile
         "48ec344951668eca0e0a4ff284d804a11e4e709194df3191a72ed8fac89cf2e0"
       ],
       "constraint": null,
+      "source": "luarocks+https://luarocks.org/",
       "hashes": {
         "rockspec": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek=",
         "source": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
