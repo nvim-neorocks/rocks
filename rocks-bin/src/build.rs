@@ -13,7 +13,7 @@ use rocks_lib::{
     package::{PackageName, PackageReq},
     progress::MultiProgress,
     rockspec::Rockspec,
-    tree::Tree,
+    tree::{RockMatches, Tree},
 };
 
 #[derive(Args, Default)]
@@ -70,14 +70,14 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
 
     let tree = Tree::new(config.tree().clone(), lua_version)?;
 
-    let build_behaviour = match tree.has_rock_and(
+    let build_behaviour = match tree.match_rocks_and(
         &PackageReq::new(
             rockspec.package.to_string(),
             Some(rockspec.version.to_string()),
         )?,
         |rock| pin == rock.pinned(),
-    ) {
-        Some(_) if !data.force => {
+    )? {
+        RockMatches::Single(_) | RockMatches::Many(_) if !data.force => {
             if Confirm::new(&format!(
                 "Package {} already exists. Overwrite?",
                 rockspec.package,
@@ -106,7 +106,10 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
 
     let dependencies_to_install = dependencies
         .into_iter()
-        .filter(|req| tree.has_rock(req).is_none())
+        .filter(|req| {
+            tree.match_rocks(req)
+                .is_ok_and(|rock_match| rock_match.is_found())
+        })
         .map(|dep| (build_behaviour, dep.to_owned()));
 
     Install::new(&config)

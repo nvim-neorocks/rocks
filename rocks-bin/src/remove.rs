@@ -1,43 +1,64 @@
+use std::io;
+
 use clap::Args;
-use eyre::Result;
+use eyre::{eyre, Result};
+use itertools::Itertools;
 use rocks_lib::{
     config::{Config, LuaVersion},
-    package::{PackageName, PackageSpec, PackageVersion},
-    progress::{MultiProgress, Progress},
-    remote_package_db::RemotePackageDB,
-    tree::Tree,
+    operations,
+    package::PackageReq,
+    tree::{RockMatches, Tree},
 };
 
 #[derive(Args)]
 pub struct Remove {
-    /// The name of the rock to remove.
-    name: PackageName,
-    /// The name of the version to remove.
-    version: Option<PackageVersion>,
+    /// The package or packages to remove.
+    packages: Vec<PackageReq>,
 }
 
 pub async fn remove(remove_args: Remove, config: Config) -> Result<()> {
-    let package_db = RemotePackageDB::from_config(&config).await?;
-
-    let target_version = remove_args
-        .version
-        .or(package_db.latest_version(&remove_args.name).cloned())
-        .unwrap();
-
     let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
 
-    match tree.has_rock(
-        &PackageSpec::new(remove_args.name.clone(), target_version.clone()).into_package_req(),
-    ) {
-        Some(package) => Ok(rocks_lib::operations::remove(
-            package,
-            &config,
-            &Progress::Progress(MultiProgress::new().new_bar()),
-        )
-        .await?),
-        None => {
-            eprintln!("Could not find {}@{}", remove_args.name, target_version);
-            Ok(())
-        }
+    let package_matches = remove_args
+        .packages
+        .iter()
+        .map(|package_req| tree.match_rocks(package_req))
+        .try_collect::<_, Vec<_>, io::Error>()?;
+
+    let (packages, nonexistent_packages, duplicate_packages) = package_matches.into_iter().fold(
+        (Vec::new(), Vec::new(), Vec::new()),
+        |(mut p, mut n, mut d), rock_match| {
+            match rock_match {
+                RockMatches::NotFound(req) => n.push(req),
+                RockMatches::Single(package) => p.push(package),
+                RockMatches::Many(packages) => d.extend(packages),
+            };
+
+            (p, n, d)
+        },
+    );
+
+    if !nonexistent_packages.is_empty() {
+        // TODO(vhyrro): Render this in the form of a tree.
+        return Err(eyre!(
+            "The following packages were not found: {:#?}",
+            nonexistent_packages
+        ));
     }
+
+    if !duplicate_packages.is_empty() {
+        // TODO(vhyrro): Greatly expand on this error message, notifying the user how it works and
+        // how to fix it.
+        return Err(eyre!(
+            "Multiple packages satisfying your version requirements were found. {:#?}",
+            duplicate_packages,
+        ));
+    }
+
+    operations::Remove::new(&config)
+        .packages(packages)
+        .remove()
+        .await?;
+
+    Ok(())
 }
