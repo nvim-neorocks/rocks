@@ -16,7 +16,7 @@ use crate::{
     rockspec::Rockspec,
 };
 
-use super::{download_rockspec, SearchAndDownloadError};
+use super::{Download, SearchAndDownloadError};
 
 #[derive(Clone, Debug)]
 pub(crate) struct PackageInstallSpec {
@@ -52,9 +52,10 @@ pub(crate) async fn get_all_dependencies(
                 tokio::spawn(async move {
                     let bar = progress.map(|p| p.new_bar());
 
-                    let rockspec = download_rockspec(&package, &package_db, &bar)
-                        .await
-                        .unwrap();
+                    let rockspec = Download::new(&package, &config, &bar)
+                        .package_db(&package_db)
+                        .download_rockspec()
+                        .await?;
 
                     let constraint =
                         if *package.version_req() == PackageVersionReq::SemVer(VersionReq::STAR) {

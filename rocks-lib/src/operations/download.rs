@@ -4,11 +4,88 @@ use bytes::Bytes;
 use thiserror::Error;
 
 use crate::{
+    config::Config,
     package::{PackageName, PackageReq, PackageVersion, RemotePackage},
     progress::{Progress, ProgressBar},
-    remote_package_db::{RemotePackageDB, SearchError},
+    remote_package_db::{RemotePackageDB, RemotePackageDBError, SearchError},
     rockspec::{Rockspec, RockspecError},
 };
+
+pub struct Download<'a> {
+    package_req: &'a PackageReq,
+    package_db: Option<&'a RemotePackageDB>,
+    config: &'a Config,
+    progress: &'a Progress<ProgressBar>,
+}
+
+/// Builder for a rock downloader.
+impl<'a> Download<'a> {
+    /// Construct a new `.src.rock` downloader.
+    pub fn new(
+        package_req: &'a PackageReq,
+        config: &'a Config,
+        progress: &'a Progress<ProgressBar>,
+    ) -> Self {
+        Self {
+            package_req,
+            package_db: None,
+            config,
+            progress,
+        }
+    }
+
+    /// Sets the package database to use for searching for packages.
+    /// Instantiated from the config if not set.
+    pub fn package_db(self, package_db: &'a RemotePackageDB) -> Self {
+        Self {
+            package_db: Some(package_db),
+            ..self
+        }
+    }
+
+    /// Download the package's Rockspec.
+    pub async fn download_rockspec(self) -> Result<Rockspec, SearchAndDownloadError> {
+        match self.package_db {
+            Some(db) => download_rockspec(self.package_req, db, self.progress).await,
+            None => {
+                let db = RemotePackageDB::from_config(self.config).await?;
+                download_rockspec(self.package_req, &db, self.progress).await
+            }
+        }
+    }
+
+    /// Download a `.src.rock` to a file.
+    /// `destination_dir` defaults to the current working directory if not set.
+    pub async fn download_src_rock_to_file(
+        self,
+        destination_dir: Option<PathBuf>,
+    ) -> Result<DownloadedSrcRock, SearchAndDownloadError> {
+        match self.package_db {
+            Some(db) => {
+                download_src_rock_to_file(self.package_req, destination_dir, db, self.progress)
+                    .await
+            }
+            None => {
+                let db = RemotePackageDB::from_config(self.config).await?;
+                download_src_rock_to_file(self.package_req, destination_dir, &db, self.progress)
+                    .await
+            }
+        }
+    }
+
+    /// Search for a `.src.rock` and download it to memory.
+    pub async fn search_and_download_src_rock(
+        self,
+    ) -> Result<DownloadedSrcRockBytes, SearchAndDownloadError> {
+        match self.package_db {
+            Some(db) => search_and_download_src_rock(self.package_req, db, self.progress).await,
+            None => {
+                let db = RemotePackageDB::from_config(self.config).await?;
+                search_and_download_src_rock(self.package_req, &db, self.progress).await
+            }
+        }
+    }
+}
 
 pub struct DownloadedSrcRockBytes {
     pub name: PackageName,
@@ -29,9 +106,11 @@ pub enum DownloadRockspecError {
     Request(#[from] reqwest::Error),
     #[error("failed to convert rockspec response: {0}")]
     ResponseConversion(#[from] FromUtf8Error),
+    #[error("error initialising remote package DB: {0}")]
+    RemotePackageDB(#[from] RemotePackageDBError),
 }
 
-pub async fn download_rockspec(
+async fn download_rockspec(
     package_req: &PackageReq,
     package_db: &RemotePackageDB,
     progress: &Progress<ProgressBar>,
@@ -55,9 +134,11 @@ pub enum SearchAndDownloadError {
     Utf8(#[from] FromUtf8Error),
     #[error(transparent)]
     Rockspec(#[from] RockspecError),
+    #[error("error initialising remote package DB: {0}")]
+    RemotePackageDB(#[from] RemotePackageDBError),
 }
 
-pub async fn search_and_download_src_rock(
+async fn search_and_download_src_rock(
     package_req: &PackageReq,
     package_db: &RemotePackageDB,
     progress: &Progress<ProgressBar>,
@@ -79,7 +160,7 @@ pub(crate) async fn download_src_rock(
     download_src_rock_impl(remote_package).await
 }
 
-pub async fn download_to_file(
+async fn download_src_rock_to_file(
     package_req: &PackageReq,
     destination_dir: Option<PathBuf>,
     package_db: &RemotePackageDB,
