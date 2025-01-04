@@ -104,7 +104,7 @@ impl LuaRocksInstallation {
             PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into())).unwrap();
         if !self.tree.match_rocks(&luarocks_req)?.is_found() {
             let rockspec = Rockspec::new(LUAROCKS_ROCKSPEC).unwrap();
-            let pkg = Build::new(rockspec, &self.config, progress)
+            let pkg = Build::new(&rockspec, &self.config, progress)
                 .constraint(LockConstraint::Constrained(
                     luarocks_req.version_req().clone(),
                 ))
@@ -165,12 +165,12 @@ impl LuaRocksInstallation {
             let bar = progress.map(|p| {
                 p.add(ProgressBar::from(format!(
                     "💻 Installing build dependency: {}",
-                    install_spec.rockspec.package,
+                    install_spec.downloaded_rock.rockspec().package,
                 )))
             });
             let config = self.config.clone();
             tokio::spawn(async move {
-                let rockspec = install_spec.rockspec;
+                let rockspec = install_spec.downloaded_rock.rockspec();
                 let pkg = Build::new(rockspec, &config, &bar)
                     .constraint(install_spec.spec.constraint())
                     .behaviour(install_spec.build_behaviour)
