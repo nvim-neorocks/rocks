@@ -12,7 +12,8 @@ use ssri::Integrity;
 use thiserror::Error;
 
 use crate::package::{
-    PackageName, PackageReq, PackageSpec, PackageVersion, PackageVersionReq, PackageVersionReqError,
+    PackageName, PackageReq, PackageSpec, PackageVersion, PackageVersionReq,
+    PackageVersionReqError, RemotePackageTypeFilterSpec,
 };
 use crate::remote_package_source::RemotePackageSource;
 
@@ -28,6 +29,15 @@ pub enum PinnedState {
 impl Default for PinnedState {
     fn default() -> Self {
         Self::Unpinned
+    }
+}
+
+impl Display for PinnedState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            PinnedState::Unpinned => "unpinned".fmt(f),
+            PinnedState::Pinned => "pinned".fmt(f),
+        }
     }
 }
 
@@ -187,7 +197,7 @@ impl LocalPackageSpec {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LocalPackage {
     pub(crate) spec: LocalPackageSpec,
-    source: RemotePackageSource,
+    pub(crate) source: RemotePackageSource,
     hashes: LocalPackageHashes,
 }
 
@@ -437,6 +447,16 @@ pub struct Lockfile<P: LockfilePermissions> {
     entrypoints: Vec<LocalPackageId>,
 }
 
+#[derive(Error, Debug)]
+pub enum LockfileIntegrityError {
+    #[error("rockspec integirty mismatch.\nExpected: {expected}\nBut got: {got}")]
+    RockspecIntegrityMismatch { expected: Integrity, got: Integrity },
+    #[error("source integrity mismatch.\nExpected: {expected}\nBut got: {got}")]
+    SourceIntegrityMismatch { expected: Integrity, got: Integrity },
+    #[error("package {0} version {1} with pinned state {2} and constraint {3} not found in the lockfile.")]
+    PackageNotFound(PackageName, PackageVersion, PinnedState, String),
+}
+
 impl<P: LockfilePermissions> Lockfile<P> {
     pub fn version(&self) -> &String {
         &self.version
@@ -458,16 +478,75 @@ impl<P: LockfilePermissions> Lockfile<P> {
             .into_group_map()
     }
 
-    pub(crate) fn has_rock(&self, req: &PackageReq) -> Option<LocalPackage> {
+    pub(crate) fn has_rock(
+        &self,
+        req: &PackageReq,
+        filter: Option<RemotePackageTypeFilterSpec>,
+    ) -> Option<LocalPackage> {
         self.list()
             .get(req.name())
             .map(|packages| {
                 packages
                     .iter()
+                    .filter(|package| match &filter {
+                        Some(filter_spec) => match package.source {
+                            RemotePackageSource::LuarocksRockspec(_) => filter_spec.rockspec,
+                            RemotePackageSource::LuarocksSrcRock(_) => filter_spec.src,
+                            RemotePackageSource::LuarocksBinaryRock(_) => filter_spec.binary,
+                            RemotePackageSource::RockspecContent(_) => true,
+                            #[cfg(test)]
+                            RemotePackageSource::Test => unimplemented!(),
+                        },
+                        None => true,
+                    })
                     .rev()
                     .find(|package| req.version_req().matches(package.version()))
             })?
             .cloned()
+    }
+
+    /// Validate the integrity of an installed package with the entry in this lockfile.
+    pub(crate) fn validate_integrity(
+        &self,
+        package: &LocalPackage,
+    ) -> Result<(), LockfileIntegrityError> {
+        match self.get(&package.id()) {
+            Some(expected_package) => {
+                if package
+                    .hashes
+                    .rockspec
+                    .matches(&expected_package.hashes.rockspec)
+                    .is_none()
+                {
+                    return Err(LockfileIntegrityError::RockspecIntegrityMismatch {
+                        expected: expected_package.hashes.rockspec.clone(),
+                        got: package.hashes.rockspec.clone(),
+                    });
+                }
+                if package
+                    .hashes
+                    .source
+                    .matches(&expected_package.hashes.source)
+                    .is_none()
+                {
+                    return Err(LockfileIntegrityError::SourceIntegrityMismatch {
+                        expected: expected_package.hashes.source.clone(),
+                        got: package.hashes.source.clone(),
+                    });
+                }
+                Ok(())
+            }
+            None => Err(LockfileIntegrityError::PackageNotFound(
+                package.name().clone(),
+                package.version().clone(),
+                package.spec.pinned,
+                package
+                    .spec
+                    .constraint
+                    .clone()
+                    .unwrap_or("UNCONSTRAINED".into()),
+            )),
+        }
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -539,13 +618,13 @@ impl Lockfile<ReadOnly> {
 
     /// Converts the current lockfile into a writeable one, executes `cb` and flushes
     /// the lockfile.
-    pub fn map_then_flush<T, F, E>(self, cb: F) -> Result<T, E>
+    pub fn map_then_flush<T, F, E>(&mut self, cb: F) -> Result<T, E>
     where
         F: FnOnce(&mut Lockfile<ReadWrite>) -> Result<T, E>,
         E: Error,
         E: From<io::Error>,
     {
-        let mut writeable_lockfile = self.into_temporary();
+        let mut writeable_lockfile = self.clone().into_temporary();
 
         let result = cb(&mut writeable_lockfile)?;
 

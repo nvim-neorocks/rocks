@@ -296,8 +296,16 @@ impl<T> PerPlatform<T> {
         )
     }
 
+    fn set(&mut self, platform: PlatformIdentifier, value: T) {
+        self.per_platform.insert(platform, value);
+    }
+
     pub fn current_platform(&self) -> &T {
         self.get(&get_platform())
+    }
+
+    pub(crate) fn current_platform_set(&mut self, value: T) {
+        self.set(get_platform(), value)
     }
 }
 

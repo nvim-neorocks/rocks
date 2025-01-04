@@ -204,6 +204,14 @@ impl From<PackageSpec> for PackageReq {
     }
 }
 
+impl From<PackageName> for PackageReq {
+    fn from(name: PackageName) -> Self {
+        Self {
+            name,
+            version_req: PackageVersionReq::default(),
+        }
+    }
+}
 #[cfg(feature = "lua")]
 impl mlua::UserData for PackageReq {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {

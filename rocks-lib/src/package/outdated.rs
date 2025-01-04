@@ -28,8 +28,8 @@ impl PackageSpec {
             .latest_version(&self.name)
             .ok_or_else(|| RockNotFound(self.name.clone()))?;
 
-        if self.version < *latest_version {
-            Ok(Some(latest_version.to_owned()))
+        if self.version < latest_version {
+            Ok(Some(latest_version))
         } else {
             Ok(None)
         }

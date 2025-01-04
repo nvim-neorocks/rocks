@@ -142,6 +142,9 @@ pub(crate) enum RemoteRockDownload {
 
 impl RemoteRockDownload {
     pub fn rockspec(&self) -> &Rockspec {
+        &self.rockspec_download().rockspec
+    }
+    pub fn rockspec_download(&self) -> &DownloadedRockspec {
         match self {
             Self::RockspecOnly { rockspec_download }
             | Self::BinaryRock {
@@ -149,7 +152,7 @@ impl RemoteRockDownload {
             }
             | Self::SrcRock {
                 rockspec_download, ..
-            } => &rockspec_download.rockspec,
+            } => rockspec_download,
         }
     }
 }

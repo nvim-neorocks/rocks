@@ -3,6 +3,7 @@
 mod download;
 mod fetch;
 mod install;
+mod lockfile_update;
 mod pin;
 mod remove;
 mod resolve;
@@ -14,6 +15,7 @@ mod update;
 pub use download::*;
 pub use fetch::*;
 pub use install::*;
+pub use lockfile_update::*;
 pub use pin::*;
 pub use remove::*;
 pub use run::*;

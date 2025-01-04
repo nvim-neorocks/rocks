@@ -13,7 +13,7 @@ use crate::{
     },
     package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress, ProgressBar},
-    remote_package_db::{RemotePackageDB, RemotePackageDBError},
+    remote_package_db::{RemotePackageDB, RemotePackageDBError, RemotePackageDbIntegrityError},
     rockspec::{BuildBackendSpec, LuaVersionError},
     tree::Tree,
 };
@@ -124,6 +124,8 @@ pub enum InstallError {
     RemotePackageDB(#[from] RemotePackageDBError),
     #[error("failed to install pre-built rock {0}: {1}")]
     InstallBinaryRockError(PackageName, InstallBinaryRockError),
+    #[error("integrity error for package {0}: {1}\n")]
+    Integrity(PackageName, RemotePackageDbIntegrityError),
 }
 
 async fn install(
@@ -140,13 +142,21 @@ where
 
     let mut lockfile = tree.lockfile()?.write_guard();
 
-    install_impl(packages, pin, package_db, config, &mut lockfile, progress).await
+    install_impl(
+        packages,
+        pin,
+        Arc::new(package_db),
+        config,
+        &mut lockfile,
+        progress,
+    )
+    .await
 }
 
 async fn install_impl(
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
-    package_db: RemotePackageDB,
+    package_db: Arc<RemotePackageDB>,
     config: &Config,
     lockfile: &mut Lockfile<ReadWrite>,
     progress_arc: Arc<Progress<MultiProgress>>,
@@ -157,7 +167,7 @@ async fn install_impl(
         tx,
         packages,
         pin,
-        Arc::new(package_db),
+        package_db.clone(),
         Arc::new(lockfile.clone()),
         config,
         progress_arc.clone(),
@@ -174,6 +184,7 @@ async fn install_impl(
         let progress_arc = progress_arc.clone();
         let downloaded_rock = install_spec.downloaded_rock;
         let config = config.clone();
+        let package_db = Arc::clone(&package_db);
 
         tokio::spawn(async move {
             let rockspec = downloaded_rock.rockspec();
@@ -217,6 +228,10 @@ async fn install_impl(
                     "rocks does not yet support installing .src.rock packages without a rockspec"
                 ),
             };
+
+            package_db
+                .validate_integrity(&pkg)
+                .map_err(|err| InstallError::Integrity(pkg.name().clone(), err))?;
 
             Ok::<_, InstallError>((pkg.id(), pkg))
         })

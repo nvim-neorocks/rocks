@@ -112,7 +112,8 @@ pub enum FetchSrcRockError {
 }
 
 async fn do_fetch_src(fetch: &FetchSrc<'_>) -> Result<(), FetchSrcError> {
-    let rock_source = fetch.rockspec.source.current_platform();
+    let rockspec = fetch.rockspec;
+    let rock_source = rockspec.source.current_platform();
     let progress = fetch.progress;
     let dest_dir = fetch.dest_dir;
     match &rock_source.source_spec {
