@@ -1,7 +1,10 @@
 use crate::{
     config::Config,
     manifest::{Manifest, ManifestError},
-    package::{PackageName, PackageReq, PackageSpec, PackageVersion, RemotePackage},
+    package::{
+        PackageName, PackageReq, PackageSpec, PackageVersion, RemotePackage,
+        RemotePackageTypeFilterSpec,
+    },
     progress::{Progress, ProgressBar},
 };
 use itertools::Itertools as _;
@@ -41,11 +44,12 @@ impl RemotePackageDB {
     pub(crate) fn find(
         &self,
         package_req: &PackageReq,
+        filter: Option<RemotePackageTypeFilterSpec>,
         progress: &Progress<ProgressBar>,
     ) -> Result<RemotePackage, SearchError> {
         let result = self.0.iter().find_map(|manifest| {
             progress.map(|p| p.set_message(format!("🔎 Searching {}", &manifest.server_url())));
-            manifest.search(package_req)
+            manifest.search(package_req, filter.clone())
         });
         match result {
             Some(package) => Ok(package),
@@ -88,10 +92,19 @@ impl RemotePackageDB {
             .last()
     }
 
-    pub fn latest_match(&self, package_req: &PackageReq) -> Option<PackageSpec> {
+    pub fn latest_match(
+        &self,
+        package_req: &PackageReq,
+        filter: Option<RemotePackageTypeFilterSpec>,
+    ) -> Option<PackageSpec> {
         self.0
             .iter()
-            .filter_map(|manifest| manifest.metadata().latest_match(package_req))
+            .filter_map(|manifest| {
+                manifest
+                    .metadata()
+                    .latest_match(package_req, filter.clone())
+                    .map(|x| x.0)
+            })
             .last()
     }
 }
