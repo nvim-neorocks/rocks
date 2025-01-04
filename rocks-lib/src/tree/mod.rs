@@ -209,7 +209,12 @@ impl Tree {
     }
 
     pub fn lockfile(&self) -> io::Result<Lockfile<ReadOnly>> {
-        Lockfile::new(self.root().join("lock.json"))
+        Lockfile::new(self.lockfile_path())
+    }
+
+    /// Get this tree's lockfile path.
+    pub fn lockfile_path(&self) -> PathBuf {
+        self.root().join("lock.json")
     }
 }
 

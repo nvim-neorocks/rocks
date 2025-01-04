@@ -76,7 +76,7 @@ async fn remove(
     tree: Tree,
     progress: &Progress<MultiProgress>,
 ) -> Result<(), RemoveError> {
-    let lockfile = tree.lockfile()?;
+    let mut lockfile = tree.lockfile()?;
 
     let packages = package_ids
         .iter()

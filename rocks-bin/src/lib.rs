@@ -7,6 +7,7 @@ use debug::Debug;
 use download::Download;
 use info::Info;
 use install::Install;
+use install_rockspec::InstallRockspec;
 use list::ListCmd;
 use outdated::Outdated;
 use path::Path;
@@ -30,6 +31,7 @@ pub mod format;
 pub mod info;
 pub mod install;
 pub mod install_lua;
+pub mod install_rockspec;
 pub mod list;
 pub mod outdated;
 pub mod path;
@@ -110,7 +112,7 @@ pub struct Cli {
 pub enum Commands {
     /// [UNIMPLEMENTED] Add a dependency to the current project.
     Add,
-    /// Build/compile a rock.
+    /// Build/compile a project.
     Build(Build),
     /// Runs `luacheck` in the current project.
     Check,
@@ -131,6 +133,9 @@ pub enum Commands {
     /// Install a rock for use on the system.
     #[command(arg_required_else_help = true)]
     Install(Install),
+    /// Install a local RockSpec for use on the system.
+    #[command(arg_required_else_help = true)]
+    InstallRockspec(InstallRockspec),
     /// Manually install and manage Lua headers for various Lua versions.
     InstallLua,
     /// [UNIMPLEMENTED] Check syntax of a rockspec.

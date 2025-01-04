@@ -141,14 +141,6 @@ impl ManifestMetadata {
         self.repository.contains_key(rock_name)
     }
 
-    pub fn latest_version(&self, rock_name: &PackageName) -> Option<&PackageVersion> {
-        if !self.has_rock(rock_name) {
-            return None;
-        }
-
-        self.repository[rock_name].keys().sorted().last()
-    }
-
     pub fn latest_match(
         &self,
         lua_package_req: &PackageReq,
@@ -241,7 +233,9 @@ impl Manifest {
     pub fn metadata(&self) -> &ManifestMetadata {
         &self.metadata
     }
-    pub fn search(
+
+    /// Find a package that matches the requirement, returning the latest match
+    pub fn find(
         &self,
         package_req: &PackageReq,
         filter: Option<RemotePackageTypeFilterSpec>,
