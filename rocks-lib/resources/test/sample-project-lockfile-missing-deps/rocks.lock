@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "rocks": {
+    "5f37e8dc4251f549b25ec62138484f4912ae3d332e57bdb1b30184db3f59d270": {
+      "name": "pathlib.nvim",
+      "version": "2.2.3-1",
+      "pinned": false,
+      "dependencies": [
+        "d7142f441ca59ebde5927d8a3489966828c6b6655125616485632a1b16362f8e"
+      ],
+      "constraint": "=2.2.3",
+      "source": "luarocks_rockspec+https://luarocks.org/",
+      "hashes": {
+        "rockspec": "sha256-kdDMqznWlwP9wIqlzPrZ5qEDp6edhlkaasAcQzWTmmM=",
+        "source": "sha256-arCZdCc4g0VvlQA11V1sHMS7WFSJqfwXC80o0A2igqo="
+      }
+    },
+    "d7142f441ca59ebde5927d8a3489966828c6b6655125616485632a1b16362f8e": {
+      "name": "nvim-nio",
+      "version": "1.10.0-1",
+      "pinned": false,
+      "dependencies": [],
+      "constraint": ">=1.8.0",
+      "source": "luarocks_rockspec+https://luarocks.org/",
+      "hashes": {
+        "rockspec": "sha256-5iL9++6X/JsKKtpIRaRHcnZpn6DrsAQQRWPubZK9erY=",
+        "source": "sha256-WPVTNoj0POenpqKhTWpyPqLe2+fXxpQC2mTU0NvC8Xw="
+      }
+    }
+  },
+  "entrypoints": [
+    "5f37e8dc4251f549b25ec62138484f4912ae3d332e57bdb1b30184db3f59d270"
+  ]
+}

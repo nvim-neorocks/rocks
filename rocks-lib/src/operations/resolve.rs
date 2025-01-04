@@ -39,7 +39,8 @@ pub(crate) async fn get_all_dependencies(
             .into_iter()
             // Exclude packages that are already installed
             .filter(|(build_behaviour, package)| {
-                build_behaviour == &BuildBehaviour::Force || lockfile.has_rock(package).is_none()
+                build_behaviour == &BuildBehaviour::Force
+                    || lockfile.has_rock(package, None).is_none()
             })
             .map(|(build_behaviour, package)| {
                 let config = config.clone();
