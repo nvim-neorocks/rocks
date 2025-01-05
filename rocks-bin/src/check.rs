@@ -19,10 +19,10 @@ pub async fn check(config: Config) -> Result<()> {
         .await?;
 
     Run::new("luacheck", &config)
-        .arg(&project.root().to_string_lossy())
+        .arg(project.root().to_string_lossy())
         .arg("--exclude-files")
         .arg(
-            &project
+            project
                 .tree(LuaVersion::from(&config)?)?
                 .root()
                 .to_string_lossy(),
