@@ -19,6 +19,7 @@ use search::Search;
 use test::Test;
 use update::Update;
 use upload::Upload;
+use url::Url;
 
 pub mod build;
 pub mod check;
@@ -57,12 +58,12 @@ pub struct Cli {
     /// Fetch rocks/rockspecs from this server (takes priority
     /// over config file).
     #[arg(long, value_name = "server")]
-    pub server: Option<String>,
+    pub server: Option<Url>,
 
-    /// Fetch rocks/rockspecs from this server only (overrides
-    /// any entries in the config file).
-    #[arg(long, value_name = "server")]
-    pub only_server: Option<String>,
+    /// Fetch rocks/rockspecs from this server in addition to the main server
+    /// (overrides any entries in the config file).
+    #[arg(long, value_name = "extra-server")]
+    pub extra_servers: Option<Vec<Url>>,
 
     /// Restrict downloads to paths matching the given URL.
     #[arg(long, value_name = "url")]
