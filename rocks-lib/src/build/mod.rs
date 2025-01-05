@@ -13,6 +13,7 @@ use crate::{
     tree::{RockLayout, Tree},
 };
 pub(crate) mod utils;
+use bon::{builder, Builder};
 use cmake::CMakeError;
 use command::CommandError;
 use external_dependency::{ExternalDependencyError, ExternalDependencyInfo};
@@ -37,72 +38,33 @@ pub mod variables;
 
 /// A rocks package builder, providing fine-grained control
 /// over how a package should be built.
+#[derive(Builder)]
+#[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
 pub struct Build<'a> {
+    #[builder(start_fn)]
     rockspec: &'a Rockspec,
+    #[builder(start_fn)]
     config: &'a Config,
+    #[builder(start_fn)]
     progress: &'a Progress<ProgressBar>,
+
+    #[builder(default)]
     pin: PinnedState,
+    #[builder(default)]
     constraint: LockConstraint,
+    #[builder(default)]
     behaviour: BuildBehaviour,
+
     source: Option<RemotePackageSource>,
 }
 
-impl<'a> Build<'a> {
-    /// Construct a new builder.
-    pub fn new(
-        rockspec: &'a Rockspec,
-        config: &'a Config,
-        progress: &'a Progress<ProgressBar>,
-    ) -> Self {
-        Self {
-            rockspec,
-            config,
-            progress,
-            pin: PinnedState::default(),
-            constraint: LockConstraint::default(),
-            behaviour: BuildBehaviour::default(),
-            source: None,
-        }
-    }
-
-    /// Sets the pinned state of the package to be built.
-    pub fn pin(self, pin: PinnedState) -> Self {
-        Self { pin, ..self }
-    }
-
-    /// Sets the lock constraint of the package to be built.
-    pub fn constraint(self, constraint: LockConstraint) -> Self {
-        Self { constraint, ..self }
-    }
-
-    /// Sets the build behaviour of the package to be built.
-    pub fn behaviour(self, behaviour: BuildBehaviour) -> Self {
-        Self { behaviour, ..self }
-    }
-
-    /// Sets the remote source of the package to be built.
-    pub(crate) fn source(self, source: RemotePackageSource) -> Self {
-        Self {
-            source: Some(source),
-            ..self
-        }
-    }
-
-    /// Builds the package.
+// Overwrite the `build()` function to use our own instead.
+impl<State> BuildBuilder<'_, State>
+where
+    State: build_builder::State + build_builder::IsComplete,
+{
     pub async fn build(self) -> Result<LocalPackage, BuildError> {
-        let source = self.source.unwrap_or_else(|| {
-            RemotePackageSource::RockspecContent(self.rockspec.raw_content.clone())
-        });
-        build(
-            self.rockspec,
-            self.pin,
-            self.constraint,
-            self.behaviour,
-            source,
-            self.config,
-            self.progress,
-        )
-        .await
+        do_build(self._build()).await
     }
 }
 
@@ -262,57 +224,52 @@ async fn install(
     Ok(())
 }
 
-async fn build(
-    rockspec: &Rockspec,
-    pinned: PinnedState,
-    constraint: LockConstraint,
-    behaviour: BuildBehaviour,
-    source: RemotePackageSource,
-    config: &Config,
-    progress: &Progress<ProgressBar>,
-) -> Result<LocalPackage, BuildError> {
-    progress.map(|p| {
+async fn do_build(build: Build<'_>) -> Result<LocalPackage, BuildError> {
+    build.progress.map(|p| {
         p.set_message(format!(
             "Building {}@{}...",
-            rockspec.package, rockspec.version
+            build.rockspec.package, build.rockspec.version
         ))
     });
 
-    for (name, dep) in rockspec.external_dependencies.current_platform() {
-        let _ = ExternalDependencyInfo::detect(name, dep, config.external_deps())?;
+    for (name, dep) in build.rockspec.external_dependencies.current_platform() {
+        let _ = ExternalDependencyInfo::detect(name, dep, build.config.external_deps())?;
     }
 
-    let lua_version = rockspec.lua_version_from_config(config)?;
+    let lua_version = build.rockspec.lua_version_from_config(build.config)?;
 
-    let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
+    let tree = Tree::new(build.config.tree().clone(), lua_version.clone())?;
 
-    let temp_dir = tempdir::TempDir::new(&rockspec.package.to_string())?;
+    let temp_dir = tempdir::TempDir::new(&build.rockspec.package.to_string())?;
 
     // Install the source in order to build.
-    let rock_source = rockspec.source.current_platform();
-    if let Err(err) = operations::fetch_src(temp_dir.path(), rock_source, progress).await {
-        let package = PackageSpec::new(rockspec.package.clone(), rockspec.version.clone());
-        progress.map(|p| {
+    let rock_source = build.rockspec.source.current_platform();
+    if let Err(err) = operations::fetch_src(temp_dir.path(), rock_source, build.progress).await {
+        let package = PackageSpec::new(
+            build.rockspec.package.clone(),
+            build.rockspec.version.clone(),
+        );
+        build.progress.map(|p| {
             p.println(format!(
                 "⚠️ WARNING: Failed to fetch source for {}: {}",
                 &package, err
             ))
         });
-        progress.map(|p| {
+        build.progress.map(|p| {
             p.println(format!(
                 "⚠️ Falling back to .src.rock archive from {}",
-                &config.server()
+                &build.config.server()
             ))
         });
-        operations::fetch_src_rock(&package, temp_dir.path(), config, progress).await?;
+        operations::fetch_src_rock(&package, temp_dir.path(), build.config, build.progress).await?;
     }
 
     let hashes = LocalPackageHashes {
-        rockspec: rockspec.hash()?,
+        rockspec: build.rockspec.hash()?,
         source: temp_dir.hash()?,
     };
 
-    if let Some(expected) = &rockspec.source.current_platform().integrity {
+    if let Some(expected) = &build.rockspec.source.current_platform().integrity {
         if expected.matches(&hashes.source).is_none() {
             return Err(BuildError::SourceIntegrityMismatch {
                 expected: expected.clone(),
@@ -322,30 +279,51 @@ async fn build(
     }
 
     let mut package = LocalPackage::from(
-        &PackageSpec::new(rockspec.package.clone(), rockspec.version.clone()),
-        constraint,
-        source,
+        &PackageSpec::new(
+            build.rockspec.package.clone(),
+            build.rockspec.version.clone(),
+        ),
+        build.constraint,
+        build.source.unwrap_or_else(|| {
+            RemotePackageSource::RockspecContent(build.rockspec.raw_content.clone())
+        }),
         hashes,
     );
-    package.spec.pinned = pinned;
+    package.spec.pinned = build.pin;
 
     match tree.lockfile()?.get(&package.id()) {
-        Some(package) if behaviour == BuildBehaviour::NoForce => Ok(package.clone()),
+        Some(package) if build.behaviour == BuildBehaviour::NoForce => Ok(package.clone()),
         _ => {
             let output_paths = tree.rock(&package)?;
 
-            let lua = LuaInstallation::new(&lua_version, config);
+            let lua = LuaInstallation::new(&lua_version, build.config);
 
             let build_dir = match &rock_source.unpack_dir {
                 Some(unpack_dir) => temp_dir.path().join(unpack_dir),
                 None => temp_dir.path().into(),
             };
 
-            run_build(rockspec, &output_paths, &lua, config, &build_dir, progress).await?;
+            run_build(
+                build.rockspec,
+                &output_paths,
+                &lua,
+                build.config,
+                &build_dir,
+                build.progress,
+            )
+            .await?;
 
-            install(rockspec, &tree, &output_paths, &lua, &build_dir, progress).await?;
+            install(
+                build.rockspec,
+                &tree,
+                &output_paths,
+                &lua,
+                &build_dir,
+                build.progress,
+            )
+            .await?;
 
-            for directory in &rockspec.build.current_platform().copy_directories {
+            for directory in &build.rockspec.build.current_platform().copy_directories {
                 recursive_copy_dir(&build_dir.join(directory), &output_paths.etc)?;
             }
 
