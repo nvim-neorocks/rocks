@@ -432,7 +432,7 @@ mod tests {
     }
 
     #[test]
-    fn rock_layout_substiture() {
+    fn rock_layout_substitute() {
         let tree_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-tree");
 
