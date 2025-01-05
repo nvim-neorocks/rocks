@@ -9,6 +9,7 @@ use crate::{
     remote_package_db::RemotePackageDBError,
     tree::Tree,
 };
+use bon::Builder;
 use itertools::Itertools;
 use thiserror::Error;
 
@@ -16,41 +17,34 @@ use super::InstallError;
 
 /// Rocks package runner, providing fine-grained control
 /// over how a package should be run.
+#[derive(Builder)]
+#[builder(start_fn = new, finish_fn(name = _run, vis = ""))]
 pub struct Run<'a> {
-    command: String,
-    args: Vec<String>,
+    #[builder(start_fn)]
+    command: &'a str,
+    #[builder(start_fn)]
     config: &'a Config,
+
+    #[builder(field)]
+    args: Vec<String>,
 }
 
-impl<'a> Run<'a> {
-    /// Construct a new runner.
-    pub fn new(command: &str, config: &'a Config) -> Self {
-        Self {
-            command: command.into(),
-            args: Vec::new(),
-            config,
-        }
+impl<State: run_builder::State> RunBuilder<'_, State> {
+    pub fn arg(mut self, arg: impl Into<String>) -> Self {
+        self.args.push(arg.into());
+        self
     }
 
-    /// Specify packages to install, along with each package's build behaviour.
-    pub fn args<I>(self, args: I) -> Self
+    pub fn args(mut self, args: impl IntoIterator<Item: Into<String>>) -> Self {
+        self.args.extend(args.into_iter().map_into());
+        self
+    }
+
+    pub async fn run(self) -> Result<(), RunError>
     where
-        I: IntoIterator<Item = String>,
+        State: run_builder::IsComplete,
     {
-        Self {
-            args: self.args.into_iter().chain(args).collect_vec(),
-            ..self
-        }
-    }
-
-    /// Add a package to the set of packages to install.
-    pub fn arg(self, arg: &str) -> Self {
-        self.args(std::iter::once(arg.into()))
-    }
-
-    /// Run the package.
-    pub async fn run(self) -> Result<(), RunError> {
-        run(&self.command, self.args, self.config).await
+        run(self._run()).await
     }
 }
 
@@ -66,24 +60,26 @@ pub enum RunError {
     Io(#[from] io::Error),
 }
 
-async fn run(command: &str, args: Vec<String>, config: &Config) -> Result<(), RunError> {
-    let lua_version = LuaVersion::from(config)?;
-    let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
+async fn run(run: Run<'_>) -> Result<(), RunError> {
+    let lua_version = LuaVersion::from(run.config)?;
+    let tree = Tree::new(run.config.tree().clone(), lua_version.clone())?;
     let paths = Paths::from_tree(tree)?;
-    let status = match Command::new(command)
-        .args(args)
+
+    let status = match Command::new(run.command)
+        .args(run.args)
         .env("PATH", paths.path_prepended().joined())
         .env("LUA_PATH", paths.package_path().joined())
         .env("LUA_CPATH", paths.package_cpath().joined())
         .status()
     {
         Ok(status) => Ok(status),
-        Err(err) => Err(RunError::RunCommandFailure(command.into(), err)),
+        Err(err) => Err(RunError::RunCommandFailure(run.command.to_string(), err)),
     }?;
+
     if status.success() {
         Ok(())
     } else {
-        Err(RunError::RunFailure(command.into()))
+        Err(RunError::RunFailure(run.command.to_string()))
     }
 }
 
