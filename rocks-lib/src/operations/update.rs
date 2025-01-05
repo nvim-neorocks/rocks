@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use bon::Builder;
 use itertools::Itertools as _;
 use thiserror::Error;
 
@@ -17,71 +18,53 @@ use super::{Install, InstallError, Remove, RemoveError};
 /// A rocks package updater, providing fine-grained control
 /// over how packages should be updated.
 /// Can update multiple packages in parallel.
+#[derive(Builder)]
+#[builder(start_fn = new, finish_fn(name = _update, vis = ""))]
 pub struct Update<'a> {
+    #[builder(start_fn)]
     config: &'a Config,
+
+    #[builder(field)]
     packages: Vec<(LocalPackage, PackageReq)>,
+
     package_db: Option<RemotePackageDB>,
-    progress: Option<Arc<Progress<MultiProgress>>>,
+
+    #[builder(default = MultiProgress::new_arc())]
+    progress: Arc<Progress<MultiProgress>>,
 }
 
-impl<'a> Update<'a> {
-    /// Construct a new updater.
-    pub fn new(config: &'a Config) -> Self {
-        Self {
-            config,
-            packages: Vec::new(),
-            package_db: None,
-            progress: None,
-        }
+impl<State: update_builder::State> UpdateBuilder<'_, State> {
+    pub fn package(mut self, package_with_req: (LocalPackage, PackageReq)) -> Self {
+        self.packages.push(package_with_req);
+        self
     }
 
-    /// Specify packages to update.
-    /// The first element of each tuple is a local package to update,
-    /// the second element is a package to update to.
-    pub fn packages<I>(self, packages: I) -> Self
+    pub fn packages(
+        mut self,
+        packages: impl IntoIterator<Item = (LocalPackage, PackageReq)>,
+    ) -> Self {
+        self.packages.extend(packages);
+        self
+    }
+
+    pub async fn update(self) -> Result<(), UpdateError>
     where
-        I: IntoIterator<Item = (LocalPackage, PackageReq)>,
+        State: update_builder::IsComplete,
     {
-        Self {
-            packages: self.packages.into_iter().chain(packages).collect_vec(),
-            ..self
-        }
-    }
+        let new_self = self._update();
 
-    /// Add a package to the set of packages to update.
-    pub fn package(self, from: LocalPackage, to: PackageReq) -> Self {
-        self.packages(std::iter::once((from, to)))
-    }
-
-    /// Sets the package database to use for searching for packages.
-    /// Instantiated from the config if not set.
-    pub fn package_db(self, package_db: RemotePackageDB) -> Self {
-        Self {
-            package_db: Some(package_db),
-            ..self
-        }
-    }
-
-    /// Pass a `MultiProgress` to this installer.
-    /// By default, a new one will be created.
-    pub fn progress(self, progress: Arc<Progress<MultiProgress>>) -> Self {
-        Self {
-            progress: Some(progress),
-            ..self
-        }
-    }
-
-    /// Update the packages.
-    pub async fn update(self) -> Result<(), UpdateError> {
-        let package_db = match self.package_db {
+        let package_db = match new_self.package_db {
             Some(db) => db,
-            None => RemotePackageDB::from_config(self.config).await?,
+            None => RemotePackageDB::from_config(new_self.config).await?,
         };
-        let progress = match self.progress {
-            Some(p) => p,
-            None => MultiProgress::new_arc(),
-        };
-        update(self.packages, package_db, self.config, progress).await
+
+        update(
+            new_self.packages,
+            package_db,
+            new_self.config,
+            new_self.progress,
+        )
+        .await
     }
 }
 
