@@ -11,7 +11,7 @@ const PLUS: &str = "+";
 
 /// The source of a remote package.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub(crate) enum RemotePackageSource {
+pub enum RemotePackageSource {
     LuarocksRockspec(Url),
     LuarocksSrcRock(Url),
     LuarocksBinaryRock(Url),

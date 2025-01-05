@@ -119,7 +119,10 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         .install()
         .await?;
 
-    build::Build::new(&rockspec, &config, &progress.map(|p| p.new_bar()))
+    build::Build::default()
+        .rockspec(&rockspec)
+        .config(&config)
+        .progress(&progress.map(|p| p.new_bar()))
         .pin(pin)
         .behaviour(build_behaviour)
         .build()

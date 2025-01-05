@@ -15,6 +15,7 @@ use crate::{
 pub(crate) mod utils;
 use cmake::CMakeError;
 use command::CommandError;
+use derive_builder::{Builder, UninitializedFieldError};
 use external_dependency::{ExternalDependencyError, ExternalDependencyInfo};
 
 use indicatif::style::TemplateError;
@@ -37,70 +38,45 @@ pub mod variables;
 
 /// A rocks package builder, providing fine-grained control
 /// over how a package should be built.
-pub struct Build<'a> {
+#[derive(Builder)]
+#[builder(
+    public,
+    name = "Build",
+    build_fn(private, name = "_build", error = "BuildError")
+)]
+struct _Build<'a> {
     rockspec: &'a Rockspec,
     config: &'a Config,
+
+    #[builder(default = &Progress::NoProgress)]
     progress: &'a Progress<ProgressBar>,
+    #[builder(default)]
     pin: PinnedState,
+    #[builder(default)]
     constraint: LockConstraint,
+    #[builder(default)]
     behaviour: BuildBehaviour,
+    #[builder(default, setter(strip_option))]
     source: Option<RemotePackageSource>,
 }
 
-impl<'a> Build<'a> {
-    /// Construct a new builder.
-    pub fn new(
-        rockspec: &'a Rockspec,
-        config: &'a Config,
-        progress: &'a Progress<ProgressBar>,
-    ) -> Self {
-        Self {
-            rockspec,
-            config,
-            progress,
-            pin: PinnedState::default(),
-            constraint: LockConstraint::default(),
-            behaviour: BuildBehaviour::default(),
-            source: None,
-        }
-    }
-
-    /// Sets the pinned state of the package to be built.
-    pub fn pin(self, pin: PinnedState) -> Self {
-        Self { pin, ..self }
-    }
-
-    /// Sets the lock constraint of the package to be built.
-    pub fn constraint(self, constraint: LockConstraint) -> Self {
-        Self { constraint, ..self }
-    }
-
-    /// Sets the build behaviour of the package to be built.
-    pub fn behaviour(self, behaviour: BuildBehaviour) -> Self {
-        Self { behaviour, ..self }
-    }
-
-    /// Sets the remote source of the package to be built.
-    pub(crate) fn source(self, source: RemotePackageSource) -> Self {
-        Self {
-            source: Some(source),
-            ..self
-        }
-    }
-
+impl Build<'_> {
     /// Builds the package.
-    pub async fn build(self) -> Result<LocalPackage, BuildError> {
-        let source = self.source.unwrap_or_else(|| {
-            RemotePackageSource::RockspecContent(self.rockspec.raw_content.clone())
+    pub async fn build(&self) -> Result<LocalPackage, BuildError> {
+        let build = self._build()?;
+
+        let source = build.source.unwrap_or_else(|| {
+            RemotePackageSource::RockspecContent(build.rockspec.raw_content.clone())
         });
-        build(
-            self.rockspec,
-            self.pin,
-            self.constraint,
-            self.behaviour,
+
+        do_build(
+            build.rockspec,
+            build.pin,
+            build.constraint,
+            build.behaviour,
             source,
-            self.config,
-            self.progress,
+            build.config,
+            build.progress,
         )
         .await
     }
@@ -108,6 +84,8 @@ impl<'a> Build<'a> {
 
 #[derive(Error, Debug)]
 pub enum BuildError {
+    #[error(transparent)]
+    BuilderError(#[from] UninitializedFieldError),
     #[error("IO operation failed: {0}")]
     Io(#[from] io::Error),
     #[error("failed to create spinner: {0}")]
@@ -262,7 +240,7 @@ async fn install(
     Ok(())
 }
 
-async fn build(
+async fn do_build(
     rockspec: &Rockspec,
     pinned: PinnedState,
     constraint: LockConstraint,

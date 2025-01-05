@@ -271,7 +271,10 @@ async fn install_rockspec(
             .await?;
     }
 
-    let pkg = Build::new(&rockspec, config, &bar)
+    let pkg = Build::default()
+        .rockspec(&rockspec)
+        .config(config)
+        .progress(&bar)
         .pin(pin)
         .constraint(constraint)
         .behaviour(behaviour)

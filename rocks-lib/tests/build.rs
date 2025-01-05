@@ -25,7 +25,10 @@ async fn builtin_build() {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    Build::new(&rockspec, &config, &Progress::Progress(bar))
+    Build::default()
+        .rockspec(&rockspec)
+        .config(&config)
+        .progress(&Progress::Progress(bar))
         .behaviour(Force)
         .build()
         .await
@@ -50,7 +53,10 @@ async fn make_build() {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    Build::new(&rockspec, &config, &Progress::Progress(bar))
+    Build::default()
+        .rockspec(&rockspec)
+        .config(&config)
+        .progress(&Progress::Progress(bar))
         .behaviour(Force)
         .build()
         .await
@@ -87,7 +93,10 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    Build::new(&rockspec, &config, &Progress::Progress(bar))
+    Build::default()
+        .rockspec(&rockspec)
+        .config(&config)
+        .progress(&Progress::Progress(bar))
         .behaviour(Force)
         .build()
         .await
