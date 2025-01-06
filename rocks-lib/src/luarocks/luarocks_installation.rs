@@ -99,9 +99,11 @@ impl LuaRocksInstallation {
         &self,
         progress: &Progress<ProgressBar>,
     ) -> Result<(), LuaRocksInstallError> {
-        let mut lockfile = self.tree.lockfile()?;
+        let mut lockfile = self.tree.lockfile()?.write_guard();
+
         let luarocks_req =
             PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into())).unwrap();
+
         if !self.tree.match_rocks(&luarocks_req)?.is_found() {
             let rockspec = Rockspec::new(LUAROCKS_ROCKSPEC).unwrap();
             let pkg = Build::new(&rockspec, &self.config, progress)
@@ -112,7 +114,7 @@ impl LuaRocksInstallation {
                 .await?;
             lockfile.add(&pkg);
         }
-        lockfile.flush()?;
+
         Ok(())
     }
 
@@ -123,7 +125,7 @@ impl LuaRocksInstallation {
         progress_arc: Arc<Progress<MultiProgress>>,
     ) -> Result<(), InstallBuildDependenciesError> {
         let progress = Arc::clone(&progress_arc);
-        let mut lockfile = self.tree.lockfile()?;
+        let mut lockfile = self.tree.lockfile()?.write_guard();
         let package_db = RemotePackageDB::from_config(&self.config).await?;
         let build_dependencies = match rockspec.rockspec_format {
             Some(RockspecFormat::_1_0 | RockspecFormat::_2_0) => {
@@ -204,7 +206,7 @@ impl LuaRocksInstallation {
                     );
                 });
         });
-        lockfile.flush()?;
+
         Ok(())
     }
 

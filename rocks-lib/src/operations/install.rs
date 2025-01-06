@@ -3,7 +3,7 @@ use std::{collections::HashMap, io, sync::Arc};
 use crate::{
     build::{Build, BuildBehaviour, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
-    lockfile::{LocalPackage, LocalPackageId, LockConstraint, Lockfile, PinnedState},
+    lockfile::{LocalPackage, LocalPackageId, LockConstraint, Lockfile, PinnedState, ReadWrite},
     luarocks::{
         install_binary_rock::{BinaryRockInstall, InstallBinaryRockError},
         luarocks_installation::{
@@ -137,10 +137,10 @@ where
 {
     let lua_version = LuaVersion::from(config)?;
     let tree = Tree::new(config.tree().clone(), lua_version)?;
-    let mut lockfile = tree.lockfile()?;
-    let result = install_impl(packages, pin, package_db, config, &mut lockfile, progress).await;
-    lockfile.flush()?;
-    result
+
+    let mut lockfile = tree.lockfile()?.write_guard();
+
+    install_impl(packages, pin, package_db, config, &mut lockfile, progress).await
 }
 
 async fn install_impl(
@@ -148,7 +148,7 @@ async fn install_impl(
     pin: PinnedState,
     package_db: RemotePackageDB,
     config: &Config,
-    lockfile: &mut Lockfile,
+    lockfile: &mut Lockfile<ReadWrite>,
     progress_arc: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, InstallError> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();

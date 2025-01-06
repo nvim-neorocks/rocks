@@ -14,3 +14,5 @@
 /*.rockspec
 *.snap.new
 /.rocks
+
+.pre-commit-config.yaml

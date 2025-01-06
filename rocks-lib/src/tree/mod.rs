@@ -4,7 +4,7 @@ use crate::{
         variables::{self, HasVariables},
     },
     config::LuaVersion,
-    lockfile::{LocalPackage, LocalPackageId, Lockfile},
+    lockfile::{LocalPackage, LocalPackageId, Lockfile, ReadOnly},
     package::PackageReq,
 };
 use std::{io, path::PathBuf};
@@ -208,7 +208,7 @@ impl Tree {
         Ok(rock_layout)
     }
 
-    pub fn lockfile(&self) -> io::Result<Lockfile> {
+    pub fn lockfile(&self) -> io::Result<Lockfile<ReadOnly>> {
         Lockfile::new(self.root().join("lock.json"))
     }
 }
@@ -248,7 +248,9 @@ impl mlua::UserData for Tree {
         methods.add_method("rock", |_, this, package: LocalPackage| {
             this.rock(&package).into_lua_err()
         });
-        methods.add_method("lockfile", |_, this, ()| this.lockfile().into_lua_err());
+        methods.add_method("lockfile", |_, this, ()| {
+            Ok(this.lockfile().into_lua_err()?.into_temporary())
+        });
     }
 }
 
