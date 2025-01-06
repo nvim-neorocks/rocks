@@ -45,9 +45,9 @@ mod tests {
 
     #[test]
     fn substitute_helper() {
-        assert_eq!(substitute(get_var, "$(TEST_VAR)".into()), "foo".to_string());
+        assert_eq!(substitute(get_var, "$(TEST_VAR)"), "foo".to_string());
         assert_eq!(
-            substitute(get_var, "$(UNRECOGNISED)".into()),
+            substitute(get_var, "$(UNRECOGNISED)"),
             "$(UNRECOGNISED)".to_string()
         );
     }

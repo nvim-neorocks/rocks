@@ -1,5 +1,8 @@
+use std::error::Error;
 use std::fmt::Display;
 use std::io::{self, Write};
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 use std::{collections::HashMap, fs::File, io::ErrorKind, path::PathBuf};
 
 use itertools::Itertools;
@@ -412,10 +415,21 @@ impl TryFrom<&Option<String>> for LockConstraint {
     }
 }
 
+pub trait LockfilePermissions {}
+#[derive(Clone)]
+pub struct ReadOnly;
+#[derive(Clone)]
+pub struct ReadWrite;
+
+impl LockfilePermissions for ReadOnly {}
+impl LockfilePermissions for ReadWrite {}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Lockfile {
+pub struct Lockfile<P: LockfilePermissions> {
     #[serde(skip)]
     filepath: PathBuf,
+    #[serde(skip)]
+    _marker: PhantomData<P>,
     // TODO: Serialize this directly into a `Version`
     version: String,
     // NOTE: We cannot directly serialize to a `Sha256` object as they don't implement serde traits.
@@ -423,8 +437,63 @@ pub struct Lockfile {
     entrypoints: Vec<LocalPackageId>,
 }
 
-impl Lockfile {
-    pub fn new(filepath: PathBuf) -> io::Result<Self> {
+impl<P: LockfilePermissions> Lockfile<P> {
+    pub fn version(&self) -> &String {
+        &self.version
+    }
+
+    pub fn rocks(&self) -> &HashMap<LocalPackageId, LocalPackage> {
+        &self.rocks
+    }
+
+    pub fn get(&self, id: &LocalPackageId) -> Option<&LocalPackage> {
+        self.rocks.get(id)
+    }
+
+    pub(crate) fn list(&self) -> HashMap<PackageName, Vec<LocalPackage>> {
+        self.rocks()
+            .values()
+            .cloned()
+            .map(|locked_rock| (locked_rock.name().clone(), locked_rock))
+            .into_group_map()
+    }
+
+    pub(crate) fn has_rock(&self, req: &PackageReq) -> Option<LocalPackage> {
+        self.list()
+            .get(req.name())
+            .map(|packages| {
+                packages
+                    .iter()
+                    .rev()
+                    .find(|package| req.version_req().matches(package.version()))
+            })?
+            .cloned()
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        let dependencies = self
+            .rocks
+            .iter()
+            .flat_map(|(_, rock)| rock.dependencies())
+            .collect_vec();
+
+        self.entrypoints = self
+            .rocks
+            .keys()
+            .filter(|id| !dependencies.iter().contains(&id))
+            .cloned()
+            .collect();
+
+        let content = serde_json::to_string_pretty(&self)?;
+
+        std::fs::write(&self.filepath, content)?;
+
+        Ok(())
+    }
+}
+
+impl Lockfile<ReadOnly> {
+    pub(crate) fn new(filepath: PathBuf) -> io::Result<Lockfile<ReadOnly>> {
         // Ensure that the lockfile exists
         match File::options().create_new(true).write(true).open(&filepath) {
             Ok(mut file) => {
@@ -443,13 +512,68 @@ impl Lockfile {
             Err(err) => return Err(err),
         }
 
-        let mut new: Lockfile = serde_json::from_str(&std::fs::read_to_string(&filepath)?)?;
+        let mut new: Lockfile<ReadOnly> =
+            serde_json::from_str(&std::fs::read_to_string(&filepath)?)?;
 
         new.filepath = filepath;
 
         Ok(new)
     }
 
+    /// Creates a temporary, writeable lockfile which can never flush.
+    pub fn into_temporary(self) -> Lockfile<ReadWrite> {
+        Lockfile::<ReadWrite> {
+            _marker: PhantomData,
+            filepath: self.filepath,
+            version: self.version,
+            rocks: self.rocks,
+            entrypoints: self.entrypoints,
+        }
+    }
+
+    /// Creates a lockfile guard, flushing the lockfile automatically
+    /// once the guard goes out of scope.
+    pub fn write_guard(self) -> LockfileGuard {
+        LockfileGuard(self.into_temporary())
+    }
+
+    /// Converts the current lockfile into a writeable one, executes `cb` and flushes
+    /// the lockfile.
+    pub fn map_then_flush<T, F, E>(self, cb: F) -> Result<T, E>
+    where
+        F: FnOnce(&mut Lockfile<ReadWrite>) -> Result<T, E>,
+        E: Error,
+        E: From<io::Error>,
+    {
+        let mut writeable_lockfile = self.into_temporary();
+
+        let result = cb(&mut writeable_lockfile)?;
+
+        writeable_lockfile.flush()?;
+
+        Ok(result)
+    }
+
+    // TODO: Add this once async closures are stabilized
+    // Converts the current lockfile into a writeable one, executes `cb` asynchronously and flushes
+    // the lockfile.
+    //pub async fn map_then_flush_async<T, F, E, Fut>(self, cb: F) -> Result<T, E>
+    //where
+    //    F: AsyncFnOnce(&mut Lockfile<ReadWrite>) -> Result<T, E>,
+    //    E: Error,
+    //    E: From<io::Error>,
+    //{
+    //    let mut writeable_lockfile = self.into_temporary();
+    //
+    //    let result = cb(&mut writeable_lockfile).await?;
+    //
+    //    writeable_lockfile.flush()?;
+    //
+    //    Ok(result)
+    //}
+}
+
+impl Lockfile<ReadWrite> {
     pub fn add(&mut self, rock: &LocalPackage) {
         self.rocks.insert(rock.id(), rock.clone());
     }
@@ -477,74 +601,53 @@ impl Lockfile {
         self.rocks.remove(target);
     }
 
-    pub fn version(&self) -> &String {
-        &self.version
-    }
-
-    pub fn rocks(&self) -> &HashMap<LocalPackageId, LocalPackage> {
-        &self.rocks
-    }
-
-    pub fn get(&self, id: &LocalPackageId) -> Option<&LocalPackage> {
-        self.rocks.get(id)
-    }
-
-    pub fn get_mut(&mut self, id: &LocalPackageId) -> Option<&mut LocalPackage> {
-        self.rocks.get_mut(id)
-    }
-
     // TODO: `fn entrypoints() -> Vec<LockedRock>`
+}
 
-    pub fn flush(&mut self) -> io::Result<()> {
-        let dependencies = self
-            .rocks
-            .iter()
-            .flat_map(|(_, rock)| rock.dependencies())
-            .collect_vec();
+pub struct LockfileGuard(Lockfile<ReadWrite>);
 
-        self.entrypoints = self
-            .rocks
-            .keys()
-            .filter(|id| !dependencies.iter().contains(&id))
-            .cloned()
-            .collect();
-
-        let content = serde_json::to_string_pretty(self)?;
-
-        std::fs::write(&self.filepath, content)?;
-
-        Ok(())
-    }
-
-    pub(crate) fn list(&self) -> HashMap<PackageName, Vec<LocalPackage>> {
-        self.rocks()
-            .values()
-            .cloned()
-            .map(|locked_rock| (locked_rock.name().clone(), locked_rock))
-            .into_group_map()
-    }
-
-    pub(crate) fn has_rock(&self, req: &PackageReq) -> Option<LocalPackage> {
-        self.list()
-            .get(req.name())
-            .map(|packages| {
-                packages
-                    .iter()
-                    .rev()
-                    .find(|package| req.version_req().matches(package.version()))
-            })?
-            .cloned()
+impl Serialize for LockfileGuard {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.serialize(serializer)
     }
 }
 
-impl Drop for Lockfile {
+impl<'de> Deserialize<'de> for LockfileGuard {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(LockfileGuard(Lockfile::<ReadWrite>::deserialize(
+            deserializer,
+        )?))
+    }
+}
+
+impl Deref for LockfileGuard {
+    type Target = Lockfile<ReadWrite>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for LockfileGuard {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Drop for LockfileGuard {
     fn drop(&mut self) {
         let _ = self.flush();
     }
 }
 
 #[cfg(feature = "lua")]
-impl mlua::UserData for Lockfile {
+impl mlua::UserData for Lockfile<ReadWrite> {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method_mut("add", |_, this, package: LocalPackage| {
             this.add(&package);
@@ -622,7 +725,7 @@ mod tests {
         };
 
         let tree = Tree::new(temp.to_path_buf(), Lua51).unwrap();
-        let mut lockfile = tree.lockfile().unwrap();
+        let mut lockfile = tree.lockfile().unwrap().write_guard();
 
         let test_package = PackageSpec::parse("test1".to_string(), "0.1.0".to_string()).unwrap();
         let test_local_package = LocalPackage::from(

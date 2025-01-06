@@ -9,7 +9,10 @@ use tokio::sync::mpsc::UnboundedSender;
 use crate::{
     build::BuildBehaviour,
     config::Config,
-    lockfile::{LocalPackageId, LocalPackageSpec, LockConstraint, Lockfile, PinnedState},
+    lockfile::{
+        LocalPackageId, LocalPackageSpec, LockConstraint, Lockfile, LockfilePermissions,
+        PinnedState,
+    },
     package::{PackageReq, PackageVersionReq},
     progress::{MultiProgress, Progress},
     remote_package_db::RemotePackageDB,
@@ -25,15 +28,18 @@ pub(crate) struct PackageInstallSpec {
 }
 
 #[async_recursion]
-pub(crate) async fn get_all_dependencies(
+pub(crate) async fn get_all_dependencies<P>(
     tx: UnboundedSender<PackageInstallSpec>,
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
     package_db: Arc<RemotePackageDB>,
-    lockfile: Arc<Lockfile>,
+    lockfile: Arc<Lockfile<P>>,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
-) -> Result<Vec<LocalPackageId>, SearchAndDownloadError> {
+) -> Result<Vec<LocalPackageId>, SearchAndDownloadError>
+where
+    P: LockfilePermissions + Send + Sync + 'static,
+{
     join_all(
         packages
             .into_iter()

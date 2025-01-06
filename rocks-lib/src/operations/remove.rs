@@ -76,7 +76,7 @@ async fn remove(
     tree: Tree,
     progress: &Progress<MultiProgress>,
 ) -> Result<(), RemoveError> {
-    let mut lockfile = tree.lockfile()?;
+    let lockfile = tree.lockfile()?;
 
     let packages = package_ids
         .iter()
@@ -92,11 +92,13 @@ async fn remove(
     }))
     .await;
 
-    package_ids
-        .iter()
-        .for_each(|package| lockfile.remove_by_id(package));
+    lockfile.map_then_flush(|lockfile| {
+        package_ids
+            .iter()
+            .for_each(|package| lockfile.remove_by_id(package));
 
-    lockfile.flush()?;
+        Ok::<_, io::Error>(())
+    })?;
 
     Ok(())
 }

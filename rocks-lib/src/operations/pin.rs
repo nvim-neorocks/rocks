@@ -37,7 +37,7 @@ pub fn set_pinned_state(
     tree: &Tree,
     pin: PinnedState,
 ) -> Result<(), PinError> {
-    let mut lockfile = tree.lockfile()?;
+    let lockfile = tree.lockfile()?;
     let mut package = lockfile
         .get(package_id)
         .ok_or_else(|| PinError::PackageNotFound(package_id.clone()))?
@@ -71,9 +71,12 @@ pub fn set_pinned_state(
 
     fs_extra::move_items(&items, new_root, &CopyOptions::new())?;
 
-    lockfile.remove(&old_package);
-    lockfile.add(&package);
-    lockfile.flush()?;
+    lockfile.map_then_flush(|lockfile| {
+        lockfile.remove(&old_package);
+        lockfile.add(&package);
+
+        Ok::<_, io::Error>(())
+    })?;
 
     Ok(())
 }
