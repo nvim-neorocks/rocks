@@ -9,6 +9,7 @@ use rocks_lib::{
     },
     config::{ConfigBuilder, LuaVersion},
     lockfile::PinnedState,
+    lua_rockspec::LuaRockspec,
     operations::{Install, LockfileUpdate},
     package::PackageName,
     progress::{MultiProgress, Progress},
@@ -25,7 +26,7 @@ async fn builtin_build() {
     let content =
         String::from_utf8(std::fs::read("resources/test/lua-cjson-2.1.0-1.rockspec").unwrap())
             .unwrap();
-    let rockspec = Rockspec::new(&content).unwrap();
+    let rockspec = LuaRockspec::new(&content).unwrap();
 
     let config = ConfigBuilder::new()
         .tree(Some(dir.into_path()))
@@ -50,7 +51,7 @@ async fn make_build() {
         std::fs::read("resources/test/make-project/make-project-scm-1.rockspec").unwrap(),
     )
     .unwrap();
-    let rockspec = Rockspec::new(&content).unwrap();
+    let rockspec = LuaRockspec::new(&content).unwrap();
 
     let config = ConfigBuilder::new()
         .tree(Some(dir.into_path()))
@@ -95,8 +96,10 @@ async fn lockfile_update() {
     let project_root: PathBuf = project_root.path().into();
     let project = Project::from(project_root).unwrap().unwrap();
     let dependencies = project
-        .rockspec()
-        .dependencies
+        .rocks()
+        .into_validated_rocks_toml()
+        .unwrap()
+        .dependencies()
         .current_platform()
         .iter()
         .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
@@ -126,7 +129,7 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
     let dir = TempDir::new("rocks-test").unwrap();
 
     let content = String::from_utf8(std::fs::read(rockspec_path).unwrap()).unwrap();
-    let rockspec = Rockspec::new(&content).unwrap();
+    let rockspec = LuaRockspec::new(&content).unwrap();
 
     let config = ConfigBuilder::new()
         .tree(Some(dir.into_path()))

@@ -1,12 +1,14 @@
 use itertools::Itertools;
 use mlua::FromLua;
+use serde_enum_str::Serialize_enum_str;
 use std::{convert::Infallible, path::PathBuf};
 use thiserror::Error;
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 use super::{
-    FromPlatformOverridable, PartialOverride, PerPlatform, PerPlatformWrapper, PlatformOverridable,
+    DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue, FromPlatformOverridable, PartialOverride,
+    PerPlatform, PerPlatformWrapper, PlatformOverridable,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -67,6 +69,18 @@ impl FromLua for PerPlatform<TestSpec> {
     }
 }
 
+impl<'de> Deserialize<'de> for TestSpec {
+    fn deserialize<D>(deserializer: D) -> Result<TestSpec, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let internal = TestSpecInternal::deserialize(deserializer)?;
+        let test_spec =
+            TestSpec::from_platform_overridable(internal).map_err(serde::de::Error::custom)?;
+        Ok(test_spec)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct BustedTestSpec {
     flags: Vec<String>,
@@ -84,23 +98,23 @@ pub struct ScriptTestSpec {
     flags: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize_enum_str, PartialEq, Clone)]
 #[serde(rename_all = "lowercase")]
-enum TestType {
+pub(crate) enum TestType {
     Busted,
     Command,
 }
 
 #[derive(Debug, PartialEq, Deserialize, Default, Clone)]
-struct TestSpecInternal {
+pub(crate) struct TestSpecInternal {
     #[serde(default, rename = "type")]
-    test_type: Option<TestType>,
+    pub(crate) test_type: Option<TestType>,
     #[serde(default)]
-    flags: Option<Vec<String>>,
+    pub(crate) flags: Option<Vec<String>>,
     #[serde(default)]
-    command: Option<String>,
+    pub(crate) command: Option<String>,
     #[serde(default)]
-    script: Option<PathBuf>,
+    pub(crate) script: Option<PathBuf>,
 }
 
 impl PartialOverride for TestSpecInternal {
@@ -150,12 +164,53 @@ fn override_opt<T: Clone>(override_opt: &Option<T>, base: &Option<T>) -> Option<
     }
 }
 
+impl DisplayAsLuaKV for TestSpecInternal {
+    fn display_lua(&self) -> DisplayLuaKV {
+        let mut result = Vec::new();
+
+        if let Some(test_type) = &self.test_type {
+            result.push(DisplayLuaKV {
+                key: "type".to_string(),
+                value: DisplayLuaValue::String(test_type.to_string()),
+            });
+        }
+        if let Some(flags) = &self.flags {
+            result.push(DisplayLuaKV {
+                key: "flags".to_string(),
+                value: DisplayLuaValue::List(
+                    flags
+                        .iter()
+                        .map(|flag| DisplayLuaValue::String(flag.clone()))
+                        .collect(),
+                ),
+            });
+        }
+        if let Some(command) = &self.command {
+            result.push(DisplayLuaKV {
+                key: "command".to_string(),
+                value: DisplayLuaValue::String(command.clone()),
+            });
+        }
+        if let Some(script) = &self.script {
+            result.push(DisplayLuaKV {
+                key: "script".to_string(),
+                value: DisplayLuaValue::String(script.to_string_lossy().to_string()),
+            });
+        }
+
+        DisplayLuaKV {
+            key: "test".to_string(),
+            value: DisplayLuaValue::Table(result),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
     use mlua::{Error, FromLua, Lua};
 
-    use crate::rockspec::PlatformIdentifier;
+    use crate::lua_rockspec::PlatformIdentifier;
 
     use super::*;
 

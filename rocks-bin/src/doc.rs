@@ -5,6 +5,7 @@ use itertools::Itertools;
 use rocks_lib::{
     config::{Config, LuaVersion},
     lockfile::LocalPackage,
+    lua_rockspec::LuaRockspec,
     package::PackageReq,
     rockspec::Rockspec,
     tree::{RockMatches, Tree},
@@ -63,8 +64,8 @@ async fn open_homepage(pkg: LocalPackage, tree: &Tree) -> Result<()> {
 fn get_homepage(pkg: &LocalPackage, tree: &Tree) -> Result<Option<Url>> {
     let layout = tree.rock_layout(pkg);
     let rockspec_content = std::fs::read_to_string(layout.rockspec_path())?;
-    let rockspec = Rockspec::new(&rockspec_content)?;
-    Ok(rockspec.description.homepage)
+    let rockspec = LuaRockspec::new(&rockspec_content)?;
+    Ok(rockspec.description().homepage.clone())
 }
 
 async fn open_local_docs(pkg: LocalPackage, tree: &Tree) -> Result<()> {

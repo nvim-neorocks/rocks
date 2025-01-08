@@ -1,5 +1,5 @@
 use std::{
-    io::{self, Cursor, Read as _},
+    io::{self, Cursor, Read},
     path::PathBuf,
     string::FromUtf8Error,
 };
@@ -10,12 +10,12 @@ use url::Url;
 
 use crate::{
     config::Config,
+    lua_rockspec::{LuaRockspec, RockspecError},
     luarocks,
     package::{PackageName, PackageReq, PackageSpec, PackageVersion, RemotePackageTypeFilterSpec},
     progress::{Progress, ProgressBar},
     remote_package_db::{RemotePackageDB, RemotePackageDBError, SearchError},
     remote_package_source::RemotePackageSource,
-    rockspec::{Rockspec, RockspecError},
 };
 
 /// Builder for a rock downloader.
@@ -121,7 +121,7 @@ pub struct DownloadedPackedRock {
 
 #[derive(Clone, Debug)]
 pub struct DownloadedRockspec {
-    pub rockspec: Rockspec,
+    pub rockspec: LuaRockspec,
     pub(crate) source: RemotePackageSource,
 }
 
@@ -141,7 +141,7 @@ pub(crate) enum RemoteRockDownload {
 }
 
 impl RemoteRockDownload {
-    pub fn rockspec(&self) -> &Rockspec {
+    pub fn rockspec(&self) -> &LuaRockspec {
         &self.rockspec_download().rockspec
     }
     pub fn rockspec_download(&self) -> &DownloadedRockspec {
@@ -210,7 +210,7 @@ async fn download_remote_rock(
                 .map_err(DownloadRockspecError::Request)?;
             let content = String::from_utf8(bytes.into())?;
             let rockspec = DownloadedRockspec {
-                rockspec: Rockspec::new(&content)?,
+                rockspec: LuaRockspec::new(&content)?,
                 source: remote_package.source,
             };
             Ok(RemoteRockDownload::RockspecOnly {
@@ -219,7 +219,7 @@ async fn download_remote_rock(
         }
         RemotePackageSource::RockspecContent(content) => {
             let rockspec = DownloadedRockspec {
-                rockspec: Rockspec::new(content)?,
+                rockspec: LuaRockspec::new(content)?,
                 source: remote_package.source,
             };
             Ok(RemoteRockDownload::RockspecOnly {
@@ -379,7 +379,7 @@ fn mk_packed_rock_name(name: &PackageName, version: &PackageVersion, ext: &str) 
 
 pub(crate) async fn unpack_rockspec(
     rock: &DownloadedPackedRockBytes,
-) -> Result<Rockspec, SearchAndDownloadError> {
+) -> Result<LuaRockspec, SearchAndDownloadError> {
     let cursor = Cursor::new(&rock.bytes);
     let rockspec_file_name = format!("{}-{}.rockspec", rock.name, rock.version);
     let mut zip = zip::ZipArchive::new(cursor)?;
@@ -391,6 +391,6 @@ pub(crate) async fn unpack_rockspec(
     let mut rockspec_file = zip.by_index(rockspec_index)?;
     let mut content = String::new();
     rockspec_file.read_to_string(&mut content)?;
-    let rockspec = Rockspec::new(&content)?;
+    let rockspec = LuaRockspec::new(&content)?;
     Ok(rockspec)
 }

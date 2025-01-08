@@ -6,8 +6,8 @@ use crate::{
     package::{PackageName, PackageReq, PackageVersionReqError},
     path::Paths,
     progress::{MultiProgress, Progress},
-    project::Project,
-    rockspec::Rockspec,
+    project::{rocks_toml::RocksTomlValidationError, Project},
+    rockspec::{LuaVersionCompatibility, Rockspec},
     tree::Tree,
 };
 use bon::Builder;
@@ -78,20 +78,22 @@ pub enum RunTestsError {
     LuaVersionUnset,
     #[error(transparent)]
     Io(#[from] io::Error),
+    #[error(transparent)]
+    RocksTomlValidation(#[from] RocksTomlValidationError),
 }
 
 async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
-    let rockspec = test.project.rockspec();
-    let lua_version = match rockspec.lua_version_from_config(test.config) {
+    let rocks = test.project.rocks().into_validated_rocks_toml()?;
+    let lua_version = match rocks.lua_version_matches(test.config) {
         Ok(lua_version) => Ok(lua_version),
-        Err(_) => rockspec
+        Err(_) => rocks
             .test_lua_version()
             .ok_or(RunTestsError::LuaVersionUnset),
     }?;
     let tree = Tree::new(test.config.tree().clone(), lua_version)?;
     // TODO(#204): Only ensure busted if running with busted (e.g. a .busted directory exists)
     ensure_busted(&tree, test.config, test.progress.clone()).await?;
-    ensure_dependencies(rockspec, &tree, test.config, test.progress).await?;
+    ensure_dependencies(&rocks, &tree, test.config, test.progress).await?;
     let tree_root = &tree.root().clone();
     let paths = Paths::from_tree(tree)?;
     let mut command = Command::new("busted");
@@ -161,16 +163,16 @@ pub async fn ensure_busted(
 /// Ensure dependencies and test dependencies are installed
 /// This defaults to the local project tree if cwd is a project root.
 async fn ensure_dependencies(
-    rockspec: &Rockspec,
+    rockspec: &impl Rockspec,
     tree: &Tree,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), InstallTestDependenciesError> {
     let dependencies = rockspec
-        .test_dependencies
+        .test_dependencies()
         .current_platform()
         .iter()
-        .chain(rockspec.dependencies.current_platform())
+        .chain(rockspec.dependencies().current_platform())
         .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
         .filter_map(|req| {
             let build_behaviour = if tree

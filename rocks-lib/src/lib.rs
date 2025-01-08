@@ -3,6 +3,7 @@ pub mod config;
 pub mod hash;
 pub mod lockfile;
 pub mod lua_installation;
+pub mod lua_rockspec;
 pub mod luarocks;
 pub mod manifest;
 pub mod operations;

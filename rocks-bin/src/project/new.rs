@@ -12,7 +12,10 @@ use spdx::LicenseId;
 use spinners::{Spinner, Spinners};
 
 use crate::utils::github_metadata::{self, RepoMetadata};
-use rocks_lib::{package::PackageReq, project::Project};
+use rocks_lib::{
+    package::PackageReq,
+    project::{Project, ROCKS_TOML},
+};
 
 // TODO:
 // - Automatically detect build type to insert into rockspec by inspecting the current repo.
@@ -108,7 +111,7 @@ pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
     if project.is_some()
         && !Confirm::new("Target directory already has a project, write anyway?")
             .with_default(false)
-            .with_help_message("This may overwrite your existing rocks.toml")
+            .with_help_message(&format!("This may overwrite your existing {}", ROCKS_TOML))
             .with_render_config(render_config)
             .prompt()?
     {
@@ -260,7 +263,7 @@ pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
 
     let _ = std::fs::create_dir_all(&cli_flags.directory);
 
-    let rocks_path = cli_flags.directory.join("rocks.toml");
+    let rocks_path = cli_flags.directory.join(ROCKS_TOML);
 
     std::fs::write(
         &rocks_path,
@@ -268,6 +271,7 @@ pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
             r#"
 package = "{package_name}"
 version = "0.1.0"
+lua = "{lua_version_req}"
 
 [description]
 summary = "{summary}"
@@ -275,8 +279,9 @@ maintainer = "{maintainer}"
 license = "{license}"
 labels = [ {labels} ]
 
-[dependenies]
-lua = "{lua_version_req}"
+[dependencies]
+# Add your dependencies here
+# `busted = ">=2.0"`
 
 [build]
 type = "builtin"

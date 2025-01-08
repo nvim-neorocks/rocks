@@ -14,6 +14,7 @@
 /*.rockspec
 *.snap.new
 /.rocks
-rocks.lock
+/rocks.lock
+/rocks.toml
 
 .pre-commit-config.yaml

@@ -1,6 +1,8 @@
 use std::env;
 use std::io::Read;
 
+use crate::project::rocks_toml::RocksTomlValidationError;
+use crate::rockspec::Rockspec;
 use crate::TOOL_VERSION;
 use crate::{config::Config, project::Project};
 use gpgme::{Context, Data};
@@ -106,7 +108,8 @@ pub enum UploadError {
     Signature(#[from] gpgme::Error),
     ToolCheck(#[from] ToolCheckError),
     UserCheck(#[from] UserCheckError),
-    ApiKayUnspecified(#[from] ApiKeyUnspecified),
+    ApiKeyUnspecified(#[from] ApiKeyUnspecified),
+    ValidationError(#[from] RocksTomlValidationError),
 }
 
 pub struct ApiKey(String);
@@ -192,13 +195,13 @@ async fn upload_from_project(
     helpers::ensure_tool_version(&client, config.server()).await?;
     helpers::ensure_user_exists(&client, api_key, config.server()).await?;
 
-    let rockspec = project.rockspec();
+    let rocks = project.rocks().into_validated_rocks_toml()?;
 
     if helpers::rock_exists(
         &client,
         api_key,
-        &rockspec.package,
-        &rockspec.version,
+        rocks.package(),
+        rocks.version(),
         config.server(),
     )
     .await?
@@ -224,10 +227,7 @@ async fn upload_from_project(
     };
 
     let rockspec = Part::text(rockspec_content)
-        .file_name(format!(
-            "{}-{}.rockspec",
-            rockspec.package, rockspec.version
-        ))
+        .file_name(format!("{}-{}.rockspec", rocks.package(), rocks.version()))
         .mime_str("application/octet-stream")?;
 
     let multipart = {

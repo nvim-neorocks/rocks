@@ -1,4 +1,4 @@
-use itertools::Itertools as _;
+use itertools::Itertools;
 use pkg_config::{Config as PkgConfig, Library};
 use std::io;
 use std::{path::PathBuf, process::Command};

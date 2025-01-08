@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 use crate::{
-    config::external_deps::ExternalDependencySearchConfig, rockspec::ExternalDependencySpec,
+    config::external_deps::ExternalDependencySearchConfig, lua_rockspec::ExternalDependencySpec,
 };
 
 #[derive(Error, Debug)]

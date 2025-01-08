@@ -10,8 +10,8 @@ use crate::{
     build::utils,
     config::Config,
     lua_installation::LuaInstallation,
+    lua_rockspec::{Build, BuildInfo, MakeBuildSpec},
     progress::{Progress, ProgressBar},
-    rockspec::{Build, BuildInfo, MakeBuildSpec},
     tree::RockLayout,
 };
 

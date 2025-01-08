@@ -16,11 +16,11 @@ use thiserror::Error;
 
 use crate::config::Config;
 use crate::hash::HasIntegrity;
+use crate::lua_rockspec::RockSourceSpec;
 use crate::operations;
 use crate::package::PackageSpec;
 use crate::progress::Progress;
 use crate::progress::ProgressBar;
-use crate::rockspec::RockSourceSpec;
 use crate::rockspec::Rockspec;
 
 use super::DownloadSrcRockError;
@@ -29,18 +29,18 @@ use super::DownloadSrcRockError;
 /// over how a package should be fetched.
 #[derive(Builder)]
 #[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
-pub struct FetchSrc<'a> {
+pub struct FetchSrc<'a, R: Rockspec> {
     #[builder(start_fn)]
     dest_dir: &'a Path,
     #[builder(start_fn)]
-    rockspec: &'a Rockspec,
+    rockspec: &'a R,
     #[builder(start_fn)]
     config: &'a Config,
     #[builder(start_fn)]
     progress: &'a Progress<ProgressBar>,
 }
 
-impl<State> FetchSrcBuilder<'_, State>
+impl<R: Rockspec, State> FetchSrcBuilder<'_, R, State>
 where
     State: fetch_src_builder::State + fetch_src_builder::IsComplete,
 {
@@ -51,8 +51,8 @@ where
         match do_fetch_src(&fetch).await {
             Err(err) => {
                 let package = PackageSpec::new(
-                    fetch.rockspec.package.clone(),
-                    fetch.rockspec.version.clone(),
+                    fetch.rockspec.package().clone(),
+                    fetch.rockspec.version().clone(),
                 );
                 fetch.progress.map(|p| {
                     p.println(format!(
@@ -120,9 +120,9 @@ pub enum FetchSrcRockError {
     Io(#[from] io::Error),
 }
 
-async fn do_fetch_src(fetch: &FetchSrc<'_>) -> Result<Integrity, FetchSrcError> {
+async fn do_fetch_src<R: Rockspec>(fetch: &FetchSrc<'_, R>) -> Result<Integrity, FetchSrcError> {
     let rockspec = fetch.rockspec;
-    let rock_source = rockspec.source.current_platform();
+    let rock_source = rockspec.source().current_platform();
     let progress = fetch.progress;
     let dest_dir = fetch.dest_dir;
     let integrity = match &rock_source.source_spec {

@@ -8,19 +8,21 @@ use bytes::Bytes;
 use tempdir::TempDir;
 use thiserror::Error;
 
+use crate::rockspec::LuaVersionCompatibility;
 use crate::{
     build::{
         external_dependency::{ExternalDependencyError, ExternalDependencyInfo},
         BuildBehaviour,
     },
     config::Config,
-    hash::HasIntegrity as _,
+    hash::HasIntegrity,
     lockfile::{LocalPackage, LocalPackageHashes, LockConstraint, PinnedState},
+    lua_rockspec::{LuaRockspec, LuaVersionError},
     luarocks::rock_manifest::RockManifest,
     package::PackageSpec,
     progress::{Progress, ProgressBar},
     remote_package_source::RemotePackageSource,
-    rockspec::{LuaVersionError, Rockspec},
+    rockspec::Rockspec,
     tree::Tree,
 };
 
@@ -43,7 +45,7 @@ pub enum InstallBinaryRockError {
 }
 
 pub(crate) struct BinaryRockInstall<'a> {
-    rockspec: &'a Rockspec,
+    rockspec: &'a LuaRockspec,
     rock_bytes: Bytes,
     source: RemotePackageSource,
     pin: PinnedState,
@@ -55,7 +57,7 @@ pub(crate) struct BinaryRockInstall<'a> {
 
 impl<'a> BinaryRockInstall<'a> {
     pub(crate) fn new(
-        rockspec: &'a Rockspec,
+        rockspec: &'a LuaRockspec,
         source: RemotePackageSource,
         rock_bytes: Bytes,
         config: &'a Config,
@@ -90,14 +92,15 @@ impl<'a> BinaryRockInstall<'a> {
         self.progress.map(|p| {
             p.set_message(format!(
                 "Unpacking and installing {}@{}...",
-                rockspec.package, rockspec.version
+                rockspec.package(),
+                rockspec.version()
             ))
         });
-        for (name, dep) in rockspec.external_dependencies.current_platform() {
+        for (name, dep) in rockspec.external_dependencies().current_platform() {
             let _ = ExternalDependencyInfo::detect(name, dep, self.config.external_deps())?;
         }
 
-        let lua_version = rockspec.lua_version_from_config(self.config)?;
+        let lua_version = rockspec.lua_version_matches(self.config)?;
 
         let tree = Tree::new(self.config.tree().clone(), lua_version.clone())?;
 
@@ -106,7 +109,7 @@ impl<'a> BinaryRockInstall<'a> {
             source: self.rock_bytes.hash()?,
         };
         let mut package = LocalPackage::from(
-            &PackageSpec::new(rockspec.package.clone(), rockspec.version.clone()),
+            &PackageSpec::new(rockspec.package().clone(), rockspec.version().clone()),
             self.constraint,
             rockspec.binaries(),
             self.source,

@@ -4,6 +4,7 @@ use crate::{
     build::{Build, BuildBehaviour, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{LocalPackage, LocalPackageId, LockConstraint, Lockfile, PinnedState, ReadWrite},
+    lua_rockspec::BuildBackendSpec,
     luarocks::{
         install_binary_rock::{BinaryRockInstall, InstallBinaryRockError},
         luarocks_installation::{
@@ -14,7 +15,7 @@ use crate::{
     package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress, ProgressBar},
     remote_package_db::{RemotePackageDB, RemotePackageDBError, RemotePackageDbIntegrityError},
-    rockspec::{BuildBackendSpec, LuaVersionError},
+    rockspec::Rockspec,
     tree::Tree,
 };
 
@@ -110,8 +111,6 @@ pub enum InstallError {
     #[error(transparent)]
     SearchAndDownloadError(#[from] SearchAndDownloadError),
     #[error(transparent)]
-    LuaVersionError(#[from] LuaVersionError),
-    #[error(transparent)]
     LuaVersionUnset(#[from] LuaVersionUnset),
     #[error(transparent)]
     Io(#[from] io::Error),
@@ -192,7 +191,7 @@ async fn install_impl(
         tokio::spawn(async move {
             let rockspec = downloaded_rock.rockspec();
             if let Some(BuildBackendSpec::LuaRock(build_backend)) =
-                &rockspec.build.current_platform().build_backend
+                &rockspec.build().current_platform().build_backend
             {
                 let luarocks = LuaRocksInstallation::new(&config)?;
                 luarocks
@@ -276,11 +275,11 @@ async fn install_rockspec(
     let progress = Arc::clone(&progress_arc);
     let rockspec = rockspec_download.rockspec;
     let source = rockspec_download.source;
-    let package = rockspec.package.clone();
+    let package = rockspec.package().clone();
     let bar = progress.map(|p| p.add(ProgressBar::from(format!("💻 Installing {}", &package,))));
 
     if let Some(BuildBackendSpec::LuaRock(build_backend)) =
-        &rockspec.build.current_platform().build_backend
+        &rockspec.build().current_platform().build_backend
     {
         let luarocks = LuaRocksInstallation::new(config)?;
         luarocks.ensure_installed(&bar).await?;
@@ -314,7 +313,7 @@ async fn install_binary_rock(
 ) -> Result<LocalPackage, InstallError> {
     let progress = Arc::clone(&progress_arc);
     let rockspec = rockspec_download.rockspec;
-    let package = rockspec.package.clone();
+    let package = rockspec.package().clone();
     let bar = progress.map(|p| {
         p.add(ProgressBar::from(format!(
             "💻 Installing {} (pre-built)",

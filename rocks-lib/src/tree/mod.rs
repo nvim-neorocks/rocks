@@ -11,7 +11,7 @@ use std::{io, path::PathBuf};
 
 use itertools::Itertools;
 #[cfg(feature = "lua")]
-use mlua::ExternalResult as _;
+use mlua::ExternalResult;
 
 mod list;
 
@@ -328,14 +328,14 @@ impl mlua::UserData for RockMatches {
 
 #[cfg(test)]
 mod tests {
-    use assert_fs::prelude::PathCopy as _;
+    use assert_fs::prelude::PathCopy;
     use itertools::Itertools;
     use std::path::PathBuf;
 
     use insta::assert_yaml_snapshot;
 
     use crate::{
-        build::variables::HasVariables as _,
+        build::variables::HasVariables,
         config::LuaVersion,
         lockfile::{LocalPackage, LocalPackageHashes, LockConstraint},
         package::{PackageName, PackageSpec, PackageVersion},

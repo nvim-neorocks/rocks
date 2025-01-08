@@ -1,15 +1,17 @@
-use itertools::Itertools as _;
+use itertools::Itertools;
 use serde::{de, Deserialize, Deserializer};
 use std::{collections::HashMap, convert::Infallible, fmt::Display, path::PathBuf, str::FromStr};
 use thiserror::Error;
 
 use crate::{
     build::utils::lua_lib_extension,
-    rockspec::{
-        deserialize_vec_from_lua, FromPlatformOverridable, PartialOverride, PerPlatform,
-        PlatformOverridable,
+    lua_rockspec::{
+        deserialize_vec_from_lua, DisplayAsLuaValue, FromPlatformOverridable, PartialOverride,
+        PerPlatform, PlatformOverridable,
     },
 };
+
+use super::{DisplayLuaKV, DisplayLuaValue};
 
 #[derive(Debug, PartialEq, Deserialize, Default, Clone)]
 pub struct BuiltinBuildSpec {
@@ -142,6 +144,23 @@ impl<'de> Deserialize<'de> for ModuleSpecInternal {
     }
 }
 
+impl DisplayAsLuaValue for ModuleSpecInternal {
+    fn display_lua_value(&self) -> DisplayLuaValue {
+        match self {
+            ModuleSpecInternal::SourcePath(path) => {
+                DisplayLuaValue::String(path.to_string_lossy().into())
+            }
+            ModuleSpecInternal::SourcePaths(paths) => DisplayLuaValue::List(
+                paths
+                    .iter()
+                    .map(|p| DisplayLuaValue::String(p.to_string_lossy().into()))
+                    .collect(),
+            ),
+            ModuleSpecInternal::ModulePaths(module_paths) => module_paths.display_lua_value(),
+        }
+    }
+}
+
 fn deserialize_definitions<'de, D>(
     deserializer: D,
 ) -> Result<Vec<(String, Option<String>)>, D::Error>
@@ -257,6 +276,64 @@ pub struct ModulePathsInternal {
     pub incdirs: Vec<PathBuf>,
     #[serde(default, deserialize_with = "deserialize_vec_from_lua")]
     pub libdirs: Vec<PathBuf>,
+}
+
+impl DisplayAsLuaValue for ModulePathsInternal {
+    fn display_lua_value(&self) -> DisplayLuaValue {
+        DisplayLuaValue::Table(vec![
+            DisplayLuaKV {
+                key: "sources".into(),
+                value: DisplayLuaValue::List(
+                    self.sources
+                        .iter()
+                        .map(|s| DisplayLuaValue::String(s.to_string_lossy().into()))
+                        .collect(),
+                ),
+            },
+            DisplayLuaKV {
+                key: "libraries".into(),
+                value: DisplayLuaValue::List(
+                    self.libraries
+                        .iter()
+                        .map(|s| DisplayLuaValue::String(s.to_string_lossy().into()))
+                        .collect(),
+                ),
+            },
+            DisplayLuaKV {
+                key: "defines".into(),
+                value: DisplayLuaValue::List(
+                    self.defines
+                        .iter()
+                        .map(|(k, v)| {
+                            if let Some(v) = v {
+                                DisplayLuaValue::String(format!("{}={}", k, v))
+                            } else {
+                                DisplayLuaValue::String(k.clone())
+                            }
+                        })
+                        .collect(),
+                ),
+            },
+            DisplayLuaKV {
+                key: "incdirs".into(),
+                value: DisplayLuaValue::List(
+                    self.incdirs
+                        .iter()
+                        .map(|s| DisplayLuaValue::String(s.to_string_lossy().into()))
+                        .collect(),
+                ),
+            },
+            DisplayLuaKV {
+                key: "libdirs".into(),
+                value: DisplayLuaValue::List(
+                    self.libdirs
+                        .iter()
+                        .map(|s| DisplayLuaValue::String(s.to_string_lossy().into()))
+                        .collect(),
+                ),
+            },
+        ])
+    }
 }
 
 impl PartialOverride for ModulePathsInternal {

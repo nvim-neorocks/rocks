@@ -7,10 +7,11 @@ use std::{borrow::Cow, convert::Infallible, fs, io, path::PathBuf, str::FromStr}
 use thiserror::Error;
 
 use super::{
-    FromPlatformOverridable, PartialOverride, PerPlatform, PerPlatformWrapper, PlatformOverridable,
+    DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue, FromPlatformOverridable, PartialOverride,
+    PerPlatform, PerPlatformWrapper, PlatformOverridable,
 };
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Deserialize, Clone, Debug, PartialEq)]
 pub struct RockSource {
     pub source_spec: RockSourceSpec,
     pub integrity: Option<Integrity>,
@@ -24,6 +25,8 @@ pub enum RockSourceError {
     SourceUrlMissing,
     #[error("invalid rockspec source field combination")]
     InvalidCombination,
+    #[error(transparent)]
+    SourceUrl(#[from] SourceUrlError),
 }
 
 impl FromPlatformOverridable<RockSourceInternal, Self> for RockSource {
@@ -32,7 +35,7 @@ impl FromPlatformOverridable<RockSourceInternal, Self> for RockSource {
     fn from_platform_overridable(internal: RockSourceInternal) -> Result<Self, Self::Err> {
         // The rockspec.source table allows invalid combinations
         // This ensures that invalid combinations are caught while parsing.
-        let url = internal.url.ok_or(RockSourceError::SourceUrlMissing)?;
+        let url = SourceUrl::from_str(&internal.url.ok_or(RockSourceError::SourceUrlMissing)?)?;
 
         let source_spec = match (url, internal.tag, internal.branch, internal.module) {
             (source, None, None, None) => Ok(RockSourceSpec::default_from_source_url(source)),
@@ -125,6 +128,18 @@ impl RockSourceSpec {
     }
 }
 
+impl<'de> Deserialize<'de> for RockSourceSpec {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let url = String::deserialize(deserializer)?;
+        Ok(RockSourceSpec::default_from_source_url(
+            url.parse().map_err(de::Error::custom)?,
+        ))
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct CvsSource {
     pub url: String,
@@ -159,17 +174,16 @@ pub struct SvnSource {
 /// Used as a helper for Deserialize,
 /// because the Rockspec schema allows invalid rockspecs (╯°□°)╯︵ ┻━┻
 #[derive(Debug, PartialEq, Deserialize, Clone, Default)]
-struct RockSourceInternal {
-    #[serde(default, deserialize_with = "source_url_from_str")]
-    url: Option<SourceUrl>,
-    #[serde(deserialize_with = "integrity_opt_from_hash_str")]
+pub(crate) struct RockSourceInternal {
     #[serde(default)]
-    hash: Option<Integrity>,
-    file: Option<String>,
-    dir: Option<PathBuf>,
-    tag: Option<String>,
-    branch: Option<String>,
-    module: Option<String>,
+    pub(crate) url: Option<String>,
+    #[serde(default, deserialize_with = "integrity_opt_from_hash_str")]
+    pub(crate) hash: Option<Integrity>,
+    pub(crate) file: Option<String>,
+    pub(crate) dir: Option<PathBuf>,
+    pub(crate) tag: Option<String>,
+    pub(crate) branch: Option<String>,
+    pub(crate) module: Option<String>,
 }
 
 impl PartialOverride for RockSourceInternal {
@@ -197,6 +211,60 @@ impl PartialOverride for RockSourceInternal {
     }
 }
 
+impl DisplayAsLuaKV for RockSourceInternal {
+    fn display_lua(&self) -> DisplayLuaKV {
+        let mut result = Vec::new();
+
+        if let Some(url) = &self.url {
+            result.push(DisplayLuaKV {
+                key: "url".to_string(),
+                value: DisplayLuaValue::String(url.clone()),
+            });
+        }
+        if let Some(hash) = &self.hash {
+            result.push(DisplayLuaKV {
+                key: "hash".to_string(),
+                value: DisplayLuaValue::String(hash.to_string()),
+            });
+        }
+        if let Some(file) = &self.file {
+            result.push(DisplayLuaKV {
+                key: "file".to_string(),
+                value: DisplayLuaValue::String(file.clone()),
+            });
+        }
+        if let Some(dir) = &self.dir {
+            result.push(DisplayLuaKV {
+                key: "dir".to_string(),
+                value: DisplayLuaValue::String(dir.to_string_lossy().to_string()),
+            });
+        }
+        if let Some(tag) = &self.tag {
+            result.push(DisplayLuaKV {
+                key: "tag".to_string(),
+                value: DisplayLuaValue::String(tag.clone()),
+            });
+        }
+        if let Some(branch) = &self.branch {
+            result.push(DisplayLuaKV {
+                key: "branch".to_string(),
+                value: DisplayLuaValue::String(branch.clone()),
+            });
+        }
+        if let Some(module) = &self.module {
+            result.push(DisplayLuaKV {
+                key: "module".to_string(),
+                value: DisplayLuaValue::String(module.clone()),
+            });
+        }
+
+        DisplayLuaKV {
+            key: "source".to_string(),
+            value: DisplayLuaValue::Table(result),
+        }
+    }
+}
+
 #[derive(Error, Debug)]
 #[error("missing source")]
 pub struct RockSourceMissingSource;
@@ -218,7 +286,7 @@ fn override_opt<T: Clone>(override_opt: Option<&T>, base: Option<&T>) -> Option<
 
 /// Internal helper for parsing
 #[derive(Debug, PartialEq, Clone)]
-enum SourceUrl {
+pub(crate) enum SourceUrl {
     /// For the CVS source control manager
     Cvs(String),
     /// For URLs in the local filesystem
@@ -281,16 +349,13 @@ impl FromStr for SourceUrl {
     }
 }
 
-fn source_url_from_str<'de, D>(deserializer: D) -> Result<Option<SourceUrl>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let opt: Option<String> = Option::deserialize(deserializer)?;
-    let source_url = match opt {
-        Some(s) => Some(SourceUrl::from_str(s.as_str()).map_err(de::Error::custom)?),
-        None => None,
-    };
-    Ok(source_url)
+impl<'de> Deserialize<'de> for SourceUrl {
+    fn deserialize<D>(deserializer: D) -> Result<SourceUrl, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        SourceUrl::from_str(&String::deserialize(deserializer)?).map_err(de::Error::custom)
+    }
 }
 
 fn integrity_opt_from_hash_str<'de, D>(deserializer: D) -> Result<Option<Integrity>, D::Error>

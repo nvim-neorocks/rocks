@@ -6,6 +6,7 @@ use std::{
 use thiserror::Error;
 use url::Url;
 
+use crate::rockspec::LuaVersionCompatibility;
 use crate::{
     build::{
         utils,
@@ -409,7 +410,7 @@ impl ConfigBuilder {
             .lua_version
             .or(current_project
                 .as_ref()
-                .and_then(|project| project.rockspec().lua_version()))
+                .and_then(|project| project.rocks().lua_version()))
             .or(crate::lua_installation::get_installed_lua_version("lua")
                 .ok()
                 .and_then(|version| LuaVersion::from_version(version).ok()));
