@@ -1,0 +1,15 @@
+package = "rocks"
+version = "0.1.0"
+
+[description]
+summary = "Hello, world!"
+maintainer = "vhyrro"
+license = "MIT"
+labels = []
+
+[dependenies]
+lua = ">= 5.1"
+my_dep = "0.3.0"
+
+[build]
+type = "builtin"

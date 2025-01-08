@@ -108,7 +108,7 @@ pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
     if project.is_some()
         && !Confirm::new("Target directory already has a project, write anyway?")
             .with_default(false)
-            .with_help_message("This may overwrite your existing project.rockspec")
+            .with_help_message("This may overwrite your existing rocks.toml")
             .with_render_config(render_config)
             .prompt()?
     {
@@ -260,34 +260,26 @@ pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
 
     let _ = std::fs::create_dir_all(&cli_flags.directory);
 
-    let rockspec_path = cli_flags.directory.join("project.rockspec");
+    let rocks_path = cli_flags.directory.join("rocks.toml");
 
     std::fs::write(
-        &rockspec_path,
+        &rocks_path,
         format!(
             r#"
-rockspec_format = "3.0"
 package = "{package_name}"
 version = "0.1.0"
 
-source = {{
-    url = "*** provide a url here ***",
-}}
+[description]
+summary = "{summary}"
+maintainer = "{maintainer}"
+license = "{license}"
+labels = [ {labels} ]
 
-description = {{
-    summary = "{summary}",
-    maintainer = "{maintainer}",
-    license = "{license}",
-    labels = {{ {labels} }},
-}}
+[dependenies]
+lua = "{lua_version_req}"
 
-dependencies = {{
-    "lua{lua_version_req}",
-}}
-
-build = {{
-    type = "builtin",
-}}
+[build]
+type = "builtin"
     "#,
             package_name = package_name,
             summary = description,
@@ -304,10 +296,7 @@ build = {{
         .trim(),
     )?;
 
-    println!(
-        "Done! Please enter `{}` and provide a URL for your project.",
-        rockspec_path.display()
-    );
+    println!("Done!");
 
     Ok(())
 }
