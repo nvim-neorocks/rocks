@@ -3,6 +3,7 @@ use flate2::read::GzDecoder;
 use git2::build::RepoBuilder;
 use git2::FetchOptions;
 use itertools::Itertools;
+use ssri::Integrity;
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
@@ -14,6 +15,7 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 use crate::config::Config;
+use crate::hash::HasIntegrity;
 use crate::operations;
 use crate::package::PackageSpec;
 use crate::progress::Progress;
@@ -42,27 +44,33 @@ impl<State> FetchSrcBuilder<'_, State>
 where
     State: fetch_src_builder::State + fetch_src_builder::IsComplete,
 {
-    pub async fn fetch(self) -> Result<(), FetchSrcError> {
+    /// Fetch and unpack the source into the `dest_dir`,
+    /// returning the source `Integrity`.
+    pub async fn fetch(self) -> Result<Integrity, FetchSrcError> {
         let fetch = self._build();
-        if let Err(err) = do_fetch_src(&fetch).await {
-            let package = PackageSpec::new(
-                fetch.rockspec.package.clone(),
-                fetch.rockspec.version.clone(),
-            );
-            fetch.progress.map(|p| {
-                p.println(format!(
-                    "⚠️ WARNING: Failed to fetch source for {}: {}",
-                    &package, err
-                ))
-            });
-            fetch
-                .progress
-                .map(|p| p.println("⚠️ Falling back to .src.rock archive"));
-            FetchSrcRock::new(&package, fetch.dest_dir, fetch.config, fetch.progress)
-                .fetch()
-                .await?;
+        match do_fetch_src(&fetch).await {
+            Err(err) => {
+                let package = PackageSpec::new(
+                    fetch.rockspec.package.clone(),
+                    fetch.rockspec.version.clone(),
+                );
+                fetch.progress.map(|p| {
+                    p.println(format!(
+                        "⚠️ WARNING: Failed to fetch source for {}: {}",
+                        &package, err
+                    ))
+                });
+                fetch
+                    .progress
+                    .map(|p| p.println("⚠️ Falling back to .src.rock archive"));
+                let integrity =
+                    FetchSrcRock::new(&package, fetch.dest_dir, fetch.config, fetch.progress)
+                        .fetch()
+                        .await?;
+                Ok(integrity)
+            }
+            Ok(integrity) => Ok(integrity),
         }
-        Ok(())
     }
 }
 
@@ -99,7 +107,7 @@ impl<State> FetchSrcRockBuilder<'_, State>
 where
     State: fetch_src_rock_builder::State + fetch_src_rock_builder::IsComplete,
 {
-    pub async fn fetch(self) -> Result<(), FetchSrcRockError> {
+    pub async fn fetch(self) -> Result<Integrity, FetchSrcRockError> {
         do_fetch_src_rock(self._build()).await
     }
 }
@@ -109,14 +117,15 @@ where
 pub enum FetchSrcRockError {
     DownloadSrcRock(#[from] DownloadSrcRockError),
     Unpack(#[from] UnpackError),
+    Io(#[from] io::Error),
 }
 
-async fn do_fetch_src(fetch: &FetchSrc<'_>) -> Result<(), FetchSrcError> {
+async fn do_fetch_src(fetch: &FetchSrc<'_>) -> Result<Integrity, FetchSrcError> {
     let rockspec = fetch.rockspec;
     let rock_source = rockspec.source.current_platform();
     let progress = fetch.progress;
     let dest_dir = fetch.dest_dir;
-    match &rock_source.source_spec {
+    let integrity = match &rock_source.source_spec {
         RockSourceSpec::Git(git) => {
             let url = &git.url.to_string();
             progress.map(|p| p.set_message(format!("🦠 Cloning {}", url)));
@@ -133,11 +142,13 @@ async fn do_fetch_src(fetch: &FetchSrc<'_>) -> Result<(), FetchSrcError> {
                 let (object, _) = repo.revparse_ext(commit_hash)?;
                 repo.checkout_tree(&object, None)?;
             }
+            fetch.dest_dir.hash()?
         }
         RockSourceSpec::Url(url) => {
             progress.map(|p| p.set_message(format!("📥 Downloading {}", url.to_owned())));
 
             let response = reqwest::get(url.to_owned()).await?.bytes().await?;
+            let hash = response.hash()?;
             let file_name = url
                 .path_segments()
                 .and_then(|segments| segments.last())
@@ -159,7 +170,8 @@ async fn do_fetch_src(fetch: &FetchSrc<'_>) -> Result<(), FetchSrcError> {
                 dest_dir,
                 progress,
             )
-            .await?
+            .await?;
+            hash
         }
         RockSourceSpec::File(path) => {
             if path.is_dir() {
@@ -195,21 +207,23 @@ async fn do_fetch_src(fetch: &FetchSrc<'_>) -> Result<(), FetchSrcError> {
                 )
                 .await?
             }
+            path.hash()?
         }
         RockSourceSpec::Cvs(_) => unimplemented!(),
         RockSourceSpec::Mercurial(_) => unimplemented!(),
         RockSourceSpec::Sscm(_) => unimplemented!(),
         RockSourceSpec::Svn(_) => unimplemented!(),
-    }
-    Ok(())
+    };
+    Ok(integrity)
 }
 
-async fn do_fetch_src_rock(fetch: FetchSrcRock<'_>) -> Result<(), FetchSrcRockError> {
+async fn do_fetch_src_rock(fetch: FetchSrcRock<'_>) -> Result<Integrity, FetchSrcRockError> {
     let package = fetch.package;
     let dest_dir = fetch.dest_dir;
     let config = fetch.config;
     let progress = fetch.progress;
     let src_rock = operations::download_src_rock(package, config.server(), progress).await?;
+    let integrity = src_rock.bytes.hash()?;
     let cursor = Cursor::new(src_rock.bytes);
     let mime_type = infer::get(cursor.get_ref()).map(|file_type| file_type.mime_type());
     unpack(
@@ -221,7 +235,7 @@ async fn do_fetch_src_rock(fetch: FetchSrcRock<'_>) -> Result<(), FetchSrcRockEr
         progress,
     )
     .await?;
-    Ok(())
+    Ok(integrity)
 }
 
 fn is_single_directory<R: Read + Seek + Send>(reader: R) -> io::Result<bool> {

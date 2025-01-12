@@ -242,7 +242,7 @@ async fn do_build(build: Build<'_>) -> Result<LocalPackage, BuildError> {
 
     let temp_dir = tempdir::TempDir::new(&build.rockspec.package.to_string())?;
 
-    operations::FetchSrc::new(
+    let source_hash = operations::FetchSrc::new(
         temp_dir.path(),
         build.rockspec,
         build.config,
@@ -253,7 +253,7 @@ async fn do_build(build: Build<'_>) -> Result<LocalPackage, BuildError> {
 
     let hashes = LocalPackageHashes {
         rockspec: build.rockspec.hash()?,
-        source: temp_dir.hash()?,
+        source: source_hash,
     };
 
     if let Some(expected) = &build.rockspec.source.current_platform().integrity {
