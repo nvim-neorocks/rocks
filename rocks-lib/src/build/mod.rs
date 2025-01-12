@@ -244,7 +244,10 @@ async fn do_build(build: Build<'_>) -> Result<LocalPackage, BuildError> {
 
     // Install the source in order to build.
     let rock_source = build.rockspec.source.current_platform();
-    if let Err(err) = operations::fetch_src(temp_dir.path(), rock_source, build.progress).await {
+    if let Err(err) = operations::FetchSrc::new(temp_dir.path(), rock_source, build.progress)
+        .fetch_src()
+        .await
+    {
         let package = PackageSpec::new(
             build.rockspec.package.clone(),
             build.rockspec.version.clone(),

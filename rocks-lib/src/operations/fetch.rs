@@ -1,3 +1,4 @@
+use bon::Builder;
 use flate2::read::GzDecoder;
 use git2::build::RepoBuilder;
 use git2::FetchOptions;
@@ -21,6 +22,28 @@ use crate::{rockspec::RockSource, rockspec::RockSourceSpec};
 
 use super::DownloadSrcRockError;
 
+/// A rocks package source fetcher, providing fine-grained control
+/// over how a package should be fetched.
+#[derive(Builder)]
+#[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
+pub struct FetchSrc<'a> {
+    #[builder(start_fn)]
+    dest_dir: &'a Path,
+    #[builder(start_fn)]
+    rock_source: &'a RockSource,
+    #[builder(start_fn)]
+    progress: &'a Progress<ProgressBar>,
+}
+
+impl<State> FetchSrcBuilder<'_, State>
+where
+    State: fetch_src_builder::State + fetch_src_builder::IsComplete,
+{
+    pub async fn fetch_src(self) -> Result<(), FetchSrcError> {
+        do_fetch_src(self._build()).await
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum FetchSrcError {
     #[error("failed to clone rock source: {0}")]
@@ -33,11 +56,10 @@ pub enum FetchSrcError {
     Unpack(#[from] UnpackError),
 }
 
-pub async fn fetch_src(
-    dest_dir: &Path,
-    rock_source: &RockSource,
-    progress: &Progress<ProgressBar>,
-) -> Result<(), FetchSrcError> {
+async fn do_fetch_src(fetch: FetchSrc<'_>) -> Result<(), FetchSrcError> {
+    let rock_source = fetch.rock_source;
+    let progress = fetch.progress;
+    let dest_dir = fetch.dest_dir;
     match &rock_source.source_spec {
         RockSourceSpec::Git(git) => {
             let url = &git.url.to_string();
