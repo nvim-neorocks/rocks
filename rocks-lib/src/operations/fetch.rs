@@ -18,7 +18,8 @@ use crate::operations;
 use crate::package::PackageSpec;
 use crate::progress::Progress;
 use crate::progress::ProgressBar;
-use crate::{rockspec::RockSource, rockspec::RockSourceSpec};
+use crate::rockspec::RockSourceSpec;
+use crate::rockspec::Rockspec;
 
 use super::DownloadSrcRockError;
 
@@ -30,7 +31,9 @@ pub struct FetchSrc<'a> {
     #[builder(start_fn)]
     dest_dir: &'a Path,
     #[builder(start_fn)]
-    rock_source: &'a RockSource,
+    rockspec: &'a Rockspec,
+    #[builder(start_fn)]
+    config: &'a Config,
     #[builder(start_fn)]
     progress: &'a Progress<ProgressBar>,
 }
@@ -39,8 +42,27 @@ impl<State> FetchSrcBuilder<'_, State>
 where
     State: fetch_src_builder::State + fetch_src_builder::IsComplete,
 {
-    pub async fn fetch_src(self) -> Result<(), FetchSrcError> {
-        do_fetch_src(self._build()).await
+    pub async fn fetch(self) -> Result<(), FetchSrcError> {
+        let fetch = self._build();
+        if let Err(err) = do_fetch_src(&fetch).await {
+            let package = PackageSpec::new(
+                fetch.rockspec.package.clone(),
+                fetch.rockspec.version.clone(),
+            );
+            fetch.progress.map(|p| {
+                p.println(format!(
+                    "⚠️ WARNING: Failed to fetch source for {}: {}",
+                    &package, err
+                ))
+            });
+            fetch
+                .progress
+                .map(|p| p.println("⚠️ Falling back to .src.rock archive"));
+            FetchSrcRock::new(&package, fetch.dest_dir, fetch.config, fetch.progress)
+                .fetch()
+                .await?;
+        }
+        Ok(())
     }
 }
 
@@ -54,13 +76,15 @@ pub enum FetchSrcError {
     Request(#[from] reqwest::Error),
     #[error(transparent)]
     Unpack(#[from] UnpackError),
+    #[error(transparent)]
+    FetchSrcRock(#[from] FetchSrcRockError),
 }
 
 /// A rocks package source fetcher, providing fine-grained control
 /// over how a package should be fetched.
 #[derive(Builder)]
 #[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
-pub(crate) struct FetchSrcRock<'a> {
+struct FetchSrcRock<'a> {
     #[builder(start_fn)]
     package: &'a PackageSpec,
     #[builder(start_fn)]
@@ -87,8 +111,8 @@ pub enum FetchSrcRockError {
     Unpack(#[from] UnpackError),
 }
 
-async fn do_fetch_src(fetch: FetchSrc<'_>) -> Result<(), FetchSrcError> {
-    let rock_source = fetch.rock_source;
+async fn do_fetch_src(fetch: &FetchSrc<'_>) -> Result<(), FetchSrcError> {
+    let rock_source = fetch.rockspec.source.current_platform();
     let progress = fetch.progress;
     let dest_dir = fetch.dest_dir;
     match &rock_source.source_spec {
