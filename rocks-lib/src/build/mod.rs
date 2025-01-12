@@ -5,7 +5,7 @@ use crate::{
     hash::HasIntegrity,
     lockfile::{LocalPackage, LocalPackageHashes, LockConstraint, PinnedState},
     lua_installation::LuaInstallation,
-    operations::{self, FetchSrcRockError},
+    operations::{self, FetchSrcError},
     package::PackageSpec,
     progress::{Progress, ProgressBar},
     remote_package_source::RemotePackageSource,
@@ -94,7 +94,7 @@ pub enum BuildError {
     #[error(transparent)]
     LuaVersionError(#[from] LuaVersionError),
     #[error("failed to fetch rock source: {0}")]
-    FetchSrcRockError(#[from] FetchSrcRockError),
+    FetchSrcError(#[from] FetchSrcError),
     #[error("compilation failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
     CommandFailure {
         status: ExitStatus,
@@ -242,32 +242,14 @@ async fn do_build(build: Build<'_>) -> Result<LocalPackage, BuildError> {
 
     let temp_dir = tempdir::TempDir::new(&build.rockspec.package.to_string())?;
 
-    // Install the source in order to build.
-    let rock_source = build.rockspec.source.current_platform();
-    if let Err(err) = operations::FetchSrc::new(temp_dir.path(), rock_source, build.progress)
-        .fetch_src()
-        .await
-    {
-        let package = PackageSpec::new(
-            build.rockspec.package.clone(),
-            build.rockspec.version.clone(),
-        );
-        build.progress.map(|p| {
-            p.println(format!(
-                "⚠️ WARNING: Failed to fetch source for {}: {}",
-                &package, err
-            ))
-        });
-        build.progress.map(|p| {
-            p.println(format!(
-                "⚠️ Falling back to .src.rock archive from {}",
-                &build.config.server()
-            ))
-        });
-        operations::FetchSrcRock::new(&package, temp_dir.path(), build.config, build.progress)
-            .fetch()
-            .await?;
-    }
+    operations::FetchSrc::new(
+        temp_dir.path(),
+        build.rockspec,
+        build.config,
+        build.progress,
+    )
+    .fetch()
+    .await?;
 
     let hashes = LocalPackageHashes {
         rockspec: build.rockspec.hash()?,
@@ -303,6 +285,7 @@ async fn do_build(build: Build<'_>) -> Result<LocalPackage, BuildError> {
 
             let lua = LuaInstallation::new(&lua_version, build.config);
 
+            let rock_source = build.rockspec.source.current_platform();
             let build_dir = match &rock_source.unpack_dir {
                 Some(unpack_dir) => temp_dir.path().join(unpack_dir),
                 None => temp_dir.path().into(),
