@@ -112,12 +112,13 @@ async fn do_add_missing_packages(update: LockfileUpdate<'_>) -> Result<(), Lockf
             let rockspec = downloaded_rock.rockspec();
             let temp_dir =
                 tempdir::TempDir::new(&format!("lockfile_update-{}", &rockspec.package))?;
-            FetchSrc::new(temp_dir.path(), rockspec, &config, &Progress::NoProgress)
-                .fetch()
-                .await?;
+            let source_hash =
+                FetchSrc::new(temp_dir.path(), rockspec, &config, &Progress::NoProgress)
+                    .fetch()
+                    .await?;
             let hashes = LocalPackageHashes {
                 rockspec: rockspec.hash()?,
-                source: temp_dir.hash()?,
+                source: source_hash,
             };
             let pkg = LocalPackage::from(
                 &PackageSpec::new(rockspec.package.clone(), rockspec.version.clone()),
