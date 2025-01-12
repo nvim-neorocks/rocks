@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use mlua::{Lua, LuaSerdeExt};
 use reqwest::{header::ToStrError, Client};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 use std::{cmp::Ordering, collections::HashMap};
 use thiserror::Error;
 use tokio::{fs, io};
@@ -90,7 +90,13 @@ async fn manifest_from_server(
 
     // If our cache file does not exist then pull the whole manifest.
 
-    let new_manifest = client.get(url).send().await?.text().await?;
+    let new_manifest = client
+        .get(url)
+        .timeout(Duration::from_secs(60 * 10))
+        .send()
+        .await?
+        .text()
+        .await?;
 
     fs::write(&cache, &new_manifest).await?;
 

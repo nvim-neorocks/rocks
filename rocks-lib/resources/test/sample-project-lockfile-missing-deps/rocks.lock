@@ -12,7 +12,7 @@
       "source": "luarocks_rockspec+https://luarocks.org/",
       "hashes": {
         "rockspec": "sha256-kdDMqznWlwP9wIqlzPrZ5qEDp6edhlkaasAcQzWTmmM=",
-        "source": "sha256-arCZdCc4g0VvlQA11V1sHMS7WFSJqfwXC80o0A2igqo="
+        "source": "sha256-fNO24tL8wApI8j3rk2mdLf5wbbjlUzsvCxki3n0xRw8="
       }
     },
     "d7142f441ca59ebde5927d8a3489966828c6b6655125616485632a1b16362f8e": {
@@ -24,7 +24,7 @@
       "source": "luarocks_rockspec+https://luarocks.org/",
       "hashes": {
         "rockspec": "sha256-5iL9++6X/JsKKtpIRaRHcnZpn6DrsAQQRWPubZK9erY=",
-        "source": "sha256-WPVTNoj0POenpqKhTWpyPqLe2+fXxpQC2mTU0NvC8Xw="
+        "source": "sha256-wbN0gqfxaFgVcFc8EQl2Y8Cccd7jIPtdTMhHRQe5MSU="
       }
     }
   },
