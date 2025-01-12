@@ -264,7 +264,9 @@ async fn do_build(build: Build<'_>) -> Result<LocalPackage, BuildError> {
                 &build.config.server()
             ))
         });
-        operations::fetch_src_rock(&package, temp_dir.path(), build.config, build.progress).await?;
+        operations::FetchSrcRock::new(&package, temp_dir.path(), build.config, build.progress)
+            .fetch()
+            .await?;
     }
 
     let hashes = LocalPackageHashes {
