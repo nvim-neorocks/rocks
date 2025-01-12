@@ -18,6 +18,7 @@ use crate::{
     rockspec::{Rockspec, RockspecError},
 };
 
+/// Builder for a rock downloader.
 pub struct Download<'a> {
     package_req: &'a PackageReq,
     package_db: Option<&'a RemotePackageDB>,
@@ -25,7 +26,6 @@ pub struct Download<'a> {
     progress: &'a Progress<ProgressBar>,
 }
 
-/// Builder for a rock downloader.
 impl<'a> Download<'a> {
     /// Construct a new `.src.rock` downloader.
     pub fn new(

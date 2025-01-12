@@ -23,7 +23,9 @@ pub async fn fetch_remote(data: UnpackRemote, config: Config) -> Result<()> {
         .path
         .unwrap_or_else(|| PathBuf::from(format!("{}-{}", &rockspec.package, &rockspec.version)));
     let rock_source = rockspec.source.current_platform();
-    rocks_lib::operations::fetch_src(destination.clone().as_path(), rock_source, &bar).await?;
+    rocks_lib::operations::FetchSrc::new(destination.clone().as_path(), rock_source, &bar)
+        .fetch_src()
+        .await?;
 
     let build_dir = rock_source
         .unpack_dir
