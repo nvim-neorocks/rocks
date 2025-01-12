@@ -56,6 +56,37 @@ pub enum FetchSrcError {
     Unpack(#[from] UnpackError),
 }
 
+/// A rocks package source fetcher, providing fine-grained control
+/// over how a package should be fetched.
+#[derive(Builder)]
+#[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
+pub(crate) struct FetchSrcRock<'a> {
+    #[builder(start_fn)]
+    package: &'a PackageSpec,
+    #[builder(start_fn)]
+    dest_dir: &'a Path,
+    #[builder(start_fn)]
+    config: &'a Config,
+    #[builder(start_fn)]
+    progress: &'a Progress<ProgressBar>,
+}
+
+impl<State> FetchSrcRockBuilder<'_, State>
+where
+    State: fetch_src_rock_builder::State + fetch_src_rock_builder::IsComplete,
+{
+    pub async fn fetch(self) -> Result<(), FetchSrcRockError> {
+        do_fetch_src_rock(self._build()).await
+    }
+}
+
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub enum FetchSrcRockError {
+    DownloadSrcRock(#[from] DownloadSrcRockError),
+    Unpack(#[from] UnpackError),
+}
+
 async fn do_fetch_src(fetch: FetchSrc<'_>) -> Result<(), FetchSrcError> {
     let rock_source = fetch.rock_source;
     let progress = fetch.progress;
@@ -148,19 +179,11 @@ async fn do_fetch_src(fetch: FetchSrc<'_>) -> Result<(), FetchSrcError> {
     Ok(())
 }
 
-#[derive(Error, Debug)]
-#[error(transparent)]
-pub enum FetchSrcRockError {
-    DownloadSrcRock(#[from] DownloadSrcRockError),
-    Unpack(#[from] UnpackError),
-}
-
-pub async fn fetch_src_rock(
-    package: &PackageSpec,
-    dest_dir: &Path,
-    config: &Config,
-    progress: &Progress<ProgressBar>,
-) -> Result<(), FetchSrcRockError> {
+async fn do_fetch_src_rock(fetch: FetchSrcRock<'_>) -> Result<(), FetchSrcRockError> {
+    let package = fetch.package;
+    let dest_dir = fetch.dest_dir;
+    let config = fetch.config;
+    let progress = fetch.progress;
     let src_rock = operations::download_src_rock(package, config.server(), progress).await?;
     let cursor = Cursor::new(src_rock.bytes);
     let mime_type = infer::get(cursor.get_ref()).map(|file_type| file_type.mime_type());
