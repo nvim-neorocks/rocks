@@ -10,20 +10,16 @@ use rocks_lib::{
     tree::{RockMatches, Tree},
 };
 
-// NOTE: This is currently functionally equivalent
-// to `rocks uninstall`, but that will change
-// when we can use it to edit projects' rocks.toml files.
-
 #[derive(Args)]
-pub struct Remove {
-    /// The package or packages to remove.
+pub struct Uninstall {
+    /// The package or packages to uninstall from the system.
     packages: Vec<PackageReq>,
 }
 
-pub async fn remove(remove_args: Remove, config: Config) -> Result<()> {
+pub async fn uninstall(uninstall_args: Uninstall, config: Config) -> Result<()> {
     let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
 
-    let package_matches = remove_args
+    let package_matches = uninstall_args
         .packages
         .iter()
         .map(|package_req| tree.match_rocks(package_req))
@@ -57,7 +53,7 @@ Multiple packages satisfying your version requirements were found:
 {:#?}
 
 Please specify the exact package to uninstall:
-> rocks remove '<name>@<version>'
+> rocks uninstall '<name>@<version>'
 ",
             duplicate_packages,
         ));
