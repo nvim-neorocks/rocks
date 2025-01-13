@@ -9,6 +9,7 @@
         "48ec344951668eca0e0a4ff284d804a11e4e709194df3191a72ed8fac89cf2e0"
       ],
       "constraint": null,
+      "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
       "hashes": {
         "rockspec": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek=",
@@ -21,6 +22,7 @@
       "pinned": false,
       "dependencies": [],
       "constraint": null,
+      "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
       "hashes": {
         "rockspec": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek=",
@@ -34,6 +36,7 @@
       "dependencies": [
         "48ec344951668eca0e0a4ff284d804a11e4e709194df3191a72ed8fac89cf2e0"
       ],
+      "binaries": [],
       "constraint": null,
       "source": "luarocks_rockspec+https://luarocks.org/",
       "hashes": {

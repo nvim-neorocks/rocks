@@ -5,7 +5,13 @@ mod rock_source;
 mod serde_util;
 mod test_spec;
 
-use std::{collections::HashMap, io, path::PathBuf, str::FromStr};
+use std::{
+    collections::HashMap,
+    io,
+    ops::{Deref, DerefMut},
+    path::PathBuf,
+    str::FromStr,
+};
 
 use itertools::Itertools;
 use mlua::{FromLua, Lua, LuaSerdeExt, Value};
@@ -106,6 +112,20 @@ impl Rockspec {
         Ok(rockspec)
     }
 
+    /// Shorthand to extract the binaries that are part of the rockspec.
+    // TODO(vhyrro): Move this to the `Rocks` trait during the `rocks.toml` rewrite.
+    pub(crate) fn binaries(&self) -> RockBinaries {
+        RockBinaries(
+            self.build
+                .current_platform()
+                .install
+                .bin
+                .keys()
+                .map_into()
+                .collect(),
+        )
+    }
+
     pub fn validate_lua_version(&self, config: &Config) -> Result<(), LuaVersionError> {
         let _ = self.lua_version_from_config(config)?;
         Ok(())
@@ -166,6 +186,23 @@ fn latest_lua_version(dependencies: &PerPlatform<Vec<PackageReq>>) -> Option<Lua
 
             None
         })
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialOrd, Ord, Hash, PartialEq, Eq)]
+pub struct RockBinaries(Vec<PathBuf>);
+
+impl Deref for RockBinaries {
+    type Target = Vec<PathBuf>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for RockBinaries {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 #[derive(Error, Debug)]

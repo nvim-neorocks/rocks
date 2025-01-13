@@ -123,6 +123,7 @@ async fn do_add_missing_packages(update: LockfileUpdate<'_>) -> Result<(), Lockf
             let pkg = LocalPackage::from(
                 &PackageSpec::new(rockspec.package.clone(), rockspec.version.clone()),
                 install_spec.spec.constraint(),
+                rockspec.binaries(),
                 downloaded_rock.rockspec_download().source.clone(),
                 hashes,
             );

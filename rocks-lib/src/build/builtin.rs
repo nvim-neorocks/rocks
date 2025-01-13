@@ -1,6 +1,8 @@
+use clean_path::Clean as _;
 use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
+    io,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -10,11 +12,8 @@ use crate::{
     build::utils,
     config::Config,
     lua_installation::LuaInstallation,
-    progress::{
-        Progress::{self},
-        ProgressBar,
-    },
-    rockspec::{Build, BuiltinBuildSpec, LuaModule, ModuleSpec},
+    progress::{Progress, ProgressBar},
+    rockspec::{Build, BuildInfo, BuiltinBuildSpec, LuaModule, ModuleSpec},
     tree::RockLayout,
 };
 
@@ -31,7 +30,7 @@ impl Build for BuiltinBuildSpec {
         _config: &Config,
         build_dir: &Path,
         progress: &Progress<ProgressBar>,
-    ) -> Result<(), Self::Err> {
+    ) -> Result<BuildInfo, Self::Err> {
         // Detect all Lua modules
         let modules = autodetect_modules(build_dir, source_paths(build_dir, &self.modules))
             .into_iter()
@@ -98,14 +97,18 @@ impl Build for BuiltinBuildSpec {
             }
         }
 
-        for relative_path in autodetect_bin_scripts(build_dir).iter() {
-            let source = build_dir.join("src").join("bin").join(relative_path);
-            let target = output_paths.bin.join(relative_path);
-            std::fs::create_dir_all(target.parent().unwrap())?;
-            std::fs::copy(source, target)?;
-        }
+        let binaries = autodetect_bin_scripts(build_dir)
+            .iter()
+            .map(|relative_path| {
+                let source = build_dir.join("src").join("bin").join(relative_path);
+                let target = output_paths.bin.join(relative_path);
+                std::fs::create_dir_all(target.parent().unwrap())?;
+                std::fs::copy(source, target)?;
+                Ok(relative_path.clean())
+            })
+            .try_collect::<_, Vec<_>, io::Error>()?;
 
-        Ok(())
+        Ok(BuildInfo { binaries })
     }
 }
 

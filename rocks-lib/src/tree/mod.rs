@@ -340,6 +340,7 @@ mod tests {
         lockfile::{LocalPackage, LocalPackageHashes, LockConstraint},
         package::{PackageName, PackageSpec, PackageVersion},
         remote_package_source::RemotePackageSource,
+        rockspec::RockBinaries,
         tree::RockLayout,
     };
 
@@ -368,6 +369,7 @@ mod tests {
         let package = LocalPackage::from(
             &PackageSpec::parse("neorg".into(), "8.0.0-1".into()).unwrap(),
             LockConstraint::Unconstrained,
+            RockBinaries::default(),
             RemotePackageSource::Test,
             mock_hashes.clone(),
         );
@@ -392,6 +394,7 @@ mod tests {
         let package = LocalPackage::from(
             &PackageSpec::parse("lua-cjson".into(), "2.1.0-1".into()).unwrap(),
             LockConstraint::Unconstrained,
+            RockBinaries::default(),
             RemotePackageSource::Test,
             mock_hashes.clone(),
         );
@@ -468,6 +471,7 @@ mod tests {
             .rock(&LocalPackage::from(
                 &PackageSpec::parse("neorg".into(), "8.0.0-1-1".into()).unwrap(),
                 LockConstraint::Unconstrained,
+                RockBinaries::default(),
                 RemotePackageSource::Test,
                 mock_hashes.clone(),
             ))

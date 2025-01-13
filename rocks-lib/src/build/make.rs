@@ -11,7 +11,7 @@ use crate::{
     config::Config,
     lua_installation::LuaInstallation,
     progress::{Progress, ProgressBar},
-    rockspec::{Build, MakeBuildSpec},
+    rockspec::{Build, BuildInfo, MakeBuildSpec},
     tree::RockLayout,
 };
 
@@ -41,7 +41,7 @@ impl Build for MakeBuildSpec {
         config: &Config,
         build_dir: &Path,
         _progress: &Progress<ProgressBar>,
-    ) -> Result<(), Self::Err> {
+    ) -> Result<BuildInfo, Self::Err> {
         // Build step
         if self.build_pass {
             let build_args = self
@@ -109,6 +109,6 @@ impl Build for MakeBuildSpec {
             }
         };
 
-        Ok(())
+        Ok(BuildInfo::default())
     }
 }

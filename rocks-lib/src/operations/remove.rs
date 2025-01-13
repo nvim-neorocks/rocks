@@ -5,6 +5,7 @@ use crate::config::{LuaVersion, LuaVersionUnset};
 use crate::lockfile::{LocalPackage, LocalPackageId};
 use crate::progress::{MultiProgress, Progress, ProgressBar};
 use crate::{config::Config, tree::Tree};
+use clean_path::Clean as _;
 use futures::future::join_all;
 use itertools::Itertools;
 use thiserror::Error;
@@ -117,6 +118,20 @@ async fn remove_package(
     });
 
     tokio::fs::remove_dir_all(tree.root_for(&package)).await?;
+
+    // Delete the corresponding binaries attached to the current package (located under `{ROCKS_TREE}/bin/`)
+    for relative_binary_path in package.spec.binaries() {
+        let binary_path = tree.bin().join(
+            relative_binary_path
+                .clean()
+                .file_name()
+                .expect("malformed lockfile"),
+        );
+
+        if binary_path.is_file() {
+            tokio::fs::remove_file(binary_path).await?;
+        }
+    }
 
     bar.map(|p| p.finish_and_clear());
     Ok(())

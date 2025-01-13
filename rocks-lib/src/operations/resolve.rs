@@ -97,6 +97,7 @@ where
                         constraint,
                         dependencies,
                         &pin,
+                        rockspec.binaries(),
                     );
 
                     let install_spec = PackageInstallSpec {

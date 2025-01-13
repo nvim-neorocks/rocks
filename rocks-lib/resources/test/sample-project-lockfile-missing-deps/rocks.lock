@@ -10,6 +10,7 @@
       ],
       "constraint": "=2.2.3",
       "source": "luarocks_rockspec+https://luarocks.org/",
+      "binaries": [],
       "hashes": {
         "rockspec": "sha256-kdDMqznWlwP9wIqlzPrZ5qEDp6edhlkaasAcQzWTmmM=",
         "source": "sha256-fNO24tL8wApI8j3rk2mdLf5wbbjlUzsvCxki3n0xRw8="
@@ -21,6 +22,7 @@
       "pinned": false,
       "dependencies": [],
       "constraint": ">=1.8.0",
+      "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
       "hashes": {
         "rockspec": "sha256-5iL9++6X/JsKKtpIRaRHcnZpn6DrsAQQRWPubZK9erY=",

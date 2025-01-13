@@ -10,7 +10,7 @@ use crate::{
     config::Config,
     lua_installation::LuaInstallation,
     progress::{Progress, ProgressBar},
-    rockspec::{Build, CommandBuildSpec},
+    rockspec::{Build, BuildInfo, CommandBuildSpec},
     tree::RockLayout,
 };
 
@@ -44,14 +44,14 @@ impl Build for CommandBuildSpec {
         config: &Config,
         build_dir: &Path,
         progress: &Progress<ProgressBar>,
-    ) -> Result<(), Self::Err> {
+    ) -> Result<BuildInfo, Self::Err> {
         progress.map(|bar| bar.set_message("Running build_command..."));
         run_command(&self.build_command, output_paths, lua, config, build_dir)?;
         if !no_install {
             progress.map(|bar| bar.set_message("Running install_command..."));
             run_command(&self.install_command, output_paths, lua, config, build_dir)?;
         }
-        Ok(())
+        Ok(BuildInfo::default())
     }
 }
 
