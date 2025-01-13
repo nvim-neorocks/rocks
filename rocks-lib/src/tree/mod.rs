@@ -66,6 +66,12 @@ pub struct RockLayout {
     pub doc: PathBuf,
 }
 
+impl RockLayout {
+    pub(crate) fn rockspec_path(&self) -> PathBuf {
+        self.rock_path.join("package.rockspec")
+    }
+}
+
 impl HasVariables for RockLayout {
     /// Substitute `$(VAR)` with one of the paths, where `VAR`
     /// is one of `PREFIX`, `LIBDIR`, `LUADIR`, `BINDIR`, `CONFDIR` or `DOCDIR`.
