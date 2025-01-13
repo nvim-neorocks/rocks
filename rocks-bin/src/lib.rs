@@ -18,6 +18,7 @@ use run::Run;
 use run_lua::RunLua;
 use search::Search;
 use test::Test;
+use uninstall::Uninstall;
 use update::Update;
 use upload::Upload;
 use url::Url;
@@ -43,6 +44,7 @@ pub mod run;
 pub mod run_lua;
 pub mod search;
 pub mod test;
+pub mod uninstall;
 pub mod unpack;
 pub mod update;
 pub mod upload;
@@ -156,7 +158,7 @@ pub enum Commands {
     Pin(ChangePin),
     /// Remove all installed rocks from a tree.
     Purge,
-    /// Uninstall a rock.
+    /// Remove a rock from the current project's rocks.toml dependencies.
     Remove(Remove),
     /// Run a command that has been installed with rocks.
     /// If the command is not found:
@@ -168,8 +170,8 @@ pub enum Commands {
     Search(Search),
     /// Run the test suite in the current directory.
     Test(Test),
-    /// [UNIMPLEMENTED] Uninstall a rock from the system.
-    Uninstall,
+    /// Uninstall a rock from the system.
+    Uninstall(Uninstall),
     /// Unpins an existing rock, allowing updates to alter the package.
     Unpin(ChangePin),
     /// Updates all rocks in a project.

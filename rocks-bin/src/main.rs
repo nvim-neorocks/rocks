@@ -5,7 +5,7 @@ use rocks::{
     build, check,
     debug::Debug,
     download, fetch, format, info, install, install_lua, install_rockspec, list, outdated, path,
-    pin, project, purge, remove, run, run_lua, search, test, unpack, update,
+    pin, project, purge, remove, run, run_lua, search, test, uninstall, unpack, update,
     upload::{self},
     Cli, Commands,
 };
@@ -80,7 +80,9 @@ async fn main() {
         Commands::Doc => unimplemented!(),
         Commands::Lint => unimplemented!(),
         Commands::Pack => unimplemented!(),
-        Commands::Uninstall => unimplemented!(),
+        Commands::Uninstall(uninstall_data) => {
+            uninstall::uninstall(uninstall_data, config).await.unwrap()
+        }
         Commands::Which => unimplemented!(),
     }
 }
