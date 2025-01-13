@@ -311,13 +311,34 @@ async fn do_build(build: Build<'_>) -> Result<LocalPackage, BuildError> {
             )
             .await?;
 
-            for directory in &build.rockspec.build.current_platform().copy_directories {
+            for directory in build
+                .rockspec
+                .build
+                .current_platform()
+                .copy_directories
+                .iter()
+                .filter(|dir| {
+                    dir.file_name()
+                        .is_some_and(|name| name != "doc" && name != "docs")
+                })
+            {
                 recursive_copy_dir(&build_dir.join(directory), &output_paths.etc)?;
             }
+
+            recursive_copy_doc_dir(&output_paths, &build_dir)?;
 
             Ok(package)
         }
     }
+}
+
+fn recursive_copy_doc_dir(output_paths: &RockLayout, build_dir: &Path) -> Result<(), BuildError> {
+    let mut doc_dir = build_dir.join("doc");
+    if !doc_dir.exists() {
+        doc_dir = build_dir.join("docs");
+    }
+    recursive_copy_dir(&doc_dir, &output_paths.doc)?;
+    Ok(())
 }
 
 #[cfg(test)]
