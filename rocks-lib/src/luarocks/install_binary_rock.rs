@@ -108,6 +108,7 @@ impl<'a> BinaryRockInstall<'a> {
         let mut package = LocalPackage::from(
             &PackageSpec::new(rockspec.package.clone(), rockspec.version.clone()),
             self.constraint,
+            rockspec.binaries(),
             self.source,
             hashes,
         );

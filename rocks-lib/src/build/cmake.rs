@@ -10,7 +10,7 @@ use crate::{
     config::Config,
     lua_installation::LuaInstallation,
     progress::{Progress, ProgressBar},
-    rockspec::{Build, CMakeBuildSpec},
+    rockspec::{Build, BuildInfo, CMakeBuildSpec},
     tree::RockLayout,
 };
 
@@ -46,7 +46,7 @@ impl Build for CMakeBuildSpec {
         config: &Config,
         build_dir: &Path,
         _progress: &Progress<ProgressBar>,
-    ) -> Result<(), Self::Err> {
+    ) -> Result<BuildInfo, Self::Err> {
         let mut args = Vec::new();
         if let Some(content) = self.cmake_lists_content {
             let cmakelists = build_dir.join("CMakeLists.txt");
@@ -101,7 +101,7 @@ impl Build for CMakeBuildSpec {
             )?;
         }
 
-        Ok(())
+        Ok(BuildInfo::default())
     }
 }
 

@@ -1,6 +1,7 @@
 use super::utils::lua_lib_extension;
 use crate::config::LuaVersionUnset;
 use crate::progress::{Progress, ProgressBar};
+use crate::rockspec::BuildInfo;
 use crate::{
     config::{Config, LuaVersion},
     lua_installation::LuaInstallation,
@@ -39,7 +40,7 @@ impl Build for RustMluaBuildSpec {
         config: &Config,
         build_dir: &Path,
         progress: &Progress<ProgressBar>,
-    ) -> Result<(), Self::Err> {
+    ) -> Result<BuildInfo, Self::Err> {
         let lua_version = LuaVersion::from(config)?;
         let lua_feature = match lua_version {
             LuaVersion::Lua51 => "lua51",
@@ -88,7 +89,7 @@ impl Build for RustMluaBuildSpec {
             cleanup(output_paths, progress).await?;
             return Err(err.into());
         }
-        Ok(())
+        Ok(BuildInfo::default())
     }
 }
 

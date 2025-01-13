@@ -16,6 +16,7 @@ use crate::package::{
     PackageVersionReqError, RemotePackageTypeFilterSpec,
 };
 use crate::remote_package_source::RemotePackageSource;
+use crate::rockspec::RockBinaries;
 
 #[cfg(feature = "lua")]
 use mlua::{ExternalResult as _, FromLua};
@@ -89,6 +90,7 @@ pub(crate) struct LocalPackageSpec {
     pub dependencies: Vec<LocalPackageId>,
     // TODO: Deserialize this directly into a `LuaPackageReq`
     pub constraint: Option<String>,
+    pub binaries: RockBinaries,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, Clone)]
@@ -138,6 +140,7 @@ impl LocalPackageSpec {
         constraint: LockConstraint,
         dependencies: Vec<LocalPackageId>,
         pinned: &PinnedState,
+        binaries: RockBinaries,
     ) -> Self {
         Self {
             name: name.clone(),
@@ -148,6 +151,7 @@ impl LocalPackageSpec {
                 LockConstraint::Unconstrained => None,
                 LockConstraint::Constrained(version_req) => Some(version_req.to_string()),
             },
+            binaries,
         }
     }
 
@@ -184,6 +188,10 @@ impl LocalPackageSpec {
         self.dependencies.iter().collect()
     }
 
+    pub fn binaries(&self) -> Vec<&PathBuf> {
+        self.binaries.iter().collect()
+    }
+
     pub fn to_package(&self) -> PackageSpec {
         PackageSpec::new(self.name.clone(), self.version.clone())
     }
@@ -209,6 +217,7 @@ struct LocalPackageIntermediate {
     pinned: PinnedState,
     dependencies: Vec<LocalPackageId>,
     constraint: Option<String>,
+    binaries: RockBinaries,
     source: RemotePackageSource,
     hashes: LocalPackageHashes,
 }
@@ -225,6 +234,7 @@ impl TryFrom<LocalPackageIntermediate> for LocalPackage {
                 constraint,
                 value.dependencies,
                 &value.pinned,
+                value.binaries,
             ),
             source: value.source,
             hashes: value.hashes,
@@ -240,6 +250,7 @@ impl From<&LocalPackage> for LocalPackageIntermediate {
             pinned: value.spec.pinned,
             dependencies: value.spec.dependencies.clone(),
             constraint: value.spec.constraint.clone(),
+            binaries: value.spec.binaries.clone(),
             source: value.source.clone(),
             hashes: value.hashes.clone(),
         }
@@ -277,6 +288,7 @@ impl LocalPackage {
     pub(crate) fn from(
         package: &PackageSpec,
         constraint: LockConstraint,
+        binaries: RockBinaries,
         source: RemotePackageSource,
         hashes: LocalPackageHashes,
     ) -> Self {
@@ -287,6 +299,7 @@ impl LocalPackage {
                 constraint,
                 Vec::default(),
                 &PinnedState::Unpinned,
+                binaries,
             ),
             source,
             hashes,
@@ -810,6 +823,7 @@ mod tests {
         let test_local_package = LocalPackage::from(
             &test_package,
             crate::lockfile::LockConstraint::Unconstrained,
+            RockBinaries::default(),
             RemotePackageSource::Test,
             mock_hashes.clone(),
         );
@@ -820,6 +834,7 @@ mod tests {
         let mut test_local_dep_package = LocalPackage::from(
             &test_dep_package,
             crate::lockfile::LockConstraint::Constrained(">= 1.0.0".parse().unwrap()),
+            RockBinaries::default(),
             RemotePackageSource::Test,
             mock_hashes.clone(),
         );
@@ -843,6 +858,6 @@ mod tests {
 
         let tree = Tree::new(temp.to_path_buf(), Lua51).unwrap();
 
-        tree.lockfile().unwrap(); // Try to create the lockfile but don't actually do anything with it.
+        let _ = tree.lockfile().unwrap().write_guard(); // Try to create the lockfile but don't actually do anything with it.
     }
 }

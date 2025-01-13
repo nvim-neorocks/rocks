@@ -5,7 +5,7 @@ use crate::{
     lua_installation::LuaInstallation,
     luarocks::luarocks_installation::{ExecLuaRocksError, LuaRocksError, LuaRocksInstallation},
     progress::{Progress, ProgressBar},
-    rockspec::Rockspec,
+    rockspec::{BuildInfo, Rockspec},
     tree::RockLayout,
 };
 
@@ -31,7 +31,7 @@ pub(crate) async fn build(
     config: &Config,
     build_dir: &Path,
     progress: &Progress<ProgressBar>,
-) -> Result<(), LuarocksBuildError> {
+) -> Result<BuildInfo, LuarocksBuildError> {
     progress.map(|p| {
         p.set_message(format!(
             "Building {} {} with luarocks...",
@@ -55,7 +55,7 @@ fn install(
     luarocks_tree: &Path,
     output_paths: &RockLayout,
     config: &Config,
-) -> Result<(), LuarocksBuildError> {
+) -> Result<BuildInfo, LuarocksBuildError> {
     let lua_version = rockspec
         .lua_version_from_config(config)
         .expect("could not get lua version!");
@@ -82,5 +82,5 @@ fn install(
         .join("lua")
         .join(lua_version.version_compatibility_str());
     recursive_copy_dir(&lib_dir, &output_paths.lib)?;
-    Ok(())
+    Ok(BuildInfo::default())
 }

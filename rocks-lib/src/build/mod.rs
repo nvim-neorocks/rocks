@@ -9,7 +9,7 @@ use crate::{
     package::PackageSpec,
     progress::{Progress, ProgressBar},
     remote_package_source::RemotePackageSource,
-    rockspec::{Build as _, BuildBackendSpec, LuaVersionError, Rockspec},
+    rockspec::{Build as _, BuildBackendSpec, BuildInfo, LuaVersionError, Rockspec},
     tree::{RockLayout, Tree},
 };
 pub(crate) mod utils;
@@ -134,42 +134,42 @@ async fn run_build(
     config: &Config,
     build_dir: &Path,
     progress: &Progress<ProgressBar>,
-) -> Result<(), BuildError> {
+) -> Result<BuildInfo, BuildError> {
     progress.map(|p| p.set_message("🛠️ Building..."));
 
-    match rockspec.build.current_platform().build_backend.to_owned() {
-        Some(BuildBackendSpec::Builtin(build_spec)) => {
-            build_spec
-                .run(output_paths, false, lua, config, build_dir, progress)
-                .await?
-        }
-        Some(BuildBackendSpec::Make(make_spec)) => {
-            make_spec
-                .run(output_paths, false, lua, config, build_dir, progress)
-                .await?
-        }
-        Some(BuildBackendSpec::CMake(cmake_spec)) => {
-            cmake_spec
-                .run(output_paths, false, lua, config, build_dir, progress)
-                .await?
-        }
-        Some(BuildBackendSpec::Command(command_spec)) => {
-            command_spec
-                .run(output_paths, false, lua, config, build_dir, progress)
-                .await?
-        }
-        Some(BuildBackendSpec::RustMlua(rust_mlua_spec)) => {
-            rust_mlua_spec
-                .run(output_paths, false, lua, config, build_dir, progress)
-                .await?
-        }
-        Some(BuildBackendSpec::LuaRock(_)) => {
-            luarocks::build(rockspec, output_paths, lua, config, build_dir, progress).await?;
-        }
-        None => (),
-    }
-
-    Ok(())
+    Ok(
+        match rockspec.build.current_platform().build_backend.to_owned() {
+            Some(BuildBackendSpec::Builtin(build_spec)) => {
+                build_spec
+                    .run(output_paths, false, lua, config, build_dir, progress)
+                    .await?
+            }
+            Some(BuildBackendSpec::Make(make_spec)) => {
+                make_spec
+                    .run(output_paths, false, lua, config, build_dir, progress)
+                    .await?
+            }
+            Some(BuildBackendSpec::CMake(cmake_spec)) => {
+                cmake_spec
+                    .run(output_paths, false, lua, config, build_dir, progress)
+                    .await?
+            }
+            Some(BuildBackendSpec::Command(command_spec)) => {
+                command_spec
+                    .run(output_paths, false, lua, config, build_dir, progress)
+                    .await?
+            }
+            Some(BuildBackendSpec::RustMlua(rust_mlua_spec)) => {
+                rust_mlua_spec
+                    .run(output_paths, false, lua, config, build_dir, progress)
+                    .await?
+            }
+            Some(BuildBackendSpec::LuaRock(_)) => {
+                luarocks::build(rockspec, output_paths, lua, config, build_dir, progress).await?
+            }
+            None => BuildInfo::default(),
+        },
+    )
 }
 
 async fn install(
@@ -271,6 +271,7 @@ async fn do_build(build: Build<'_>) -> Result<LocalPackage, BuildError> {
             build.rockspec.version.clone(),
         ),
         build.constraint,
+        build.rockspec.binaries(),
         build.source.unwrap_or_else(|| {
             RemotePackageSource::RockspecContent(build.rockspec.raw_content.clone())
         }),
@@ -291,7 +292,7 @@ async fn do_build(build: Build<'_>) -> Result<LocalPackage, BuildError> {
                 None => temp_dir.path().into(),
             };
 
-            run_build(
+            let output = run_build(
                 build.rockspec,
                 &output_paths,
                 &lua,
@@ -300,6 +301,8 @@ async fn do_build(build: Build<'_>) -> Result<LocalPackage, BuildError> {
                 build.progress,
             )
             .await?;
+
+            package.spec.binaries.extend(output.binaries);
 
             install(
                 build.rockspec,

@@ -528,6 +528,11 @@ impl Default for BuildType {
     }
 }
 
+#[derive(Default)]
+pub struct BuildInfo {
+    pub binaries: Vec<PathBuf>,
+}
+
 // TODO(vhyrro): Move this to the dedicated build.rs module
 pub trait Build {
     type Err: std::error::Error;
@@ -540,7 +545,7 @@ pub trait Build {
         config: &Config,
         build_dir: &Path,
         progress: &Progress<ProgressBar>,
-    ) -> impl Future<Output = Result<(), Self::Err>> + Send;
+    ) -> impl Future<Output = Result<BuildInfo, Self::Err>> + Send;
 }
 
 #[cfg(test)]
