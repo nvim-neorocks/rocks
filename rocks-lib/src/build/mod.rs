@@ -327,6 +327,8 @@ async fn do_build(build: Build<'_>) -> Result<LocalPackage, BuildError> {
 
             recursive_copy_doc_dir(&output_paths, &build_dir)?;
 
+            std::fs::write(output_paths.rockspec_path(), &build.rockspec.raw_content)?;
+
             Ok(package)
         }
     }
