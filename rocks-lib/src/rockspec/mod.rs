@@ -19,6 +19,7 @@ pub use serde_util::*;
 use ssri::Integrity;
 pub use test_spec::*;
 use thiserror::Error;
+use url::Url;
 
 use crate::{
     config::{Config, LuaVersion, LuaVersionUnset},
@@ -190,7 +191,7 @@ pub struct RockDescription {
     /// The license used by the package.
     pub license: Option<String>,
     /// An URL for the project. This is not the URL for the tarball, but the address of a website.
-    pub homepage: Option<String>,
+    pub homepage: Option<Url>,
     /// An URL for the project's issue tracker.
     pub issues_url: Option<String>,
     /// Contact information for the rockspec maintainer.
@@ -336,7 +337,7 @@ mod tests {
             summary: Some("some summary".into()),
             detailed: Some("some detailed description".into()),
             license: Some("MIT".into()),
-            homepage: Some("https://github.com/nvim-neorocks/rocks".into()),
+            homepage: Some(Url::parse("https://github.com/nvim-neorocks/rocks").unwrap()),
             issues_url: Some("https://github.com/nvim-neorocks/rocks/issues".into()),
             maintainer: Some("neorocks".into()),
             labels: Vec::new(),
@@ -369,7 +370,7 @@ mod tests {
             summary: Some("some summary".into()),
             detailed: Some("some detailed description".into()),
             license: Some("MIT".into()),
-            homepage: Some("https://github.com/nvim-neorocks/rocks".into()),
+            homepage: Some(Url::parse("https://github.com/nvim-neorocks/rocks").unwrap()),
             issues_url: Some("https://github.com/nvim-neorocks/rocks/issues".into()),
             maintainer: Some("neorocks".into()),
             labels: Vec::new(),
@@ -411,7 +412,7 @@ mod tests {
             summary: Some("some summary".into()),
             detailed: Some("some detailed description".into()),
             license: Some("MIT".into()),
-            homepage: Some("https://github.com/nvim-neorocks/rocks".into()),
+            homepage: Some(Url::parse("https://github.com/nvim-neorocks/rocks").unwrap()),
             issues_url: Some("https://github.com/nvim-neorocks/rocks/issues".into()),
             maintainer: Some("neorocks".into()),
             labels: vec!["package management".into()],

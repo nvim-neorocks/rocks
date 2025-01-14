@@ -4,8 +4,8 @@ use clap::Parser;
 use rocks::{
     build, check,
     debug::Debug,
-    download, fetch, format, info, install, install_lua, install_rockspec, list, outdated, path,
-    pin, project, purge, remove, run, run_lua, search, test, uninstall, unpack, update,
+    doc, download, fetch, format, info, install, install_lua, install_rockspec, list, outdated,
+    path, pin, project, purge, remove, run, run_lua, search, test, uninstall, unpack, update,
     upload::{self},
     Cli, Commands,
 };
@@ -77,7 +77,7 @@ async fn main() {
         Commands::Check => check::check(config).await.unwrap(),
         Commands::Add => unimplemented!(),
         Commands::Config => unimplemented!(),
-        Commands::Doc => unimplemented!(),
+        Commands::Doc(doc_args) => doc::doc(doc_args, config).await.unwrap(),
         Commands::Lint => unimplemented!(),
         Commands::Pack => unimplemented!(),
         Commands::Uninstall(uninstall_data) => {

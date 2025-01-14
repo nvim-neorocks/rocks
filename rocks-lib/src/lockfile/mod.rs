@@ -201,6 +201,12 @@ pub struct LocalPackage {
     hashes: LocalPackageHashes,
 }
 
+impl LocalPackage {
+    pub fn into_package_spec(self) -> PackageSpec {
+        PackageSpec::new(self.spec.name, self.spec.version)
+    }
+}
+
 #[cfg_attr(feature = "lua", derive(FromLua,))]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct LocalPackageIntermediate {

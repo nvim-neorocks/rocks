@@ -28,6 +28,7 @@ which = "7.0.0"
 indicatif = "0.17.8"
 path-absolutize = "3.1.1"
 url = "2.5.4"
+open = "5.3.2"
 
 [dev-dependencies]
 assert_fs = "1.1.2"
