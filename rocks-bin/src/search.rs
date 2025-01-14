@@ -8,7 +8,7 @@ use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
 use rocks_lib::{
     config::Config,
     package::{PackageName, PackageReq, PackageVersion},
-    progress::{MultiProgress, ProgressBar},
+    progress::{MultiProgress, Progress},
     remote_package_db::RemotePackageDB,
 };
 
@@ -23,20 +23,18 @@ pub struct Search {
 
 pub async fn search(data: Search, config: Config) -> Result<()> {
     let progress = MultiProgress::new();
-    let bar = progress.add(ProgressBar::from(format!(
-        "🔎 Searching for `{}`...",
-        data.lua_package_req
-    )));
-
+    let bar = Progress::Progress(progress.new_bar());
     let formatting = TreeFormatting::dir_tree(FormatCharacters::box_chars());
 
-    let package_db = RemotePackageDB::from_config(&config).await?;
+    let package_db = RemotePackageDB::from_config(&config, &bar).await?;
+
+    bar.map(|b| b.set_message(format!("🔎 Searching for `{}`...", data.lua_package_req)));
 
     let lua_package_req = data.lua_package_req;
 
     let result = package_db.search(&lua_package_req);
 
-    bar.finish_and_clear();
+    bar.map(|b| b.finish_and_clear());
 
     if data.porcelain {
         let rock_to_version_map: HashMap<&PackageName, Vec<&PackageVersion>> =

@@ -55,7 +55,7 @@ impl<'a> Download<'a> {
         match self.package_db {
             Some(db) => download_rockspec(self.package_req, db, self.progress).await,
             None => {
-                let db = RemotePackageDB::from_config(self.config).await?;
+                let db = RemotePackageDB::from_config(self.config, self.progress).await?;
                 download_rockspec(self.package_req, &db, self.progress).await
             }
         }
@@ -73,7 +73,7 @@ impl<'a> Download<'a> {
                     .await
             }
             None => {
-                let db = RemotePackageDB::from_config(self.config).await?;
+                let db = RemotePackageDB::from_config(self.config, self.progress).await?;
                 download_src_rock_to_file(self.package_req, destination_dir, &db, self.progress)
                     .await
             }
@@ -87,7 +87,7 @@ impl<'a> Download<'a> {
         match self.package_db {
             Some(db) => search_and_download_src_rock(self.package_req, db, self.progress).await,
             None => {
-                let db = RemotePackageDB::from_config(self.config).await?;
+                let db = RemotePackageDB::from_config(self.config, self.progress).await?;
                 search_and_download_src_rock(self.package_req, &db, self.progress).await
             }
         }
@@ -99,7 +99,7 @@ impl<'a> Download<'a> {
         match self.package_db {
             Some(db) => download_remote_rock(self.package_req, db, self.progress).await,
             None => {
-                let db = RemotePackageDB::from_config(self.config).await?;
+                let db = RemotePackageDB::from_config(self.config, self.progress).await?;
                 download_remote_rock(self.package_req, &db, self.progress).await
             }
         }

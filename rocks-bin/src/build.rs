@@ -33,11 +33,16 @@ pub struct Build {
 pub async fn build(data: Build, config: Config) -> Result<()> {
     let project = Project::current()?.ok_or_eyre("Not in a project!")?;
     let pin = PinnedState::from(data.pin);
+    let progress_arc = MultiProgress::new_arc();
+    let progress = Arc::clone(&progress_arc);
+
+    let bar = progress.map(|p| p.new_bar());
     let package_db = match project.lockfile()? {
-        None => RemotePackageDB::from_config(&config).await?,
-        Some(_) if data.ignore_lockfile => RemotePackageDB::from_config(&config).await?,
+        None => RemotePackageDB::from_config(&config, &bar).await?,
+        Some(_) if data.ignore_lockfile => RemotePackageDB::from_config(&config, &bar).await?,
         Some(lockfile) => lockfile.into(),
     };
+    bar.map(|b| b.finish_and_clear());
     let rockspec = project.new_local_rockspec();
     let lua_version = rockspec.lua_version_from_config(&config)?;
     let tree = project.tree(lua_version)?;
@@ -49,9 +54,6 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         .iter()
         .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
         .collect_vec();
-
-    let progress_arc = MultiProgress::new_arc();
-    let progress = Arc::clone(&progress_arc);
 
     let dependencies_to_install = dependencies
         .into_iter()

@@ -90,13 +90,16 @@ impl<'a> Install<'a> {
 
     /// Install the packages.
     pub async fn install(self) -> Result<Vec<LocalPackage>, InstallError> {
-        let package_db = match self.package_db {
-            Some(db) => db,
-            None => RemotePackageDB::from_config(self.config).await?,
-        };
         let progress = match self.progress {
             Some(p) => p,
             None => MultiProgress::new_arc(),
+        };
+        let package_db = match self.package_db {
+            Some(db) => db,
+            None => {
+                let bar = progress.map(|p| p.new_bar());
+                RemotePackageDB::from_config(self.config, &bar).await?
+            }
         };
         install(self.packages, self.pin, package_db, self.config, progress).await
     }
