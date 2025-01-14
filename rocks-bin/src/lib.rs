@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use build::Build;
 use clap::{Parser, Subcommand};
 use debug::Debug;
+use doc::Doc;
 use download::Download;
 use info::Info;
 use install::Install;
@@ -26,6 +27,7 @@ use url::Url;
 pub mod build;
 pub mod check;
 pub mod debug;
+pub mod doc;
 pub mod download;
 pub mod fetch;
 pub mod format;
@@ -124,7 +126,7 @@ pub enum Commands {
     #[command(subcommand, arg_required_else_help = true)]
     Debug(Debug),
     /// [UNIMPLEMENTED] Show documentation for an installed rock.
-    Doc,
+    Doc(Doc),
     /// Download a specific rock file from a rocks server.
     #[command(arg_required_else_help = true)]
     Download(Download),

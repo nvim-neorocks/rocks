@@ -67,7 +67,7 @@ pub struct RockLayout {
 }
 
 impl RockLayout {
-    pub(crate) fn rockspec_path(&self) -> PathBuf {
+    pub fn rockspec_path(&self) -> PathBuf {
         self.rock_path.join("package.rockspec")
     }
 }
