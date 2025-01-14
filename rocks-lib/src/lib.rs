@@ -15,6 +15,7 @@ pub mod remote_package_db;
 pub mod rockspec;
 pub mod tree;
 pub mod upload;
+pub mod which;
 
 pub(crate) mod remote_package_source;
 

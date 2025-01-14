@@ -23,6 +23,7 @@ use uninstall::Uninstall;
 use update::Update;
 use upload::Upload;
 use url::Url;
+use which::Which;
 
 pub mod build;
 pub mod check;
@@ -51,6 +52,7 @@ pub mod unpack;
 pub mod update;
 pub mod upload;
 pub mod utils;
+pub mod which;
 
 /// A fast and efficient Lua package manager.
 #[derive(Parser)]
@@ -180,6 +182,6 @@ pub enum Commands {
     Update(Update),
     /// Upload a rockspec to the public rocks repository.
     Upload(Upload),
-    /// [UNIMPLEMENTED] Tell which file corresponds to a given module name.
-    Which,
+    /// Tell which file corresponds to a given module name.
+    Which(Which),
 }

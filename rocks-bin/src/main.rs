@@ -7,7 +7,7 @@ use rocks::{
     doc, download, fetch, format, info, install, install_lua, install_rockspec, list, outdated,
     path, pin, project, purge, remove, run, run_lua, search, test, uninstall, unpack, update,
     upload::{self},
-    Cli, Commands,
+    which, Cli, Commands,
 };
 use rocks_lib::{
     config::ConfigBuilder,
@@ -83,6 +83,6 @@ async fn main() {
         Commands::Uninstall(uninstall_data) => {
             uninstall::uninstall(uninstall_data, config).await.unwrap()
         }
-        Commands::Which => unimplemented!(),
+        Commands::Which(which_args) => which::which(which_args, config).unwrap(),
     }
 }

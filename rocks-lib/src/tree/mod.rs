@@ -138,23 +138,12 @@ impl Tree {
     }
 
     pub fn match_rocks(&self, req: &PackageReq) -> io::Result<RockMatches> {
-        match self.list()?.get(req.name()) {
-            Some(packages) => {
-                let mut found_packages = packages
-                    .iter()
-                    .rev()
-                    .filter(|package| req.version_req().matches(package.version()))
-                    .map(|package| package.id())
-                    .collect_vec();
-
-                Ok(match found_packages.len() {
-                    0 => RockMatches::NotFound(req.clone()),
-                    1 => RockMatches::Single(found_packages.pop().unwrap()),
-                    2.. => RockMatches::Many(found_packages),
-                })
-            }
-            None => Ok(RockMatches::NotFound(req.clone())),
-        }
+        let mut found_packages = self.lockfile()?.find_rocks(req);
+        Ok(match found_packages.len() {
+            0 => RockMatches::NotFound(req.clone()),
+            1 => RockMatches::Single(found_packages.pop().unwrap()),
+            2.. => RockMatches::Many(found_packages),
+        })
     }
 
     pub fn match_rocks_and<F>(&self, req: &PackageReq, filter: F) -> io::Result<RockMatches>

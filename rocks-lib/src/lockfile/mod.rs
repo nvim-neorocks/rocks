@@ -524,6 +524,19 @@ impl<P: LockfilePermissions> Lockfile<P> {
             .cloned()
     }
 
+    /// Find all rocks that match the requirement
+    pub(crate) fn find_rocks(&self, req: &PackageReq) -> Vec<LocalPackageId> {
+        match self.list().get(req.name()) {
+            Some(packages) => packages
+                .iter()
+                .rev()
+                .filter(|package| req.version_req().matches(package.version()))
+                .map(|package| package.id())
+                .collect_vec(),
+            None => Vec::default(),
+        }
+    }
+
     /// Validate the integrity of an installed package with the entry in this lockfile.
     pub(crate) fn validate_integrity(
         &self,
