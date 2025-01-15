@@ -45,13 +45,16 @@ pub enum RemotePackageDbIntegrityError {
 }
 
 impl RemotePackageDB {
-    pub async fn from_config(config: &Config) -> Result<Self, RemotePackageDBError> {
+    pub async fn from_config(
+        config: &Config,
+        progress: &Progress<ProgressBar>,
+    ) -> Result<Self, RemotePackageDBError> {
         let mut manifests = Vec::new();
         for server in config.extra_servers() {
-            let manifest = Manifest::from_config(server.clone(), config).await?;
+            let manifest = Manifest::from_config(server.clone(), config, progress).await?;
             manifests.push(manifest);
         }
-        manifests.push(Manifest::from_config(config.server().clone(), config).await?);
+        manifests.push(Manifest::from_config(config.server().clone(), config, progress).await?);
         Ok(Self(Impl::LuarocksManifests(manifests)))
     }
 

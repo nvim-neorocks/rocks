@@ -55,7 +55,12 @@ impl<State: update_builder::State> UpdateBuilder<'_, State> {
 
         let package_db = match new_self.package_db {
             Some(db) => db,
-            None => RemotePackageDB::from_config(new_self.config).await?,
+            None => {
+                let bar = new_self.progress.map(|p| p.new_bar());
+                let db = RemotePackageDB::from_config(new_self.config, &bar).await?;
+                bar.map(|b| b.finish_and_clear());
+                db
+            }
         };
 
         update(

@@ -5,7 +5,7 @@ use eyre::Result;
 use itertools::Itertools;
 use rocks_lib::{
     config::{Config, LuaVersion},
-    progress::{MultiProgress, ProgressBar},
+    progress::{MultiProgress, Progress},
     remote_package_db::RemotePackageDB,
     tree::Tree,
 };
@@ -19,13 +19,12 @@ pub struct Outdated {
 
 pub async fn outdated(outdated_data: Outdated, config: Config) -> Result<()> {
     let progress = MultiProgress::new();
-    let bar = progress.add(ProgressBar::from(
-        "🔎 Checking for outdated rocks...".to_string(),
-    ));
-
+    let bar = Progress::Progress(progress.new_bar());
     let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
 
-    let package_db = RemotePackageDB::from_config(&config).await?;
+    let package_db = RemotePackageDB::from_config(&config, &bar).await?;
+
+    bar.map(|b| b.set_message("🔎 Checking for outdated rocks...".to_string()));
 
     // NOTE: This will display all installed versions and each possible upgrade.
     // However, this should also take into account dependency constraints made by other rocks.
@@ -43,7 +42,7 @@ pub async fn outdated(outdated_data: Outdated, config: Config) -> Result<()> {
         .sorted_by_key(|(rock, _)| rock.name().to_owned())
         .into_group_map_by(|(rock, _)| rock.name().to_owned());
 
-    bar.finish_and_clear();
+    bar.map(|b| b.finish_and_clear());
 
     if outdated_data.porcelain {
         let jsonified_rock_list = rock_list

@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use mlua::{Lua, LuaSerdeExt};
 use reqwest::{header::ToStrError, Client};
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 use std::{cmp::Ordering, collections::HashMap};
 use thiserror::Error;
 use tokio::{fs, io};
@@ -9,6 +9,7 @@ use url::Url;
 
 use crate::luarocks;
 use crate::package::{RemotePackageType, RemotePackageTypeFilterSpec};
+use crate::progress::{Progress, ProgressBar};
 use crate::{
     config::{Config, LuaVersion},
     package::{PackageName, PackageReq, PackageSpec, PackageVersion, RemotePackage},
@@ -30,6 +31,7 @@ pub enum ManifestFromServerError {
 async fn manifest_from_server(
     url: &Url,
     config: &Config,
+    bar: &Progress<ProgressBar>,
 ) -> Result<String, ManifestFromServerError> {
     let manifest_filename = "manifest".to_string()
         + &config
@@ -89,14 +91,11 @@ async fn manifest_from_server(
     }
 
     // If our cache file does not exist then pull the whole manifest.
+;
+    // TODO(#337): switch to something that can report progress
+    bar.map(|bar| bar.set_message(format!("📥 Downloading manifest from {}", &url)));
 
-    let new_manifest = client
-        .get(url)
-        .timeout(Duration::from_secs(60 * 10))
-        .send()
-        .await?
-        .text()
-        .await?;
+    let new_manifest = client.get(url).send().await?.text().await?;
 
     fs::write(&cache, &new_manifest).await?;
 
@@ -228,8 +227,12 @@ impl Manifest {
         }
     }
 
-    pub async fn from_config(server_url: Url, config: &Config) -> Result<Self, ManifestError> {
-        let manifest = crate::manifest::manifest_from_server(&server_url, config).await?;
+    pub async fn from_config(
+        server_url: Url,
+        config: &Config,
+        progress: &Progress<ProgressBar>,
+    ) -> Result<Self, ManifestError> {
+        let manifest = crate::manifest::manifest_from_server(&server_url, config, progress).await?;
         let metadata = ManifestMetadata::new(&manifest)?;
         Ok(Self::new(server_url, metadata))
     }
@@ -337,9 +340,13 @@ mod tests {
             .lua_version(Some(crate::config::LuaVersion::LuaJIT))
             .build()
             .unwrap();
-        manifest_from_server(&Url::parse(&url_str).unwrap(), &config)
-            .await
-            .unwrap();
+        manifest_from_server(
+            &Url::parse(&url_str).unwrap(),
+            &config,
+            &Progress::NoProgress,
+        )
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -356,9 +363,13 @@ mod tests {
             .build()
             .unwrap();
 
-        manifest_from_server(&Url::parse(&url_str).unwrap(), &config)
-            .await
-            .unwrap();
+        manifest_from_server(
+            &Url::parse(&url_str).unwrap(),
+            &config,
+            &Progress::NoProgress,
+        )
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -377,9 +388,13 @@ mod tests {
             .lua_version(Some(crate::config::LuaVersion::Lua51))
             .build()
             .unwrap();
-        let result = manifest_from_server(&Url::parse(&url_str).unwrap(), &config)
-            .await
-            .unwrap();
+        let result = manifest_from_server(
+            &Url::parse(&url_str).unwrap(),
+            &config,
+            &Progress::NoProgress,
+        )
+        .await
+        .unwrap();
         assert_eq!(result, manifest_content);
     }
 

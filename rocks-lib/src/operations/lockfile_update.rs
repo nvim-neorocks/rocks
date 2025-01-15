@@ -70,9 +70,10 @@ pub enum LockfileUpdateError {
 }
 
 async fn do_add_missing_packages(update: LockfileUpdate<'_>) -> Result<(), LockfileUpdateError> {
+    let bar = update.progress.map(|p| p.new_bar());
     let package_db = match update.package_db {
         Some(db) => db,
-        None => RemotePackageDB::from_config(update.config).await?,
+        None => RemotePackageDB::from_config(update.config, &bar).await?,
     };
     let lockfile = update.lockfile;
     let packages_to_add = update
@@ -86,7 +87,6 @@ async fn do_add_missing_packages(update: LockfileUpdate<'_>) -> Result<(), Lockf
         return Ok(());
     }
 
-    let bar = update.progress.map(|p| p.new_bar());
     bar.map(|b| b.set_message("🔐 Updating lockfile..."));
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();

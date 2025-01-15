@@ -126,7 +126,9 @@ impl LuaRocksInstallation {
     ) -> Result<(), InstallBuildDependenciesError> {
         let progress = Arc::clone(&progress_arc);
         let mut lockfile = self.tree.lockfile()?.write_guard();
-        let package_db = RemotePackageDB::from_config(&self.config).await?;
+        let bar = progress.map(|p| p.new_bar());
+        let package_db = RemotePackageDB::from_config(&self.config, &bar).await?;
+        bar.map(|b| b.finish_and_clear());
         let build_dependencies = match rockspec.rockspec_format {
             Some(RockspecFormat::_1_0 | RockspecFormat::_2_0) => {
                 // XXX: rockspec formats < 3.0 don't support `build_dependencies`,
