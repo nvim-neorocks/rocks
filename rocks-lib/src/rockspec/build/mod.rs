@@ -53,6 +53,8 @@ pub struct BuildSpec {
     /// A list of directories that should be copied as-is into the resulting rock.
     pub copy_directories: Vec<PathBuf>,
     /// A list of patches to apply to the project before packaging it.
+    // NOTE: This cannot be a diffy::Patch<'a, str>
+    // because Lua::from_value requires a DeserializeOwned
     pub patches: HashMap<PathBuf, String>,
 }
 
