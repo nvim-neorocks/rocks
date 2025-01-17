@@ -127,6 +127,7 @@ mod test {
         };
         let temp: PathBuf = assert_fs::TempDir::new().unwrap().path().into();
         let config = ConfigBuilder::new()
+            .unwrap()
             .tree(Some(temp.clone()))
             .luarocks_tree(Some(temp))
             .build()

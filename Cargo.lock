@@ -3099,6 +3099,7 @@ dependencies = [
  "tempdir",
  "thiserror 2.0.3",
  "tokio",
+ "toml",
  "url",
  "vfs",
  "walkdir",

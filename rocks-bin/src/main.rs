@@ -19,6 +19,7 @@ async fn main() {
     let cli = Cli::parse();
 
     let config = ConfigBuilder::new()
+        .unwrap()
         .dev(Some(cli.dev))
         .lua_dir(cli.lua_dir)
         .lua_version(cli.lua_version)

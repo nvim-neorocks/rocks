@@ -194,6 +194,7 @@ mod test {
         let rockspec = unpack_rockspec(&rock).await.unwrap();
         let dir = assert_fs::TempDir::new().unwrap();
         let config = ConfigBuilder::new()
+            .unwrap()
             .tree(Some(dir.to_path_buf()))
             .build()
             .unwrap();

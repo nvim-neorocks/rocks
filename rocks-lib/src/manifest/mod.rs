@@ -336,6 +336,7 @@ mod tests {
         let mut url_str = server.url_str(""); // Remove trailing "/"
         url_str.pop();
         let config = ConfigBuilder::new()
+            .unwrap()
             .cache_dir(Some(cache_dir))
             .lua_version(Some(crate::config::LuaVersion::LuaJIT))
             .build()
@@ -358,6 +359,7 @@ mod tests {
         url_str.pop();
 
         let config = ConfigBuilder::new()
+            .unwrap()
             .cache_dir(Some(cache_dir))
             .lua_version(Some(crate::config::LuaVersion::Lua51))
             .build()
@@ -384,6 +386,7 @@ mod tests {
         fs::write(&cache, manifest_content).await.unwrap();
         let _metadata = fs::metadata(&cache).await.unwrap();
         let config = ConfigBuilder::new()
+            .unwrap()
             .cache_dir(Some(cache_dir.to_path_buf()))
             .lua_version(Some(crate::config::LuaVersion::Lua51))
             .build()

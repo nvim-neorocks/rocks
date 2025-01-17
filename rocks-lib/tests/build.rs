@@ -28,6 +28,7 @@ async fn builtin_build() {
     let rockspec = Rockspec::new(&content).unwrap();
 
     let config = ConfigBuilder::new()
+        .unwrap()
         .tree(Some(dir.into_path()))
         .build()
         .unwrap();
@@ -53,6 +54,7 @@ async fn make_build() {
     let rockspec = Rockspec::new(&content).unwrap();
 
     let config = ConfigBuilder::new()
+        .unwrap()
         .tree(Some(dir.into_path()))
         .build()
         .unwrap();
@@ -75,7 +77,7 @@ async fn cmake_build() {
 #[tokio::test]
 async fn command_build() {
     // The rockspec appears to be broken when using luajit headers on macos
-    let config = ConfigBuilder::new().build().unwrap();
+    let config = ConfigBuilder::new().unwrap().build().unwrap();
     if cfg!(target_os = "macos") && config.lua_version() == Some(&LuaVersion::LuaJIT) {
         println!("luaposix is broken on macos/luajit! Skipping...");
         return;
@@ -86,6 +88,7 @@ async fn command_build() {
 #[tokio::test]
 async fn lockfile_update() {
     let config = ConfigBuilder::new()
+        .unwrap()
         .tree(Some(assert_fs::TempDir::new().unwrap().path().into()))
         .build()
         .unwrap();
@@ -129,6 +132,7 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
     let rockspec = Rockspec::new(&content).unwrap();
 
     let config = ConfigBuilder::new()
+        .unwrap()
         .tree(Some(dir.into_path()))
         .build()
         .unwrap();

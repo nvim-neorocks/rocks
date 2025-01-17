@@ -15,6 +15,7 @@ use rocks_lib::{
 async fn luarocks_make() {
     let dir = TempDir::new().unwrap();
     let config = ConfigBuilder::new()
+        .unwrap()
         .tree(Some(dir.path().into()))
         .luarocks_tree(Some(TempDir::new().unwrap().path().into()))
         .build()

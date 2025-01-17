@@ -8,6 +8,7 @@ use tempdir::TempDir;
 async fn run_nlua() {
     let dir = TempDir::new("rocks-test").unwrap();
     let config = ConfigBuilder::new()
+        .unwrap()
         .tree(Some(dir.into_path()))
         .build()
         .unwrap();
