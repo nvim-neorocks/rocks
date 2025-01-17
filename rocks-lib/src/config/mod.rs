@@ -413,21 +413,20 @@ impl ConfigBuilder {
             .or(crate::lua_installation::get_installed_lua_version("lua")
                 .ok()
                 .and_then(|version| LuaVersion::from_version(version).ok()));
+        let cflags = env::var("CFLAGS").unwrap_or(utils::default_cflags().into());
         let default_variables = vec![
             ("LUA", "lua"),
             ("LIB_EXTENSION", utils::lua_lib_extension()),
             ("OBJ_EXTENSION", utils::lua_obj_extension()),
-            (
-                "CFLAGS",
-                env::var("CFLAGS")
-                    .unwrap_or(utils::default_cflags().into())
-                    .as_str(),
-            ),
+            ("CFLAGS", cflags.as_str()),
             ("LIBFLAG", utils::default_libflag()),
-        ]
-        .into_iter()
-        .map(|(key, val)| (key.into(), val.into()))
-        .collect();
+        ];
+
+        let variables = default_variables
+            .into_iter()
+            .map(|(key, val)| (key.into(), val.into()))
+            .chain(self.variables.unwrap_or_default())
+            .collect();
         Ok(Config {
             enable_development_rockspecs: self.enable_development_rockspecs.unwrap_or(false),
             server: self
@@ -456,7 +455,7 @@ impl ConfigBuilder {
             timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(30)),
             make: self.make.unwrap_or("make".into()),
             cmake: self.cmake.unwrap_or("cmake".into()),
-            variables: self.variables.unwrap_or(default_variables),
+            variables,
             external_deps: self.external_deps.unwrap_or_default(),
             cache_dir,
             data_dir,
