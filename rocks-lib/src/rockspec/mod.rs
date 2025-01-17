@@ -228,6 +228,7 @@ pub struct RockDescription {
     /// The license used by the package.
     pub license: Option<String>,
     /// An URL for the project. This is not the URL for the tarball, but the address of a website.
+    #[serde(default, deserialize_with = "deserialize_url")]
     pub homepage: Option<Url>,
     /// An URL for the project's issue tracker.
     pub issues_url: Option<String>,
@@ -236,6 +237,15 @@ pub struct RockDescription {
     /// A list of short strings that specify labels for categorization of this rock.
     #[serde(default)]
     pub labels: Vec<String>,
+}
+
+fn deserialize_url<'de, D>(deserializer: D) -> Result<Option<Url>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = Option::<String>::deserialize(deserializer)?;
+    s.map(|s| Url::parse(&s).map_err(serde::de::Error::custom))
+        .transpose()
 }
 
 #[derive(Error, Debug)]
