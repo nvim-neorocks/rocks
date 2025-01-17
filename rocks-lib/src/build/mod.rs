@@ -392,7 +392,7 @@ mod tests {
         let build_dir = assert_fs::TempDir::new().unwrap();
         build_dir.copy_from(&project_root, &["**"]).unwrap();
         let dest_dir = assert_fs::TempDir::new().unwrap();
-        let config = ConfigBuilder::new().build().unwrap();
+        let config = ConfigBuilder::new().unwrap().build().unwrap();
         let rock_layout = RockLayout {
             rock_path: dest_dir.to_path_buf(),
             etc: dest_dir.join("etc"),

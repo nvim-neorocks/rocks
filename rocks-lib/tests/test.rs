@@ -9,6 +9,10 @@ async fn run_busted_test() {
     let project: Project = Project::from(project_root).unwrap().unwrap();
     let tree_root = project.root().to_path_buf().join(".rocks");
     let _ = std::fs::remove_dir_all(&tree_root);
-    let config = ConfigBuilder::new().tree(Some(tree_root)).build().unwrap();
+    let config = ConfigBuilder::new()
+        .unwrap()
+        .tree(Some(tree_root))
+        .build()
+        .unwrap();
     Test::new(project, &config).run().await.unwrap();
 }

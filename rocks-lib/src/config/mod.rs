@@ -1,5 +1,6 @@
 use directories::ProjectDirs;
 use external_deps::ExternalDependencySearchConfig;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap, env, fmt::Display, io, path::PathBuf, str::FromStr, time::Duration,
 };
@@ -18,13 +19,19 @@ use crate::{
 
 pub mod external_deps;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum LuaVersion {
+    #[serde(rename = "5.1")]
     Lua51,
+    #[serde(rename = "5.2")]
     Lua52,
+    #[serde(rename = "5.3")]
     Lua53,
+    #[serde(rename = "5.4")]
     Lua54,
+    #[serde(rename = "jit")]
     LuaJIT,
+    #[serde(rename = "jit5.2")]
     LuaJIT52,
     // TODO(vhyrro): Support luau?
     // LuaU,
@@ -277,14 +284,18 @@ impl HasVariables for Config {
 }
 
 #[derive(Error, Debug)]
-#[error(transparent)]
 pub enum ConfigError {
+    #[error(transparent)]
     Io(#[from] io::Error),
+    #[error(transparent)]
     NoValidHomeDirectory(#[from] NoValidHomeDirectory),
+    #[error(transparent)]
     Project(#[from] ProjectError),
+    #[error("error deserializing rocks config: {0}")]
+    Deserialize(#[from] toml::de::Error),
 }
 
-#[derive(Default)]
+#[derive(Default, Deserialize, Serialize)]
 pub struct ConfigBuilder {
     enable_development_rockspecs: Option<bool>,
     server: Option<Url>,
@@ -301,15 +312,22 @@ pub struct ConfigBuilder {
     make: Option<String>,
     cmake: Option<String>,
     variables: Option<HashMap<String, String>>,
-    external_deps: Option<ExternalDependencySearchConfig>,
-
     cache_dir: Option<PathBuf>,
     data_dir: Option<PathBuf>,
+    #[serde(default)]
+    external_deps: ExternalDependencySearchConfig,
 }
 
 impl ConfigBuilder {
-    pub fn new() -> Self {
-        Self::default()
+    /// Create a new `ConfigBuilder` from a config file by deserializing from a config file
+    /// if present, or otherwise by instantiating the default config.
+    pub fn new() -> Result<Self, ConfigError> {
+        let config_file = config_file()?;
+        if config_file.is_file() {
+            Ok(toml::from_str(&std::fs::read_to_string(&config_file)?)?)
+        } else {
+            Ok(Self::default())
+        }
     }
 
     pub fn dev(self, dev: Option<bool>) -> Self {
@@ -383,17 +401,6 @@ impl ConfigBuilder {
         Self { cmake, ..self }
     }
 
-    pub fn variables(self, variables: Option<HashMap<String, String>>) -> Self {
-        Self { variables, ..self }
-    }
-
-    pub fn external_deps(self, external_deps: Option<ExternalDependencySearchConfig>) -> Self {
-        Self {
-            external_deps,
-            ..self
-        }
-    }
-
     pub fn cache_dir(self, cache_dir: Option<PathBuf>) -> Self {
         Self { cache_dir, ..self }
     }
@@ -414,20 +421,6 @@ impl ConfigBuilder {
             .or(crate::lua_installation::get_installed_lua_version("lua")
                 .ok()
                 .and_then(|version| LuaVersion::from_version(version).ok()));
-        let cflags = env::var("CFLAGS").unwrap_or(utils::default_cflags().into());
-        let default_variables = vec![
-            ("LUA", "lua"),
-            ("LIB_EXTENSION", utils::lua_lib_extension()),
-            ("OBJ_EXTENSION", utils::lua_obj_extension()),
-            ("CFLAGS", cflags.as_str()),
-            ("LIBFLAG", utils::default_libflag()),
-        ];
-
-        let variables = default_variables
-            .into_iter()
-            .map(|(key, val)| (key.into(), val.into()))
-            .chain(self.variables.unwrap_or_default())
-            .collect();
         Ok(Config {
             enable_development_rockspecs: self.enable_development_rockspecs.unwrap_or(false),
             server: self
@@ -456,10 +449,30 @@ impl ConfigBuilder {
             timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(30)),
             make: self.make.unwrap_or("make".into()),
             cmake: self.cmake.unwrap_or("cmake".into()),
-            variables,
-            external_deps: self.external_deps.unwrap_or_default(),
+            variables: default_variables()
+                .chain(self.variables.unwrap_or_default())
+                .collect(),
+            external_deps: self.external_deps,
             cache_dir,
             data_dir,
         })
     }
+}
+
+fn default_variables() -> impl Iterator<Item = (String, String)> {
+    let cflags = env::var("CFLAGS").unwrap_or(utils::default_cflags().into());
+    vec![
+        ("LUA".into(), "lua".into()),
+        ("LIB_EXTENSION".into(), utils::lua_lib_extension().into()),
+        ("OBJ_EXTENSION".into(), utils::lua_obj_extension().into()),
+        ("CFLAGS".into(), cflags),
+        ("LIBFLAG".into(), utils::default_libflag().into()),
+    ]
+    .into_iter()
+}
+
+fn config_file() -> Result<PathBuf, NoValidHomeDirectory> {
+    let project_dirs =
+        directories::ProjectDirs::from("org", "neorocks", "rocks").ok_or(NoValidHomeDirectory)?;
+    Ok(project_dirs.config_dir().join("config.toml").to_path_buf())
 }

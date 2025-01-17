@@ -139,7 +139,7 @@ impl ExternalDependencyInfo {
                 }
                 for prefix in search_prefixes {
                     let inc_dir = prefix.join(&config.include_subdir);
-                    for lib_subdir in &config.lib_subdir {
+                    for lib_subdir in &config.lib_subdirs {
                         let lib_dir = prefix.join(lib_subdir);
                         if library_exists(&lib_dir, lib, &config.lib_patterns) {
                             return Ok(Self::Library {
