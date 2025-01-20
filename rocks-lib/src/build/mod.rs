@@ -21,6 +21,7 @@ use external_dependency::{ExternalDependencyError, ExternalDependencyInfo};
 use indicatif::style::TemplateError;
 use luarocks::LuarocksBuildError;
 use make::MakeError;
+use patch::{Patch, PatchError};
 use rust_mlua::RustError;
 use ssri::Integrity;
 use thiserror::Error;
@@ -31,6 +32,7 @@ mod cmake;
 mod command;
 mod luarocks;
 mod make;
+mod patch;
 mod rust_mlua;
 
 pub mod external_dependency;
@@ -81,6 +83,8 @@ pub enum BuildError {
         expected: Integrity,
         actual: Integrity,
     },
+    #[error(transparent)]
+    PatchError(#[from] PatchError),
     #[error("failed to compile build modules: {0}")]
     CompilationError(#[from] cc::Error),
     #[error(transparent)]
@@ -291,6 +295,13 @@ async fn do_build(build: Build<'_>) -> Result<LocalPackage, BuildError> {
                 Some(unpack_dir) => temp_dir.path().join(unpack_dir),
                 None => temp_dir.path().into(),
             };
+
+            Patch::new(
+                &build_dir,
+                &build.rockspec.build.current_platform().patches,
+                build.progress,
+            )
+            .apply()?;
 
             let output = run_build(
                 build.rockspec,
