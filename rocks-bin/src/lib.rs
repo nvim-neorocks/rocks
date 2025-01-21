@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use build::Build;
 use clap::{Parser, Subcommand};
+use config::ConfigCmd;
 use debug::Debug;
 use doc::Doc;
 use download::Download;
@@ -26,6 +27,7 @@ use url::Url;
 
 pub mod build;
 pub mod check;
+pub mod config;
 pub mod debug;
 pub mod doc;
 pub mod download;
@@ -120,8 +122,9 @@ pub enum Commands {
     Build(Build),
     /// Runs `luacheck` in the current project.
     Check,
-    /// [UNIMPLEMENTED] Query information about Rocks's configuration.
-    Config,
+    /// Interact with the rocks configuration.
+    #[command(subcommand, arg_required_else_help = true)]
+    Config(ConfigCmd),
     /// Various debugging utilities.
     #[command(subcommand, arg_required_else_help = true)]
     Debug(Debug),

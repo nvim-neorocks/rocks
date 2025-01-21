@@ -103,7 +103,7 @@ async fn open_local_docs(pkg: LocalPackage, tree: &Tree) -> Result<()> {
             }
         }
     } else if files.len() == 1 {
-        open::that(layout.doc.join(files.first().unwrap()))?;
+        edit::edit_file(layout.doc.join(files.first().unwrap()))?;
         Ok(())
     } else {
         let file = Select::new(
@@ -112,7 +112,7 @@ async fn open_local_docs(pkg: LocalPackage, tree: &Tree) -> Result<()> {
         )
         .prompt()
         .expect("error selecting from multiple files");
-        open::that(layout.doc.join(file))?;
+        edit::edit_file(layout.doc.join(file))?;
         Ok(())
     }
 }

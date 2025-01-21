@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use clap::Parser;
 use rocks::{
-    build, check,
+    build, check, config,
     debug::Debug,
     doc, download, fetch, format, info, install, install_lua, install_rockspec, list, outdated,
     path, pin, project, purge, remove, run, run_lua, search, test, uninstall, unpack, update,
@@ -77,7 +77,7 @@ async fn main() {
         Commands::Upload(upload_data) => upload::upload(upload_data, config).await.unwrap(),
         Commands::Check => check::check(config).await.unwrap(),
         Commands::Add => unimplemented!(),
-        Commands::Config => unimplemented!(),
+        Commands::Config(config_cmd) => config::config(config_cmd, config).unwrap(),
         Commands::Doc(doc_args) => doc::doc(doc_args, config).await.unwrap(),
         Commands::Lint => unimplemented!(),
         Commands::Pack => unimplemented!(),
