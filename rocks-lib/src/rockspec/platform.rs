@@ -191,18 +191,24 @@ impl PlatformSupport {
     }
 
     pub fn parse(platforms: &[String]) -> Result<Self, PlatformValidationError> {
+        // Platforms are matched in one of two ways: exclusively or inclusively.
+        // If only positive matches are present, then the platforms are matched inclusively (as you only support the matches that you specified).
+        // If any negative matches are present, then the platforms are matched exclusively (as you want to support any operating system *other* than the ones you negated).
         match platforms {
             [] => Ok(Self::default()),
-            platforms if platforms.iter().all(|platform| platform.starts_with('!')) => {
+            platforms if platforms.iter().any(|platform| platform.starts_with('!')) => {
                 let mut platform_map = Self::validate_platforms(platforms)?;
 
+                // Loop through all identifiers and set them to true if they are not present in
+                // the map (exclusive matching).
                 for identifier in PlatformIdentifier::iter() {
                     platform_map.entry(identifier).or_insert(true);
                 }
 
                 Ok(Self { platform_map })
             }
-            _ => Ok(Self {
+            // Only validate positive matches (inclusive matching)
+            platforms => Ok(Self {
                 platform_map: Self::validate_platforms(platforms)?,
             }),
         }
