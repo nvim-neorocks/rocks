@@ -1,15 +1,18 @@
 use lets_find_up::{find_up_with, FindUpKind, FindUpOptions};
 use rocks_toml::{RocksToml, RocksTomlValidationError};
 use std::{
+    collections::HashMap,
     io,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 use thiserror::Error;
 
 use crate::{
     config::LuaVersion,
     lockfile::{Lockfile, ReadOnly},
-    lua_rockspec::{LuaRockspec, RockSourceSpec, RockspecError},
+    lua_rockspec::{ExternalDependencySpec, LuaRockspec, RockSourceSpec, RockspecError},
+    package::PackageReq,
     rockspec::Rockspec,
     tree::Tree,
 };
@@ -31,6 +34,21 @@ pub enum ProjectError {
 pub enum IntoRockspecError {
     RocksTomlValidationError(#[from] RocksTomlValidationError),
     RockspecError(#[from] RockspecError),
+}
+
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub enum ProjectEditError {
+    Io(#[from] tokio::io::Error),
+    Toml(#[from] toml_edit::TomlError),
+    //RocksTomlValidationError(#[from] RocksTomlValidationError),
+}
+
+pub enum DependencyType {
+    Regular(Vec<PackageReq>),
+    Build(Vec<PackageReq>),
+    Test(Vec<PackageReq>),
+    External(HashMap<String, ExternalDependencySpec>),
 }
 
 #[derive(Clone, Debug)]
@@ -121,6 +139,158 @@ impl Project {
     pub fn tree(&self, lua_version: LuaVersion) -> io::Result<Tree> {
         Tree::new(self.root.join(".rocks"), lua_version)
     }
+
+    pub async fn add(&mut self, dependencies: DependencyType) -> Result<(), ProjectEditError> {
+        let mut rocks =
+            toml_edit::DocumentMut::from_str(&tokio::fs::read_to_string(self.rocks_path()).await?)?;
+
+        let table = match dependencies {
+            DependencyType::Regular(_) => &mut rocks["dependencies"],
+            DependencyType::Build(_) => &mut rocks["build_dependencies"],
+            DependencyType::Test(_) => &mut rocks["test_dependencies"],
+            DependencyType::External(_) => &mut rocks["external_dependencies"],
+        };
+
+        match dependencies {
+            DependencyType::Regular(ref deps)
+            | DependencyType::Build(ref deps)
+            | DependencyType::Test(ref deps) => {
+                for dep in deps {
+                    table[dep.name().to_string()] = toml_edit::value(dep.version_req().to_string());
+                }
+            }
+            DependencyType::External(ref deps) => {
+                for (name, dep) in deps {
+                    match dep {
+                        ExternalDependencySpec::Header(path) => {
+                            table[name]["header"] =
+                                toml_edit::value(path.to_string_lossy().to_string());
+                        }
+                        ExternalDependencySpec::Library(path) => {
+                            table[name]["library"] =
+                                toml_edit::value(path.to_string_lossy().to_string());
+                        }
+                    }
+                }
+            }
+        };
+
+        tokio::fs::write(self.rocks_path(), rocks.to_string()).await?;
+
+        match dependencies {
+            DependencyType::Regular(deps) => {
+                self.rocks.dependencies = Some(
+                    self.rocks
+                        .dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .chain(deps)
+                        .collect(),
+                )
+            }
+            DependencyType::Build(deps) => {
+                self.rocks.build_dependencies = Some(
+                    self.rocks
+                        .build_dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .chain(deps)
+                        .collect(),
+                )
+            }
+            DependencyType::Test(deps) => {
+                self.rocks.test_dependencies = Some(
+                    self.rocks
+                        .test_dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .chain(deps)
+                        .collect(),
+                )
+            }
+            DependencyType::External(deps) => {
+                self.rocks.external_dependencies = Some(
+                    self.rocks
+                        .external_dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .chain(deps)
+                        .collect(),
+                )
+            }
+        };
+
+        Ok(())
+    }
 }
 
 // TODO: Add plenty of tests
+#[cfg(test)]
+mod tests {
+    use assert_fs::prelude::PathCopy;
+
+    use super::*;
+    use crate::package::PackageReq;
+
+    #[tokio::test]
+    async fn add_various_dependencies() {
+        let sample_project: PathBuf = "resources/test/sample-project-busted/".into();
+        let project_root = assert_fs::TempDir::new().unwrap();
+        project_root.copy_from(&sample_project, &["**"]).unwrap();
+        let project_root: PathBuf = project_root.path().into();
+        let mut project = Project::from(&project_root).unwrap().unwrap();
+        let expected_dependencies =
+            vec![PackageReq::new("busted".into(), Some(">= 1.0.0".into())).unwrap()];
+
+        project
+            .add(DependencyType::Regular(expected_dependencies.clone()))
+            .await
+            .unwrap();
+
+        project
+            .add(DependencyType::Build(expected_dependencies.clone()))
+            .await
+            .unwrap();
+        project
+            .add(DependencyType::Test(expected_dependencies.clone()))
+            .await
+            .unwrap();
+
+        project
+            .add(DependencyType::External(HashMap::from([(
+                "lib".into(),
+                ExternalDependencySpec::Library("path.so".into()),
+            )])))
+            .await
+            .unwrap();
+
+        // Reparse the rocks.toml (not usually necessary, but we want to test that the file was
+        // written correctly)
+        let project = Project::from(&project_root).unwrap().unwrap();
+        let validated_rocks_toml = project.rocks().into_validated_rocks_toml().unwrap();
+        assert_eq!(
+            validated_rocks_toml.dependencies().current_platform(),
+            &expected_dependencies
+        );
+        assert_eq!(
+            validated_rocks_toml.build_dependencies().current_platform(),
+            &expected_dependencies
+        );
+        assert_eq!(
+            validated_rocks_toml.test_dependencies().current_platform(),
+            &expected_dependencies
+        );
+        assert_eq!(
+            validated_rocks_toml
+                .external_dependencies()
+                .current_platform()
+                .get("lib")
+                .unwrap(),
+            &ExternalDependencySpec::Library("path.so".into())
+        );
+    }
+}
