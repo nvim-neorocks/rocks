@@ -2,7 +2,7 @@ use crate::{
     build::BuildError,
     config::Config,
     lua_installation::LuaInstallation,
-    rockspec::{LuaModule, ModulePaths},
+    lua_rockspec::{LuaModule, ModulePaths},
     tree::RockLayout,
 };
 use itertools::Itertools;

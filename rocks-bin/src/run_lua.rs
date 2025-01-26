@@ -8,6 +8,7 @@ use rocks_lib::{
     lua_installation::get_installed_lua_version,
     path::Paths,
     project::Project,
+    rockspec::LuaVersionCompatibility,
     tree::Tree,
 };
 
@@ -33,7 +34,7 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
     }
     let project = Project::current()?;
     let lua_version = match &project {
-        Some(prj) => prj.rockspec().lua_version_from_config(&config)?,
+        Some(prj) => prj.rocks().lua_version_matches(&config)?,
         None => LuaVersion::from(&config)?,
     };
     match get_installed_lua_version(&lua_cmd).and_then(|ver| Ok(LuaVersion::from_version(ver)?)) {

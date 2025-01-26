@@ -5,6 +5,7 @@ use rocks_lib::{
     config::Config,
     operations::Download,
     progress::{MultiProgress, Progress},
+    rockspec::Rockspec,
 };
 
 use crate::unpack::UnpackRemote;
@@ -19,14 +20,14 @@ pub async fn fetch_remote(data: UnpackRemote, config: Config) -> Result<()> {
         .await?
         .rockspec;
 
-    let destination = data
-        .path
-        .unwrap_or_else(|| PathBuf::from(format!("{}-{}", &rockspec.package, &rockspec.version)));
+    let destination = data.path.unwrap_or_else(|| {
+        PathBuf::from(format!("{}-{}", &rockspec.package(), &rockspec.version()))
+    });
     rocks_lib::operations::FetchSrc::new(destination.clone().as_path(), &rockspec, &config, &bar)
         .fetch()
         .await?;
 
-    let rock_source = rockspec.source.current_platform();
+    let rock_source = rockspec.source().current_platform();
     let build_dir = rock_source
         .unpack_dir
         .as_ref()

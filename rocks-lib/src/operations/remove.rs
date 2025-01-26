@@ -5,7 +5,7 @@ use crate::config::{LuaVersion, LuaVersionUnset};
 use crate::lockfile::{LocalPackage, LocalPackageId};
 use crate::progress::{MultiProgress, Progress, ProgressBar};
 use crate::{config::Config, tree::Tree};
-use clean_path::Clean as _;
+use clean_path::Clean;
 use futures::future::join_all;
 use itertools::Itertools;
 use thiserror::Error;

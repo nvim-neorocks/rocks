@@ -1,11 +1,11 @@
 use super::utils::lua_lib_extension;
 use crate::config::LuaVersionUnset;
+use crate::lua_rockspec::BuildInfo;
 use crate::progress::{Progress, ProgressBar};
-use crate::rockspec::BuildInfo;
 use crate::{
     config::{Config, LuaVersion},
     lua_installation::LuaInstallation,
-    rockspec::{Build, RustMluaBuildSpec},
+    lua_rockspec::{Build, RustMluaBuildSpec},
     tree::RockLayout,
 };
 use itertools::Itertools;

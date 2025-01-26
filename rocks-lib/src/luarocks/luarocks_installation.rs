@@ -15,12 +15,13 @@ use crate::{
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{LocalPackage, LocalPackageId, LockConstraint, PinnedState},
     lua_installation::LuaInstallation,
+    lua_rockspec::{LuaRockspec, RockspecFormat},
     operations::{get_all_dependencies, SearchAndDownloadError},
     package::PackageReq,
     path::Paths,
     progress::{MultiProgress, Progress, ProgressBar},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
-    rockspec::{Rockspec, RockspecFormat},
+    rockspec::Rockspec,
     tree::Tree,
 };
 
@@ -105,7 +106,7 @@ impl LuaRocksInstallation {
             PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into())).unwrap();
 
         if !self.tree.match_rocks(&luarocks_req)?.is_found() {
-            let rockspec = Rockspec::new(LUAROCKS_ROCKSPEC).unwrap();
+            let rockspec = LuaRockspec::new(LUAROCKS_ROCKSPEC).unwrap();
             let pkg = Build::new(&rockspec, &self.config, progress)
                 .constraint(LockConstraint::Constrained(
                     luarocks_req.version_req().clone(),
@@ -118,10 +119,10 @@ impl LuaRocksInstallation {
         Ok(())
     }
 
-    pub async fn install_build_dependencies(
+    pub async fn install_build_dependencies<R: Rockspec>(
         &self,
         build_backend: &str,
-        rockspec: &Rockspec,
+        rocks: &R,
         progress_arc: Arc<Progress<MultiProgress>>,
     ) -> Result<(), InstallBuildDependenciesError> {
         let progress = Arc::clone(&progress_arc);
@@ -129,19 +130,19 @@ impl LuaRocksInstallation {
         let bar = progress.map(|p| p.new_bar());
         let package_db = RemotePackageDB::from_config(&self.config, &bar).await?;
         bar.map(|b| b.finish_and_clear());
-        let build_dependencies = match rockspec.rockspec_format {
+        let build_dependencies = match rocks.format() {
             Some(RockspecFormat::_1_0 | RockspecFormat::_2_0) => {
                 // XXX: rockspec formats < 3.0 don't support `build_dependencies`,
                 // so we have to fetch the build backend from the dependencies.
-                rockspec
-                    .dependencies
+                rocks
+                    .dependencies()
                     .current_platform()
                     .iter()
                     .filter(|dep| dep.name().to_string().contains(build_backend))
                     .cloned()
                     .collect_vec()
             }
-            _ => rockspec.build_dependencies.current_platform().to_vec(),
+            _ => rocks.build_dependencies().current_platform().to_vec(),
         }
         .into_iter()
         .map(|dep| (BuildBehaviour::NoForce, dep))
@@ -169,7 +170,7 @@ impl LuaRocksInstallation {
             let bar = progress.map(|p| {
                 p.add(ProgressBar::from(format!(
                     "💻 Installing build dependency: {}",
-                    install_spec.downloaded_rock.rockspec().package,
+                    install_spec.downloaded_rock.rockspec().package(),
                 )))
             });
             let config = self.config.clone();

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use assert_fs::assert::PathAssert;
-use assert_fs::prelude::{PathChild as _, PathCopy};
+use assert_fs::prelude::{PathChild, PathCopy};
 use assert_fs::TempDir;
 use predicates::prelude::predicate;
 use rocks_lib::progress::{MultiProgress, Progress, ProgressBar};

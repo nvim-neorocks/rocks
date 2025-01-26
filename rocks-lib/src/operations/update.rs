@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bon::Builder;
-use itertools::Itertools as _;
+use itertools::Itertools;
 use thiserror::Error;
 
 use crate::{

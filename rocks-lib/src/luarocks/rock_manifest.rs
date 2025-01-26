@@ -1,4 +1,4 @@
-use mlua::{FromLua, Lua, LuaSerdeExt as _, Table, Value};
+use mlua::{FromLua, Lua, LuaSerdeExt, Table, Value};
 /// Compatibility layer/adapter for the luarocks client
 use std::{collections::HashMap, path::PathBuf};
 use thiserror::Error;

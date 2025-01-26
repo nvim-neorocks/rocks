@@ -5,10 +5,10 @@ pub fn debug_project() -> Result<()> {
     let project = Project::current()?;
 
     if let Some(project) = project {
-        let rockspec = project.rockspec();
+        let rocks = project.rocks();
 
-        println!("Project Name: {}", rockspec.package);
-        println!("Project Version: {}", rockspec.version);
+        println!("Project Name: {}", rocks.package());
+        println!("Project Version: {}", rocks.version());
 
         println!("Project location: {}", project.root().display());
     } else {

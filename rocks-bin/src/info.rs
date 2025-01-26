@@ -5,6 +5,7 @@ use rocks_lib::{
     operations::Download,
     package::PackageReq,
     progress::{MultiProgress, Progress},
+    rockspec::Rockspec,
     tree::Tree,
 };
 
@@ -31,35 +32,42 @@ pub async fn info(data: Info, config: Config) -> Result<()> {
         println!("Currently installed in {}", tree.root().display());
     }
 
-    println!("Package name: {}", rockspec.package);
-    println!("Package version: {}", rockspec.version);
+    println!("Package name: {}", rockspec.package());
+    println!("Package version: {}", rockspec.version());
     println!();
 
     println!(
         "Summary: {}",
-        rockspec.description.summary.unwrap_or("None".into())
+        rockspec
+            .description()
+            .summary
+            .as_ref()
+            .unwrap_or(&"None".to_string())
     );
     println!(
         "Description: {}",
         rockspec
-            .description
+            .description()
             .detailed
-            .unwrap_or("None".into())
+            .as_ref()
+            .unwrap_or(&"None".to_string())
             .trim()
     );
     println!(
         "License: {}",
         rockspec
-            .description
+            .description()
             .license
-            .unwrap_or("Unknown (all rights reserved by the author)".into())
+            .as_ref()
+            .unwrap_or(&"Unknown (all rights reserved by the author)".to_string())
     );
     println!(
         "Maintainer: {}",
         rockspec
-            .description
+            .description()
             .maintainer
-            .unwrap_or("Unspecified".into())
+            .as_ref()
+            .unwrap_or(&"Unspecified".to_string())
     );
 
     Ok(())

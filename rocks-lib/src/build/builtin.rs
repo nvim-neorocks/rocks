@@ -1,4 +1,4 @@
-use clean_path::Clean as _;
+use clean_path::Clean;
 use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
@@ -12,8 +12,8 @@ use crate::{
     build::utils,
     config::Config,
     lua_installation::LuaInstallation,
+    lua_rockspec::{Build, BuildInfo, BuiltinBuildSpec, LuaModule, ModuleSpec},
     progress::{Progress, ProgressBar},
-    rockspec::{Build, BuildInfo, BuiltinBuildSpec, LuaModule, ModuleSpec},
     tree::RockLayout,
 };
 

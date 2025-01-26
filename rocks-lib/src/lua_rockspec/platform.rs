@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use mlua::{FromLua, Lua, LuaSerdeExt as _, Value};
+use mlua::{FromLua, Lua, LuaSerdeExt, Value};
 use std::{cmp::Ordering, collections::HashMap, convert::Infallible, marker::PhantomData};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -12,6 +12,8 @@ use serde::{
 use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
 
 use crate::package::PackageReq;
+
+use super::{DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue};
 
 /// Identifier by a platform.
 /// The `PartialOrd` instance views more specific platforms as `Greater`
@@ -110,6 +112,7 @@ impl Default for PlatformSupport {
     fn default() -> Self {
         Self {
             platform_map: PlatformIdentifier::iter()
+                .filter(|identifier| !matches!(identifier, PlatformIdentifier::Unknown(_)))
                 .map(|identifier| (identifier, true))
                 .collect(),
         }
@@ -123,6 +126,26 @@ impl<'de> Deserialize<'de> for PlatformSupport {
     {
         let platforms: Vec<String> = Vec::deserialize(deserializer)?;
         Self::parse(&platforms).map_err(de::Error::custom)
+    }
+}
+
+impl DisplayAsLuaKV for PlatformSupport {
+    fn display_lua(&self) -> DisplayLuaKV {
+        DisplayLuaKV {
+            key: "supported_platforms".to_string(),
+            value: DisplayLuaValue::List(
+                self.platforms()
+                    .iter()
+                    .map(|(platform, supported)| {
+                        DisplayLuaValue::String(format!(
+                            "{}{}",
+                            if *supported { "" } else { "!" },
+                            platform,
+                        ))
+                    })
+                    .collect(),
+            ),
+        }
     }
 }
 
@@ -202,7 +225,9 @@ impl PlatformSupport {
                 // Loop through all identifiers and set them to true if they are not present in
                 // the map (exclusive matching).
                 for identifier in PlatformIdentifier::iter() {
-                    platform_map.entry(identifier).or_insert(true);
+                    if !matches!(identifier, PlatformIdentifier::Unknown(_)) {
+                        platform_map.entry(identifier).or_insert(true);
+                    }
                 }
 
                 Ok(Self { platform_map })
@@ -220,6 +245,10 @@ impl PlatformSupport {
 
     pub fn is_current_platform_supported(&self) -> bool {
         self.is_supported(&get_platform())
+    }
+
+    pub(crate) fn platforms(&self) -> &HashMap<PlatformIdentifier, bool> {
+        &self.platform_map
     }
 }
 
@@ -287,6 +316,13 @@ pub struct PerPlatform<T> {
 }
 
 impl<T> PerPlatform<T> {
+    pub(crate) fn new(default: T) -> Self {
+        Self {
+            default,
+            per_platform: HashMap::default(),
+        }
+    }
+
     pub fn get(&self, platform: &PlatformIdentifier) -> &T {
         self.per_platform.get(platform).unwrap_or(
             platform
@@ -313,6 +349,35 @@ impl<T> PerPlatform<T> {
     pub(crate) fn current_platform_set(&mut self, value: T) {
         self.set(get_platform(), value)
     }
+
+    pub fn map<U, F>(self, cb: F) -> PerPlatform<U>
+    where
+        F: Fn(T) -> U,
+    {
+        PerPlatform {
+            default: cb(self.default),
+            per_platform: self
+                .per_platform
+                .into_iter()
+                .map(|(identifier, value)| (identifier, cb(value)))
+                .collect(),
+        }
+    }
+
+    pub fn try_map<U, E, F>(self, cb: F) -> Result<PerPlatform<U>, E>
+    where
+        F: Fn(T) -> Result<U, E>,
+        E: std::error::Error,
+    {
+        Ok(PerPlatform {
+            default: cb(self.default)?,
+            per_platform: self
+                .per_platform
+                .into_iter()
+                .map(|(identifier, value)| Ok((identifier, cb(value)?)))
+                .try_collect()?,
+        })
+    }
 }
 
 impl<T: Default> Default for PerPlatform<T> {
@@ -321,6 +386,35 @@ impl<T: Default> Default for PerPlatform<T> {
             default: T::default(),
             per_platform: HashMap::default(),
         }
+    }
+}
+
+impl<'de, T> Deserialize<'de> for PerPlatform<T>
+where
+    T: Deserialize<'de>,
+    T: Clone,
+    T: PartialOverride,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let mut map = toml::map::Map::deserialize(deserializer)?;
+
+        let mut per_platform: HashMap<PlatformIdentifier, T> = map
+            .remove("platforms")
+            .map_or(Ok(HashMap::default()), |platforms| platforms.try_into())
+            .map_err(serde::de::Error::custom)?;
+
+        let default: T = map.try_into().map_err(serde::de::Error::custom)?;
+
+        apply_per_platform_overrides(&mut per_platform, &default)
+            .map_err(serde::de::Error::custom)?;
+
+        Ok(PerPlatform {
+            default,
+            per_platform,
+        })
     }
 }
 
@@ -403,13 +497,47 @@ where
     }
 }
 
+impl<'de, T, G> Deserialize<'de> for PerPlatformWrapper<T, G>
+where
+    T: FromPlatformOverridable<G, T, Err: ToString>,
+    G: PlatformOverridable<Err: ToString>,
+    G: DeserializeOwned,
+    G: Default,
+    G: Clone,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let internal = PerPlatform::deserialize(deserializer)?;
+        let per_platform: HashMap<_, _> = internal
+            .per_platform
+            .into_iter()
+            .map(|(platform, internal_override)| {
+                let override_spec = T::from_platform_overridable(internal_override)
+                    .map_err(serde::de::Error::custom)?;
+
+                Ok((platform, override_spec))
+            })
+            .try_collect::<_, _, D::Error>()?;
+        let un_per_platform = PerPlatform {
+            default: T::from_platform_overridable(internal.default)
+                .map_err(serde::de::Error::custom)?,
+            per_platform,
+        };
+        Ok(PerPlatformWrapper {
+            un_per_platform,
+            phantom: PhantomData,
+        })
+    }
+}
+
 fn apply_per_platform_overrides<T>(
     per_platform: &mut HashMap<PlatformIdentifier, T>,
     base: &T,
 ) -> Result<(), T::Err>
 where
     T: PartialOverride,
-    T: Default,
     T: Clone,
 {
     let per_platform_raw = per_platform.clone();
@@ -421,14 +549,12 @@ where
     for (platform, overrides) in per_platform_raw {
         // Add extended platform dependencies (without base deps) for each platform
         for extended_platform in &platform.get_extended_platforms() {
-            let extended_overrides = per_platform
-                .get(extended_platform)
-                .cloned()
-                .unwrap_or_default();
-            per_platform.insert(
-                extended_platform.to_owned(),
-                extended_overrides.apply_overrides(&overrides)?,
-            );
+            if let Some(extended_overrides) = per_platform.get(extended_platform) {
+                per_platform.insert(
+                    extended_platform.to_owned(),
+                    extended_overrides.apply_overrides(&overrides)?,
+                );
+            }
         }
     }
     Ok(())

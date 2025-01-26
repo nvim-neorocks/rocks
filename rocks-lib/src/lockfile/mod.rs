@@ -19,7 +19,7 @@ use crate::remote_package_source::RemotePackageSource;
 use crate::rockspec::RockBinaries;
 
 #[cfg(feature = "lua")]
-use mlua::{ExternalResult as _, FromLua};
+use mlua::{ExternalResult, FromLua};
 
 #[derive(Copy, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub enum PinnedState {

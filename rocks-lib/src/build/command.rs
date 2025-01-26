@@ -9,8 +9,8 @@ use thiserror::Error;
 use crate::{
     config::Config,
     lua_installation::LuaInstallation,
+    lua_rockspec::{Build, BuildInfo, CommandBuildSpec},
     progress::{Progress, ProgressBar},
-    rockspec::{Build, BuildInfo, CommandBuildSpec},
     tree::RockLayout,
 };
 

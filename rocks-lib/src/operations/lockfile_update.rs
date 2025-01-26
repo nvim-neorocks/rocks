@@ -13,6 +13,7 @@ use crate::{
     package::{PackageReq, PackageSpec},
     progress::{MultiProgress, Progress},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
+    rockspec::Rockspec,
 };
 
 use super::{FetchSrc, FetchSrcError, SearchAndDownloadError};
@@ -39,7 +40,7 @@ pub struct LockfileUpdate<'a> {
     progress: Arc<Progress<MultiProgress>>,
 }
 
-impl<'a, State: lockfile_update_builder::State> LockfileUpdateBuilder<'a, State> {
+impl<State: lockfile_update_builder::State> LockfileUpdateBuilder<'_, State> {
     pub fn package(mut self, package: PackageReq) -> Self {
         self.packages.push(package);
         self
@@ -111,7 +112,7 @@ async fn do_add_missing_packages(update: LockfileUpdate<'_>) -> Result<(), Lockf
             let downloaded_rock = install_spec.downloaded_rock;
             let rockspec = downloaded_rock.rockspec();
             let temp_dir =
-                tempdir::TempDir::new(&format!("lockfile_update-{}", &rockspec.package))?;
+                tempdir::TempDir::new(&format!("lockfile_update-{}", &rockspec.package()))?;
             let source_hash =
                 FetchSrc::new(temp_dir.path(), rockspec, &config, &Progress::NoProgress)
                     .fetch()
@@ -121,7 +122,7 @@ async fn do_add_missing_packages(update: LockfileUpdate<'_>) -> Result<(), Lockf
                 source: source_hash,
             };
             let pkg = LocalPackage::from(
-                &PackageSpec::new(rockspec.package.clone(), rockspec.version.clone()),
+                &PackageSpec::new(rockspec.package().clone(), rockspec.version().clone()),
                 install_spec.spec.constraint(),
                 rockspec.binaries(),
                 downloaded_rock.rockspec_download().source.clone(),

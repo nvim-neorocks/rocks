@@ -12,7 +12,10 @@ pub use version::{
     PackageVersion, PackageVersionParseError, PackageVersionReq, PackageVersionReqError,
 };
 
-use crate::remote_package_source::RemotePackageSource;
+use crate::{
+    lua_rockspec::{DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue},
+    remote_package_source::RemotePackageSource,
+};
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]
@@ -156,10 +159,10 @@ impl FromStr for PackageSpec {
 #[cfg_attr(feature = "lua", derive(mlua::FromLua))]
 pub struct PackageReq {
     /// The name of the package.
-    name: PackageName,
+    pub(crate) name: PackageName,
     /// The version requirement, for example "1.0.0" or ">=1.0.0".
     #[cfg_attr(feature = "clap", clap(default_value_t = PackageVersionReq::default()))]
-    version_req: PackageVersionReq,
+    pub(crate) version_req: PackageVersionReq,
 }
 
 impl PackageReq {
@@ -218,6 +221,53 @@ impl mlua::UserData for PackageReq {
         methods.add_method("matches", |_, this, package: PackageSpec| {
             Ok(this.matches(&package))
         });
+    }
+}
+
+/// Wrapper structs for proper serialization of various dependency types.
+pub(crate) struct Dependencies<'a>(pub(crate) &'a Vec<PackageReq>);
+pub(crate) struct BuildDependencies<'a>(pub(crate) &'a Vec<PackageReq>);
+pub(crate) struct TestDependencies<'a>(pub(crate) &'a Vec<PackageReq>);
+
+impl DisplayAsLuaKV for Dependencies<'_> {
+    fn display_lua(&self) -> DisplayLuaKV {
+        DisplayLuaKV {
+            key: "dependencies".to_string(),
+            value: DisplayLuaValue::List(
+                self.0
+                    .iter()
+                    .map(|req| DisplayLuaValue::String(req.to_string()))
+                    .collect(),
+            ),
+        }
+    }
+}
+
+impl DisplayAsLuaKV for BuildDependencies<'_> {
+    fn display_lua(&self) -> DisplayLuaKV {
+        DisplayLuaKV {
+            key: "build_dependencies".to_string(),
+            value: DisplayLuaValue::List(
+                self.0
+                    .iter()
+                    .map(|req| DisplayLuaValue::String(req.to_string()))
+                    .collect(),
+            ),
+        }
+    }
+}
+
+impl DisplayAsLuaKV for TestDependencies<'_> {
+    fn display_lua(&self) -> DisplayLuaKV {
+        DisplayLuaKV {
+            key: "test_dependencies".to_string(),
+            value: DisplayLuaValue::List(
+                self.0
+                    .iter()
+                    .map(|req| DisplayLuaValue::String(req.to_string()))
+                    .collect(),
+            ),
+        }
     }
 }
 

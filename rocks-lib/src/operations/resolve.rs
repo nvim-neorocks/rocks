@@ -16,6 +16,7 @@ use crate::{
     package::{PackageReq, PackageVersionReq},
     progress::{MultiProgress, Progress},
     remote_package_db::RemotePackageDB,
+    rockspec::Rockspec,
 };
 
 use super::{Download, RemoteRockDownload, SearchAndDownloadError};
@@ -72,7 +73,7 @@ where
 
                     let dependencies = downloaded_rock
                         .rockspec()
-                        .dependencies
+                        .dependencies()
                         .current_platform()
                         .iter()
                         .filter(|dep| !dep.name().eq(&"lua".into()))
@@ -92,8 +93,8 @@ where
 
                     let rockspec = downloaded_rock.rockspec();
                     let local_spec = LocalPackageSpec::new(
-                        &rockspec.package,
-                        &rockspec.version,
+                        rockspec.package(),
+                        rockspec.version(),
                         constraint,
                         dependencies,
                         &pin,
