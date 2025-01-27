@@ -164,8 +164,6 @@ pub struct Config {
     no_project: bool,
     verbose: bool,
     timeout: Duration,
-    make: String,
-    cmake: String,
     variables: HashMap<String, String>,
     external_deps: ExternalDependencySearchConfig,
 
@@ -251,12 +249,18 @@ impl Config {
         &self.timeout
     }
 
-    pub fn make_cmd(&self) -> &String {
-        &self.make
+    pub fn make_cmd(&self) -> String {
+        match self.variables.get("MAKE") {
+            Some(make) => make.clone(),
+            None => "make".into(),
+        }
     }
 
-    pub fn cmake_cmd(&self) -> &String {
-        &self.cmake
+    pub fn cmake_cmd(&self) -> String {
+        match self.variables.get("CMAKE") {
+            Some(cmake) => cmake.clone(),
+            None => "cmake".into(),
+        }
     }
 
     pub fn variables(&self) -> &HashMap<String, String> {
@@ -296,23 +300,21 @@ pub enum ConfigError {
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct ConfigBuilder {
-    enable_development_rockspecs: Option<bool>,
     server: Option<Url>,
     extra_servers: Option<Vec<Url>>,
     only_sources: Option<String>,
     namespace: Option<String>,
-    lua_dir: Option<PathBuf>,
     lua_version: Option<LuaVersion>,
     tree: Option<PathBuf>,
+    lua_dir: Option<PathBuf>,
     luarocks_tree: Option<PathBuf>,
-    no_project: Option<bool>,
-    verbose: Option<bool>,
-    timeout: Option<Duration>,
-    make: Option<String>,
-    cmake: Option<String>,
-    variables: Option<HashMap<String, String>>,
     cache_dir: Option<PathBuf>,
     data_dir: Option<PathBuf>,
+    no_project: Option<bool>,
+    enable_development_rockspecs: Option<bool>,
+    verbose: Option<bool>,
+    timeout: Option<Duration>,
+    variables: Option<HashMap<String, String>>,
     #[serde(default)]
     external_deps: ExternalDependencySearchConfig,
 }
@@ -321,12 +323,19 @@ impl ConfigBuilder {
     /// Create a new `ConfigBuilder` from a config file by deserializing from a config file
     /// if present, or otherwise by instantiating the default config.
     pub fn new() -> Result<Self, ConfigError> {
-        let config_file = config_file()?;
+        let config_file = Self::config_file()?;
         if config_file.is_file() {
             Ok(toml::from_str(&std::fs::read_to_string(&config_file)?)?)
         } else {
             Ok(Self::default())
         }
+    }
+
+    /// Get the path to the rocks config file.
+    pub fn config_file() -> Result<PathBuf, NoValidHomeDirectory> {
+        let project_dirs = directories::ProjectDirs::from("org", "neorocks", "rocks")
+            .ok_or(NoValidHomeDirectory)?;
+        Ok(project_dirs.config_dir().join("config.toml").to_path_buf())
     }
 
     pub fn dev(self, dev: Option<bool>) -> Self {
@@ -392,14 +401,6 @@ impl ConfigBuilder {
         Self { timeout, ..self }
     }
 
-    pub fn make_cmd(self, make: Option<String>) -> Self {
-        Self { make, ..self }
-    }
-
-    pub fn cmake_cmd(self, cmake: Option<String>) -> Self {
-        Self { cmake, ..self }
-    }
-
     pub fn cache_dir(self, cache_dir: Option<PathBuf>) -> Self {
         Self { cache_dir, ..self }
     }
@@ -446,8 +447,6 @@ impl ConfigBuilder {
             no_project: self.no_project.unwrap_or(false),
             verbose: self.verbose.unwrap_or(false),
             timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(30)),
-            make: self.make.unwrap_or("make".into()),
-            cmake: self.cmake.unwrap_or("cmake".into()),
             variables: default_variables()
                 .chain(self.variables.unwrap_or_default())
                 .collect(),
@@ -458,20 +457,40 @@ impl ConfigBuilder {
     }
 }
 
+/// Useful for printing the current config
+impl From<Config> for ConfigBuilder {
+    fn from(value: Config) -> Self {
+        ConfigBuilder {
+            enable_development_rockspecs: Some(value.enable_development_rockspecs),
+            server: Some(value.server),
+            extra_servers: Some(value.extra_servers),
+            only_sources: value.only_sources,
+            namespace: Some(value.namespace),
+            lua_dir: Some(value.lua_dir),
+            lua_version: value.lua_version,
+            tree: Some(value.tree),
+            luarocks_tree: Some(value.luarocks_tree),
+            no_project: Some(value.no_project),
+            verbose: Some(value.verbose),
+            timeout: Some(value.timeout),
+            variables: Some(value.variables),
+            cache_dir: Some(value.cache_dir),
+            data_dir: Some(value.data_dir),
+            external_deps: value.external_deps,
+        }
+    }
+}
+
 fn default_variables() -> impl Iterator<Item = (String, String)> {
     let cflags = env::var("CFLAGS").unwrap_or(utils::default_cflags().into());
     vec![
         ("LUA".into(), "lua".into()),
+        ("MAKE".into(), "make".into()),
+        ("CMAKE".into(), "cmake".into()),
         ("LIB_EXTENSION".into(), utils::lua_lib_extension().into()),
         ("OBJ_EXTENSION".into(), utils::lua_obj_extension().into()),
         ("CFLAGS".into(), cflags),
         ("LIBFLAG".into(), utils::default_libflag().into()),
     ]
     .into_iter()
-}
-
-fn config_file() -> Result<PathBuf, NoValidHomeDirectory> {
-    let project_dirs =
-        directories::ProjectDirs::from("org", "neorocks", "rocks").ok_or(NoValidHomeDirectory)?;
-    Ok(project_dirs.config_dir().join("config.toml").to_path_buf())
 }
