@@ -1,14 +1,14 @@
 use eyre::Result;
-use inquire::Confirm;
 use rocks_lib::{
-    build::BuildBehaviour,
     config::{Config, LuaVersion},
     lockfile::PinnedState,
     operations,
     package::PackageReq,
     progress::MultiProgress,
-    tree::{RockMatches, Tree},
+    tree::Tree,
 };
+
+use crate::utils::install::apply_build_behaviour;
 
 #[derive(clap::Args)]
 pub struct Install {
@@ -30,26 +30,7 @@ pub async fn install(data: Install, config: Config) -> Result<()> {
     let lua_version = LuaVersion::from(&config)?;
     let tree = Tree::new(config.tree().clone(), lua_version)?;
 
-    let packages = data.package_req.into_iter().filter_map(|req| {
-        let build_behaviour: Option<BuildBehaviour> = match tree
-            .match_rocks_and(&req, |rock| pin == rock.pinned())
-            .expect("unable to get tree data")
-        {
-            RockMatches::Single(_) | RockMatches::Many(_) if !data.force => {
-                if Confirm::new(&format!("Package {} already exists. Overwrite?", req))
-                    .with_default(false)
-                    .prompt()
-                    .expect("Error prompting for reinstall")
-                {
-                    Some(BuildBehaviour::Force)
-                } else {
-                    None
-                }
-            }
-            _ => Some(BuildBehaviour::from(data.force)),
-        };
-        build_behaviour.map(|it| (it, req))
-    });
+    let packages = apply_build_behaviour(data.package_req, pin, data.force, &tree);
 
     // TODO(vhyrro): If the tree doesn't exist then error out.
     operations::Install::new(&config)

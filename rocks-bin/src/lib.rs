@@ -1,6 +1,7 @@
 use crate::project::NewProject;
 use std::path::PathBuf;
 
+use add::Add;
 use build::Build;
 use clap::{Parser, Subcommand};
 use config::ConfigCmd;
@@ -27,6 +28,7 @@ use upload::Upload;
 use url::Url;
 use which::Which;
 
+pub mod add;
 pub mod build;
 pub mod check;
 pub mod config;
@@ -121,7 +123,7 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// [UNIMPLEMENTED] Add a dependency to the current project.
-    Add,
+    Add(Add),
     /// Build/compile a project.
     Build(Build),
     /// Runs `luacheck` in the current project.
