@@ -44,7 +44,7 @@ impl PackageSpec {
     pub fn into_package_req(self) -> PackageReq {
         PackageReq {
             name: self.name,
-            version_req: self.version.into_version_req(),
+            version_req: Some(self.version.into_version_req()),
         }
     }
 }
@@ -161,18 +161,15 @@ pub struct PackageReq {
     /// The name of the package.
     pub(crate) name: PackageName,
     /// The version requirement, for example "1.0.0" or ">=1.0.0".
-    #[cfg_attr(feature = "clap", clap(default_value_t = PackageVersionReq::default()))]
-    pub(crate) version_req: PackageVersionReq,
+    pub(crate) version_req: Option<PackageVersionReq>,
 }
 
 impl PackageReq {
     pub fn new(name: String, version: Option<String>) -> Result<Self, PackageVersionReqError> {
         Ok(Self {
             name: PackageName::new(name),
-            version_req: match version {
-                Some(version_req_str) => PackageVersionReq::parse(version_req_str.as_str())?,
-                None => PackageVersionReq::default(),
-            },
+            version_req: version
+                .map(|version_req_str| PackageVersionReq::parse(version_req_str.as_str()).unwrap()),
         })
     }
     pub fn parse(pkg_constraints: &String) -> Result<Self, PackageReqParseError> {
@@ -181,22 +178,27 @@ impl PackageReq {
     pub fn name(&self) -> &PackageName {
         &self.name
     }
-    pub fn version_req(&self) -> &PackageVersionReq {
-        &self.version_req
+    pub fn version_req(&self) -> Option<&PackageVersionReq> {
+        self.version_req.as_ref()
     }
     /// Evaluate whether the given package satisfies the package requirement
     /// given by `self`.
     pub fn matches(&self, package: &PackageSpec) -> bool {
-        self.name == package.name && self.version_req.matches(&package.version)
+        self.name == package.name
+            && self
+                .version_req
+                .as_ref()
+                .unwrap_or(&PackageVersionReq::any())
+                .matches(&package.version)
     }
 }
 
 impl Display for PackageReq {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.version_req.eq(&PackageVersionReq::default()) {
-            self.name.fmt(f)
+        if let Some(version_req) = &self.version_req {
+            f.write_str(format!("{} {}", self.name, version_req).as_str())
         } else {
-            f.write_str(format!("{} {}", self.name, self.version_req).as_str())
+            self.name.fmt(f)
         }
     }
 }
@@ -211,7 +213,7 @@ impl From<PackageName> for PackageReq {
     fn from(name: PackageName) -> Self {
         Self {
             name,
-            version_req: PackageVersionReq::default(),
+            version_req: None,
         }
     }
 }
@@ -298,13 +300,13 @@ impl FromStr for PackageReq {
 
         let constraints = str.trim_start_matches(&rock_name_str).trim();
         let version_req = match constraints {
-            "" => PackageVersionReq::default(),
-            constraints => PackageVersionReq::parse(constraints.trim_start()).map_err(|error| {
-                PackageReqParseError::InvalidPackageVersionReq {
+            "" => None,
+            constraints => Some(PackageVersionReq::parse(constraints.trim_start()).map_err(
+                |error| PackageReqParseError::InvalidPackageVersionReq {
                     error,
                     str: str.to_string(),
-                }
-            })?,
+                },
+            )?),
         };
         Ok(Self {
             name: PackageName::new(rock_name_str),

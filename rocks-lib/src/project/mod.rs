@@ -13,6 +13,7 @@ use crate::{
     lockfile::{Lockfile, ReadOnly},
     lua_rockspec::{ExternalDependencySpec, LuaRockspec, RockSourceSpec, RockspecError},
     package::PackageReq,
+    remote_package_db::RemotePackageDB,
     rockspec::Rockspec,
     tree::Tree,
 };
@@ -140,7 +141,11 @@ impl Project {
         Tree::new(self.root.join(".rocks"), lua_version)
     }
 
-    pub async fn add(&mut self, dependencies: DependencyType) -> Result<(), ProjectEditError> {
+    pub async fn add(
+        &mut self,
+        dependencies: DependencyType,
+        package_db: &RemotePackageDB,
+    ) -> Result<(), ProjectEditError> {
         let mut rocks =
             toml_edit::DocumentMut::from_str(&tokio::fs::read_to_string(self.rocks_path()).await?)?;
 
@@ -169,7 +174,19 @@ impl Project {
             | DependencyType::Build(ref deps)
             | DependencyType::Test(ref deps) => {
                 for dep in deps {
-                    table[dep.name().to_string()] = toml_edit::value(dep.version_req().to_string());
+                    table[dep.name().to_string()] = toml_edit::value(
+                        dep.version_req().map(|v| v.to_string()).unwrap_or(
+                            package_db
+                                .latest_version(dep.name())
+                                // This condition should never be reached, as the package should
+                                // have been found in the database or an error should have been
+                                // reported prior.
+                                // Still worth making an error message for this in the future,
+                                // though.
+                                .expect("unable to query latest version for package")
+                                .to_string(),
+                        ),
+                    );
                 }
             }
             DependencyType::External(ref deps) => {
@@ -245,9 +262,13 @@ impl Project {
 #[cfg(test)]
 mod tests {
     use assert_fs::prelude::PathCopy;
+    use url::Url;
 
     use super::*;
-    use crate::package::PackageReq;
+    use crate::{
+        manifest::{Manifest, ManifestMetadata},
+        package::PackageReq,
+    };
 
     #[tokio::test]
     async fn add_various_dependencies() {
@@ -259,25 +280,43 @@ mod tests {
         let expected_dependencies =
             vec![PackageReq::new("busted".into(), Some(">= 1.0.0".into())).unwrap()];
 
+        let test_manifest_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/manifest-5.1");
+        let content = String::from_utf8(std::fs::read(&test_manifest_path).unwrap()).unwrap();
+        let metadata = ManifestMetadata::new(&content).unwrap();
+        let package_db = Manifest::new(Url::parse("https://example.com").unwrap(), metadata).into();
+
         project
-            .add(DependencyType::Regular(expected_dependencies.clone()))
+            .add(
+                DependencyType::Regular(expected_dependencies.clone()),
+                &package_db,
+            )
             .await
             .unwrap();
 
         project
-            .add(DependencyType::Build(expected_dependencies.clone()))
+            .add(
+                DependencyType::Build(expected_dependencies.clone()),
+                &package_db,
+            )
             .await
             .unwrap();
         project
-            .add(DependencyType::Test(expected_dependencies.clone()))
+            .add(
+                DependencyType::Test(expected_dependencies.clone()),
+                &package_db,
+            )
             .await
             .unwrap();
 
         project
-            .add(DependencyType::External(HashMap::from([(
-                "lib".into(),
-                ExternalDependencySpec::Library("path.so".into()),
-            )])))
+            .add(
+                DependencyType::External(HashMap::from([(
+                    "lib".into(),
+                    ExternalDependencySpec::Library("path.so".into()),
+                )])),
+                &package_db,
+            )
             .await
             .unwrap();
 

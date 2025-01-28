@@ -296,7 +296,7 @@ type = "builtin"
                 .into_iter()
                 .map(|label| "\"".to_string() + &label + "\"")
                 .join(", "),
-            lua_version_req = lua_versions.version_req(),
+            lua_version_req = lua_versions.version_req().unwrap(),
         )
         .trim(),
     )?;

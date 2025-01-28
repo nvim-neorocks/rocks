@@ -519,7 +519,11 @@ impl<P: LockfilePermissions> Lockfile<P> {
                         None => true,
                     })
                     .rev()
-                    .find(|package| req.version_req().matches(package.version()))
+                    .find(|package| {
+                        req.version_req()
+                            .unwrap_or(&PackageVersionReq::any())
+                            .matches(package.version())
+                    })
             })?
             .cloned()
     }
@@ -530,7 +534,11 @@ impl<P: LockfilePermissions> Lockfile<P> {
             Some(packages) => packages
                 .iter()
                 .rev()
-                .filter(|package| req.version_req().matches(package.version()))
+                .filter(|package| {
+                    req.version_req()
+                        .map(|req| req.matches(package.version()))
+                        .unwrap_or(true)
+                })
                 .map(|package| package.id())
                 .collect_vec(),
             None => Vec::default(),

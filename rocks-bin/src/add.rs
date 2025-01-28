@@ -4,8 +4,9 @@ use rocks_lib::{
     lockfile::PinnedState,
     operations,
     package::PackageReq,
-    progress::MultiProgress,
+    progress::{MultiProgress, Progress, ProgressBar},
     project::Project,
+    remote_package_db::RemotePackageDB,
 };
 
 use crate::utils::install::apply_build_behaviour;
@@ -41,20 +42,25 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
     let pin = PinnedState::from(data.pin);
     let lua_version = LuaVersion::from(&config)?;
     let tree = project.tree(lua_version)?;
+    let db = RemotePackageDB::from_config(&config, &Progress::Progress(ProgressBar::new())).await?;
 
     project
-        .add(rocks_lib::project::DependencyType::Regular(
-            data.package_req.clone(),
-        ))
+        .add(
+            rocks_lib::project::DependencyType::Regular(data.package_req.clone()),
+            &db,
+        )
         .await?;
     if let Some(build) = &data.build {
         project
-            .add(rocks_lib::project::DependencyType::Build(build.clone()))
+            .add(
+                rocks_lib::project::DependencyType::Build(build.clone()),
+                &db,
+            )
             .await?;
     }
     if let Some(test) = &data.test {
         project
-            .add(rocks_lib::project::DependencyType::Test(test.clone()))
+            .add(rocks_lib::project::DependencyType::Test(test.clone()), &db)
             .await?;
     }
 

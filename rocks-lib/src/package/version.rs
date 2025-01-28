@@ -229,9 +229,15 @@ pub enum PackageVersionReq {
 }
 
 impl PackageVersionReq {
+    /// Returns a `PackageVersionReq` that matches any version.
+    pub fn any() -> Self {
+        PackageVersionReq::SemVer(VersionReq::default())
+    }
+
     pub fn parse(text: &str) -> Result<Self, PackageVersionReqError> {
         PackageVersionReq::from_str(text)
     }
+
     pub fn matches(&self, version: &PackageVersion) -> bool {
         match (self, version) {
             (PackageVersionReq::SemVer(version_req), PackageVersion::SemVer(semver)) => {
@@ -252,12 +258,6 @@ impl Display for PackageVersionReq {
             PackageVersionReq::SemVer(version_req) => version_req.fmt(f),
             PackageVersionReq::Dev(name_req) => f.write_str(name_req.as_str()),
         }
-    }
-}
-
-impl Default for PackageVersionReq {
-    fn default() -> Self {
-        PackageVersionReq::SemVer(VersionReq::default())
     }
 }
 
