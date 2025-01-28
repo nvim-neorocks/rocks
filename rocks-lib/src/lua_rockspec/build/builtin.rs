@@ -24,14 +24,22 @@ pub struct LuaModule(String);
 
 impl LuaModule {
     pub fn to_lua_path(&self) -> PathBuf {
-        self.to_pathbuf(".lua")
+        self.to_file_path(".lua")
+    }
+
+    pub fn to_lua_init_path(&self) -> PathBuf {
+        self.to_path_buf().join("init.lua")
     }
 
     pub fn to_lib_path(&self) -> PathBuf {
-        self.to_pathbuf(&format!(".{}", lua_lib_extension()))
+        self.to_file_path(&format!(".{}", lua_lib_extension()))
     }
 
-    fn to_pathbuf(&self, extension: &str) -> PathBuf {
+    fn to_path_buf(&self) -> PathBuf {
+        PathBuf::from(self.0.replace('.', std::path::MAIN_SEPARATOR_STR))
+    }
+
+    fn to_file_path(&self, extension: &str) -> PathBuf {
         PathBuf::from(self.0.replace('.', std::path::MAIN_SEPARATOR_STR) + extension)
     }
 
