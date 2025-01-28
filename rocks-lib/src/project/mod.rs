@@ -150,16 +150,28 @@ impl Project {
             toml_edit::DocumentMut::from_str(&tokio::fs::read_to_string(self.rocks_path()).await?)?;
 
         if !rocks.contains_table("dependencies") {
-            rocks["dependencies"] = toml_edit::table();
+            let mut table = toml_edit::table().into_table().unwrap();
+            table.set_implicit(true);
+
+            rocks["dependencies"] = toml_edit::Item::Table(table);
         }
         if !rocks.contains_table("build_dependencies") {
-            rocks["build_dependencies"] = toml_edit::table();
+            let mut table = toml_edit::table().into_table().unwrap();
+            table.set_implicit(true);
+
+            rocks["build_dependencies"] = toml_edit::Item::Table(table);
         }
         if !rocks.contains_table("test_dependencies") {
-            rocks["test_dependencies"] = toml_edit::table();
+            let mut table = toml_edit::table().into_table().unwrap();
+            table.set_implicit(true);
+
+            rocks["test_dependencies"] = toml_edit::Item::Table(table);
         }
         if !rocks.contains_table("external_dependencies") {
-            rocks["external_dependencies"] = toml_edit::table();
+            let mut table = toml_edit::table().into_table().unwrap();
+            table.set_implicit(true);
+
+            rocks["external_dependencies"] = toml_edit::Item::Table(table);
         }
 
         let table = match dependencies {
