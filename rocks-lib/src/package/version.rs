@@ -221,9 +221,6 @@ pub struct PackageVersionReqError(#[from] Error);
 /// or a **Dev** version requirement, which can be one of "dev", "scm", or "git"
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum PackageVersionReq {
-    // TODO(vhyrro): Eventually we'll want to either add a `Latest` enum case here,
-    // or remove the `Default` implementation from `PackageVersionReq`, so that edge cases
-    // related to the version being `"*"` are handled correctly.
     SemVer(VersionReq),
     Dev(String),
 }

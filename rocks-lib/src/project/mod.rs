@@ -42,7 +42,6 @@ pub enum IntoRockspecError {
 pub enum ProjectEditError {
     Io(#[from] tokio::io::Error),
     Toml(#[from] toml_edit::TomlError),
-    //RocksTomlValidationError(#[from] RocksTomlValidationError),
 }
 
 pub enum DependencyType {
@@ -270,7 +269,7 @@ impl Project {
     }
 }
 
-// TODO: Add plenty of tests
+// TODO: More project-based test
 #[cfg(test)]
 mod tests {
     use assert_fs::prelude::PathCopy;

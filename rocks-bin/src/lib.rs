@@ -122,7 +122,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// [UNIMPLEMENTED] Add a dependency to the current project.
+    /// Add a dependency to the current project.
     Add(Add),
     /// Build/compile a project.
     Build(Build),

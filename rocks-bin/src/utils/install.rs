@@ -1,5 +1,4 @@
 //! Utilities for converting a list of packages into a list with the correct build behaviour.
-//!
 
 use inquire::Confirm;
 use rocks_lib::{

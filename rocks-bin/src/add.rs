@@ -11,8 +11,6 @@ use rocks_lib::{
 
 use crate::utils::install::apply_build_behaviour;
 
-// TODO: Make `rocks add thing --build lots of stuff here --test more stuff here` work
-
 #[derive(clap::Args)]
 pub struct Add {
     /// Package or list of packages to install.
@@ -44,45 +42,51 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
     let tree = project.tree(lua_version)?;
     let db = RemotePackageDB::from_config(&config, &Progress::Progress(ProgressBar::new())).await?;
 
-    project
-        .add(
-            rocks_lib::project::DependencyType::Regular(data.package_req.clone()),
-            &db,
-        )
-        .await?;
-    if let Some(build) = &data.build {
+    let regular_packages = apply_build_behaviour(data.package_req, pin, data.force, &tree);
+    if !regular_packages.is_empty() {
         project
             .add(
-                rocks_lib::project::DependencyType::Build(build.clone()),
+                rocks_lib::project::DependencyType::Regular(
+                    regular_packages
+                        .iter()
+                        .map(|(_, req)| req.clone())
+                        .collect(),
+                ),
                 &db,
             )
             .await?;
     }
-    if let Some(test) = &data.test {
+
+    let build_packages =
+        apply_build_behaviour(data.build.unwrap_or_default(), pin, data.force, &tree);
+    if !build_packages.is_empty() {
         project
-            .add(rocks_lib::project::DependencyType::Test(test.clone()), &db)
+            .add(
+                rocks_lib::project::DependencyType::Build(
+                    build_packages.iter().map(|(_, req)| req.clone()).collect(),
+                ),
+                &db,
+            )
+            .await?;
+    }
+
+    let test_packages =
+        apply_build_behaviour(data.test.unwrap_or_default(), pin, data.force, &tree);
+    if !test_packages.is_empty() {
+        project
+            .add(
+                rocks_lib::project::DependencyType::Test(
+                    test_packages.iter().map(|(_, req)| req.clone()).collect(),
+                ),
+                &db,
+            )
             .await?;
     }
 
     operations::Install::new(&config)
-        .packages(apply_build_behaviour(
-            data.package_req,
-            pin,
-            data.force,
-            &tree,
-        ))
-        .packages(apply_build_behaviour(
-            data.build.unwrap_or_default(),
-            pin,
-            data.force,
-            &tree,
-        ))
-        .packages(apply_build_behaviour(
-            data.test.unwrap_or_default(),
-            pin,
-            data.force,
-            &tree,
-        ))
+        .packages(regular_packages)
+        .packages(build_packages)
+        .packages(test_packages)
         .pin(pin)
         .progress(MultiProgress::new_arc())
         .install()
