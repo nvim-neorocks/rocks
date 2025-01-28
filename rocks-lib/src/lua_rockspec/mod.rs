@@ -1,17 +1,19 @@
 mod build;
 mod dependency;
+mod partial;
 mod platform;
 mod rock_source;
 mod serde_util;
 mod test_spec;
 
-use std::{collections::HashMap, io, path::PathBuf, str::FromStr};
+use std::{collections::HashMap, fmt::Display, io, path::PathBuf, str::FromStr};
 
 use mlua::{FromLua, Lua, LuaSerdeExt, Value};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 pub use build::*;
 pub use dependency::*;
+pub use partial::*;
 pub use platform::*;
 pub use rock_source::*;
 pub use serde_util::*;
@@ -317,6 +319,16 @@ impl FromLua for RockspecFormat {
     ) -> mlua::prelude::LuaResult<Self> {
         let s = String::from_lua(value, lua)?;
         Self::from_str(&s).map_err(|err| mlua::Error::DeserializeError(err.to_string()))
+    }
+}
+
+impl Display for RockspecFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::_1_0 => write!(f, "1.0"),
+            Self::_2_0 => write!(f, "2.0"),
+            Self::_3_0 => write!(f, "3.0"),
+        }
     }
 }
 

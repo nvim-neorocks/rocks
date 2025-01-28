@@ -11,7 +11,10 @@ use thiserror::Error;
 use crate::{
     config::LuaVersion,
     lockfile::{Lockfile, ReadOnly},
-    lua_rockspec::{ExternalDependencySpec, LuaRockspec, RockSourceSpec, RockspecError},
+    lua_rockspec::{
+        ExternalDependencySpec, LuaRockspec, PartialLuaRockspec, PartialRockspecError,
+        RockSourceSpec, RockspecError,
+    },
     package::PackageReq,
     remote_package_db::RemotePackageDB,
     rockspec::Rockspec,
@@ -21,6 +24,7 @@ use crate::{
 pub mod rocks_toml;
 
 pub const ROCKS_TOML: &str = "rocks.toml";
+pub const EXTRA_ROCKSPEC: &str = "extra.rockspec";
 
 #[derive(Error, Debug)]
 #[error(transparent)]
@@ -28,6 +32,8 @@ pub enum ProjectError {
     Io(#[from] io::Error),
     Rocks(#[from] RocksTomlValidationError),
     Toml(#[from] toml::de::Error),
+    #[error("error when parsing `extra.rockspec`: {0}")]
+    Rockspec(#[from] PartialRockspecError),
 }
 
 #[derive(Error, Debug)]
@@ -78,16 +84,20 @@ impl Project {
         )? {
             Some(path) => {
                 let rocks_content = std::fs::read_to_string(&path)?;
-                let rocks = RocksToml::new(&rocks_content)?;
-
                 let root = path.parent().unwrap();
+
+                let mut project = Project {
+                    root: root.to_path_buf(),
+                    rocks: RocksToml::new(&rocks_content)?,
+                };
+
+                if let Some(extra_rockspec) = project.extra_rockspec()? {
+                    project.rocks = project.rocks.merge(extra_rockspec);
+                }
 
                 std::fs::create_dir_all(root)?;
 
-                Ok(Some(Project {
-                    root: root.to_path_buf(),
-                    rocks,
-                }))
+                Ok(Some(project))
             }
             None => Ok(None),
         }
@@ -96,6 +106,11 @@ impl Project {
     /// Get the `rocks.toml` path.
     pub fn rocks_path(&self) -> PathBuf {
         self.root.join(ROCKS_TOML)
+    }
+
+    /// Get the `extra.rockspec` path.
+    pub fn extra_rockspec_path(&self) -> PathBuf {
+        self.root.join(EXTRA_ROCKSPEC)
     }
 
     /// Get the `rocks.lock` lockfile path.
@@ -128,6 +143,16 @@ impl Project {
 
     pub fn rockspec(&self) -> Result<LuaRockspec, IntoRockspecError> {
         Ok(self.rocks().into_validated_rocks_toml()?.to_rockspec()?)
+    }
+
+    pub fn extra_rockspec(&self) -> Result<Option<PartialLuaRockspec>, PartialRockspecError> {
+        if self.extra_rockspec_path().exists() {
+            Ok(Some(PartialLuaRockspec::new(&std::fs::read_to_string(
+                self.extra_rockspec_path(),
+            )?)?))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Create a RockSpec with the source set to the project root.
@@ -336,21 +361,28 @@ mod tests {
             .await
             .unwrap();
 
+        let strip_lua = |deps: &Vec<PackageReq>| -> Vec<PackageReq> {
+            deps.iter()
+                .filter(|dep| dep.name() != &"lua".into())
+                .cloned()
+                .collect()
+        };
+
         // Reparse the rocks.toml (not usually necessary, but we want to test that the file was
         // written correctly)
         let project = Project::from(&project_root).unwrap().unwrap();
         let validated_rocks_toml = project.rocks().into_validated_rocks_toml().unwrap();
         assert_eq!(
-            validated_rocks_toml.dependencies().current_platform(),
-            &expected_dependencies
+            strip_lua(validated_rocks_toml.dependencies().current_platform()),
+            expected_dependencies
         );
         assert_eq!(
-            validated_rocks_toml.build_dependencies().current_platform(),
-            &expected_dependencies
+            strip_lua(validated_rocks_toml.build_dependencies().current_platform()),
+            expected_dependencies
         );
         assert_eq!(
-            validated_rocks_toml.test_dependencies().current_platform(),
-            &expected_dependencies
+            strip_lua(validated_rocks_toml.test_dependencies().current_platform()),
+            expected_dependencies
         );
         assert_eq!(
             validated_rocks_toml
@@ -359,6 +391,27 @@ mod tests {
                 .get("lib")
                 .unwrap(),
             &ExternalDependencySpec::Library("path.so".into())
+        );
+    }
+
+    #[tokio::test]
+    async fn extra_rockspec_parsing() {
+        let sample_project: PathBuf = "resources/test/sample-project-extra-rockspec".into();
+        let project_root = assert_fs::TempDir::new().unwrap();
+        project_root.copy_from(&sample_project, &["**"]).unwrap();
+        let project_root: PathBuf = project_root.path().into();
+        let project = Project::from(project_root).unwrap().unwrap();
+
+        let extra_rockspec = project.extra_rockspec().unwrap();
+
+        assert!(extra_rockspec.is_some());
+
+        let rocks = project.rocks().into_validated_rocks_toml().unwrap();
+
+        assert_eq!(rocks.package().to_string(), "custom-package");
+        assert_eq!(rocks.version().to_string(), "2.0.0-1");
+        assert!(
+            matches!(&rocks.source().current_platform().source_spec, RockSourceSpec::Url(url) if url == &Url::parse("https://github.com/custom/url").unwrap())
         );
     }
 }
