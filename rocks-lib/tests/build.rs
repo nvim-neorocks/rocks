@@ -108,7 +108,7 @@ async fn lockfile_update() {
         .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
         .cloned()
         .collect_vec();
-    let mut lockfile = project.lockfile().unwrap().unwrap();
+    let mut lockfile = project.try_lockfile().unwrap().unwrap();
     LockfileUpdate::new(&mut lockfile, &config)
         .packages(dependencies.clone())
         .add_missing_packages()

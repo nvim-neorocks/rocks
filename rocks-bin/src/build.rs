@@ -38,7 +38,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     let progress = Arc::clone(&progress_arc);
 
     let bar = progress.map(|p| p.new_bar());
-    let package_db = match project.lockfile()? {
+    let package_db = match project.try_lockfile()? {
         None => RemotePackageDB::from_config(&config, &bar).await?,
         Some(_) if data.ignore_lockfile => RemotePackageDB::from_config(&config, &bar).await?,
         Some(lockfile) => lockfile.into(),

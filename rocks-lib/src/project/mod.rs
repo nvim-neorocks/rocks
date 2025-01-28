@@ -104,7 +104,12 @@ impl Project {
     }
 
     /// Get the `rocks.lock` lockfile in the project root, if present.
-    pub fn lockfile(&self) -> Result<Option<Lockfile<ReadOnly>>, ProjectError> {
+    pub fn lockfile(&self) -> Result<Lockfile<ReadOnly>, io::Error> {
+        Lockfile::new(self.lockfile_path())
+    }
+
+    /// Get the `rocks.lock` lockfile in the project root, if present.
+    pub fn try_lockfile(&self) -> Result<Option<Lockfile<ReadOnly>>, io::Error> {
         let path = self.lockfile_path();
         if path.is_file() {
             Ok(Some(Lockfile::new(path)?))

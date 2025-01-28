@@ -36,6 +36,7 @@ pub struct Add {
 
 pub async fn add(data: Add, config: Config) -> Result<()> {
     let mut project = Project::current()?.ok_or_eyre("No project found")?;
+    let lockfile = project.lockfile()?;
 
     let pin = PinnedState::from(data.pin);
     let lua_version = LuaVersion::from(&config)?;
@@ -89,6 +90,7 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
         .packages(test_packages)
         .pin(pin)
         .progress(MultiProgress::new_arc())
+        .lockfile(lockfile)
         .install()
         .await?;
 
