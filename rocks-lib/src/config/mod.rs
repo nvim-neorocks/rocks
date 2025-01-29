@@ -1,6 +1,7 @@
 use directories::ProjectDirs;
 use external_deps::ExternalDependencySearchConfig;
-use serde::{Deserialize, Serialize};
+use itertools::Itertools;
+use serde::{Deserialize, Serialize, Serializer};
 use std::{
     collections::HashMap, env, fmt::Display, io, path::PathBuf, str::FromStr, time::Duration,
 };
@@ -301,7 +302,17 @@ pub enum ConfigError {
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct ConfigBuilder {
+    #[serde(
+        default,
+        deserialize_with = "deserialize_url",
+        serialize_with = "serialize_url"
+    )]
     server: Option<Url>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_url_vec",
+        serialize_with = "serialize_url_vec"
+    )]
     extra_servers: Option<Vec<Url>>,
     only_sources: Option<String>,
     namespace: Option<String>,
@@ -494,4 +505,49 @@ fn default_variables() -> impl Iterator<Item = (String, String)> {
         ("LIBFLAG".into(), utils::default_libflag().into()),
     ]
     .into_iter()
+}
+
+fn deserialize_url<'de, D>(deserializer: D) -> Result<Option<Url>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = Option::<String>::deserialize(deserializer)?;
+    s.map(|s| Url::parse(&s).map_err(serde::de::Error::custom))
+        .transpose()
+}
+
+fn serialize_url<S>(url: &Option<Url>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match url {
+        Some(url) => serializer.serialize_some(url.as_str()),
+        None => serializer.serialize_none(),
+    }
+}
+
+fn deserialize_url_vec<'de, D>(deserializer: D) -> Result<Option<Vec<Url>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = Option::<Vec<String>>::deserialize(deserializer)?;
+    s.map(|v| {
+        v.into_iter()
+            .map(|s| Url::parse(&s).map_err(serde::de::Error::custom))
+            .try_collect()
+    })
+    .transpose()
+}
+
+fn serialize_url_vec<S>(urls: &Option<Vec<Url>>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match urls {
+        Some(urls) => {
+            let url_strings: Vec<String> = urls.iter().map(|url| url.to_string()).collect();
+            serializer.serialize_some(&url_strings)
+        }
+        None => serializer.serialize_none(),
+    }
 }
