@@ -1,6 +1,6 @@
 //! Structs and utilities for `rocks.toml`
 
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use itertools::Itertools;
 use serde::{Deserialize, Deserializer};
@@ -10,10 +10,10 @@ use crate::{
     config::{Config, LuaVersion},
     lua_rockspec::{
         BuildSpec, BuildSpecInternal, BuildSpecInternalError, DisplayAsLuaKV, ExternalDependencies,
-        ExternalDependencySpec, FromPlatformOverridable, LuaRockspec, LuaVersionError, PerPlatform,
-        PlatformIdentifier, PlatformSupport, PlatformValidationError, RockDescription, RockSource,
-        RockSourceError, RockSourceInternal, RockspecError, RockspecFormat, TestSpec,
-        TestSpecError, TestSpecInternal,
+        ExternalDependencySpec, FromPlatformOverridable, LuaRockspec, LuaVersionError,
+        PartialLuaRockspec, PerPlatform, PlatformIdentifier, PlatformSupport,
+        PlatformValidationError, RockDescription, RockSource, RockSourceError, RockSourceInternal,
+        RockspecError, RockspecFormat, TestSpec, TestSpecError, TestSpecInternal,
     },
     package::{
         BuildDependencies, Dependencies, PackageName, PackageReq, PackageVersion,
@@ -55,6 +55,8 @@ pub enum RocksTomlValidationError {
     BuildSpecInternal(#[from] BuildSpecInternalError),
     #[error(transparent)]
     PlatformValidationError(#[from] PlatformValidationError),
+    #[error("{}copy_directories cannot contain a rockspec name", ._0.as_ref().map(|p| format!("{p}: ")).unwrap_or_default())]
+    CopyDirectoriesContainRockspecName(Option<String>),
 }
 
 /// The `rocks.toml` file.
@@ -65,6 +67,7 @@ pub struct RocksToml {
     pub(crate) package: PackageName,
     pub(crate) version: PackageVersion,
     pub(crate) build: BuildSpecInternal,
+    pub(crate) rockspec_format: Option<RockspecFormat>,
     #[serde(default)]
     pub(crate) lua: Option<PackageVersionReq>,
     #[serde(default)]
@@ -91,6 +94,7 @@ pub struct RocksTomlValidated {
     package: PackageName,
     version: PackageVersion,
     lua: PackageVersionReq,
+    rockspec_format: Option<RockspecFormat>,
     description: RockDescription,
     supported_platforms: PlatformSupport,
     dependencies: PerPlatform<Vec<PackageReq>>,
@@ -115,12 +119,15 @@ impl RocksToml {
     ) -> Result<RocksTomlValidated, RocksTomlValidationError> {
         let rocks = self.clone();
 
-        Ok(RocksTomlValidated {
+        let validated = RocksTomlValidated {
             internal: rocks.clone(),
 
             package: rocks.package,
             version: rocks.version,
-            lua: rocks.lua.ok_or(RocksTomlValidationError::NoLuaVersion)?,
+            lua: rocks
+                .lua
+                .clone()
+                .ok_or(RocksTomlValidationError::NoLuaVersion)?,
             description: rocks.description.unwrap_or_default(),
             supported_platforms: PlatformSupport::parse(
                 &rocks
@@ -136,7 +143,19 @@ impl RocksToml {
                     })
                     .collect_vec(),
             )?,
-            dependencies: PerPlatform::new(rocks.dependencies.unwrap_or_default()),
+            // Merge dependencies internally with lua version
+            // so the output of `dependencies()` is consistent
+            dependencies: PerPlatform::new(
+                rocks
+                    .dependencies
+                    .unwrap_or_default()
+                    .into_iter()
+                    .chain(std::iter::once(PackageReq {
+                        name: "lua".into(),
+                        version_req: rocks.lua,
+                    }))
+                    .collect(),
+            ),
             build_dependencies: PerPlatform::new(rocks.build_dependencies.unwrap_or_default()),
             external_dependencies: PerPlatform::new(
                 rocks.external_dependencies.unwrap_or_default(),
@@ -149,7 +168,34 @@ impl RocksToml {
                 rocks.test.clone().unwrap_or_default(),
             )?),
             build: PerPlatform::new(BuildSpec::from_internal_spec(rocks.build.clone())?),
-        })
+            rockspec_format: self.rockspec_format.clone(),
+        };
+
+        let rockspec_file_name = format!("{}-{}.rockspec", validated.package, validated.version);
+
+        if validated
+            .build
+            .default
+            .copy_directories
+            .contains(&PathBuf::from(&rockspec_file_name))
+        {
+            return Err(RocksTomlValidationError::CopyDirectoriesContainRockspecName(None));
+        }
+
+        for (platform, build_override) in &validated.build.per_platform {
+            if build_override
+                .copy_directories
+                .contains(&PathBuf::from(&rockspec_file_name))
+            {
+                return Err(
+                    RocksTomlValidationError::CopyDirectoriesContainRockspecName(Some(
+                        platform.to_string(),
+                    )),
+                );
+            }
+        }
+
+        Ok(validated)
     }
 
     // In the not-yet-validated struct, we create getters only
@@ -161,16 +207,56 @@ impl RocksToml {
     pub fn version(&self) -> &PackageVersion {
         &self.version
     }
+
+    /// Merge the `RocksToml` struct with an unvalidated `LuaRockspec`.
+    /// The final merged struct can then be validated.
+    pub fn merge(self, other: PartialLuaRockspec) -> Self {
+        RocksToml {
+            package: other.package.unwrap_or(self.package),
+            version: other.version.unwrap_or(self.version),
+            lua: other
+                .dependencies
+                .as_ref()
+                .and_then(|deps| {
+                    deps.iter()
+                        .find(|dep| dep.name == "lua".into())
+                        .and_then(|dep| dep.version_req.clone())
+                })
+                .or(self.lua),
+            build: other.build.unwrap_or(self.build),
+            description: other.description.or(self.description),
+            supported_platforms: other
+                .supported_platforms
+                .map(|platform_support| platform_support.platforms().clone())
+                .or(self.supported_platforms),
+            dependencies: other
+                .dependencies
+                .map(|deps| {
+                    deps.into_iter()
+                        .filter(|dep| dep.name != "lua".into())
+                        .collect()
+                })
+                .or(self.dependencies),
+            build_dependencies: other.build_dependencies.or(self.build_dependencies),
+            test_dependencies: other.test_dependencies.or(self.test_dependencies),
+            external_dependencies: other.external_dependencies.or(self.external_dependencies),
+            source: other.source.or(self.source),
+            test: other.test.or(self.test),
+            rockspec_format: other.rockspec_format.or(self.rockspec_format),
+        }
+    }
 }
 
 impl RocksTomlValidated {
     pub fn to_rockspec_string(&self) -> String {
         let starter = format!(
             r#"
-rockspec_format = "3.0"
+rockspec_format = "{}"
 package = "{}"
 version = "{}""#,
-            self.package, self.version
+            self.rockspec_format.as_ref().unwrap_or(&"3.0".into()),
+            self.package,
+            self.version
         );
 
         let mut template = Vec::new();
@@ -357,14 +443,14 @@ impl Rockspec for RocksTomlValidated {
     }
 
     fn format(&self) -> &Option<RockspecFormat> {
-        &Some(RockspecFormat::_3_0)
+        &self.rockspec_format
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        lua_rockspec::{LuaRockspec, PerPlatform},
+        lua_rockspec::{LuaRockspec, PartialLuaRockspec, PerPlatform},
         package::PackageReq,
         rockspec::Rockspec,
     };
@@ -377,6 +463,8 @@ mod tests {
         package = "my-package"
         version = "1.0.0"
         lua = "5.3"
+
+        rockspec_format = "1.0"
 
         [source]
         url = "https://example.com"
@@ -452,6 +540,10 @@ mod tests {
         version = "1.0.0"
         lua = "5.1"
 
+        # For testing, specify a custom rockspec format
+        # (defaults to 3.0)
+        rockspec_format = "1.0"
+
         [description]
         summary = "A summary"
         detailed = "A detailed description"
@@ -497,7 +589,7 @@ mod tests {
         "#;
 
         let expected_rockspec = r#"
-            rockspec_format = "3.0"
+            rockspec_format = "1.0"
             package = "my-package"
             version = "1.0.0"
 
@@ -591,5 +683,160 @@ mod tests {
         assert_eq!(rockspec.source(), expected_rockspec.source());
         assert_eq!(rockspec.test(), expected_rockspec.test());
         assert_eq!(rockspec.build(), expected_rockspec.build());
+        assert_eq!(rockspec.format(), expected_rockspec.format());
+    }
+
+    #[test]
+    fn merge_rocks_toml_with_partial_rockspec() {
+        let rocks_toml = r#"
+        package = "my-package"
+        version = "1.0.0"
+        lua = "5.1"
+
+        # For testing, specify a custom rockspec format
+        # (defaults to 3.0)
+        rockspec_format = "1.0"
+
+        [description]
+        summary = "A summary"
+        detailed = "A detailed description"
+        license = "MIT"
+        homepage = "https://example.com"
+        issues_url = "https://example.com/issues"
+        maintainer = "John Doe"
+        labels = ["label1", "label2"]
+
+        [supported_platforms]
+        linux = true
+        windows = false
+
+        [dependencies]
+        foo = "1.0"
+        bar = ">=2.0"
+
+        [build_dependencies]
+        baz = "1.0"
+
+        [external_dependencies.foo]
+        header = "foo.h"
+
+        [external_dependencies.bar]
+        library = "libbar.so"
+
+        [test_dependencies]
+        busted = "1.0"
+
+        [source]
+        url = "https://example.com"
+        hash = "sha256-di00mD8txN7rjaVpvxzNbnQsAh6H16zUtJZapH7U4HU="
+        file = "my-package-1.0.0.tar.gz"
+        dir = "my-package-1.0.0"
+
+        [test]
+        type = "command"
+        script = "test.lua"
+        flags = [ "foo", "bar" ]
+
+        [build]
+        type = "builtin"
+        "#;
+
+        let mergable_rockspec_content = r#"
+            rockspec_format = "1.0"
+            package = "my-package-overwritten"
+            version = "2.0.0"
+
+            description = {
+                summary = "A summary overwritten",
+                detailed = "A detailed description overwritten",
+                license = "GPL-2.0",
+                homepage = "https://example.com/overwritten",
+                issues_url = "https://example.com/issues/overwritten",
+                maintainer = "John Doe Overwritten",
+                labels = {"over", "written"},
+            }
+
+            -- Inverted supported platforms
+            supported_platforms = {"!linux", "windows"}
+
+            dependencies = {
+                "lua 5.1",
+                "foo >1.0",
+                "bar <=2.0",
+            }
+
+            build_dependencies = {
+                "baz >1.0",
+            }
+
+            external_dependencies = {
+                foo = { header = "overwritten.h" },
+                bar = { library = "overwritten.so" },
+            }
+
+            test_dependencies = {
+                "busted >1.0",
+            }
+
+            source = {
+                url = "https://example.com/overwritten",
+                hash = "sha256-QL5OCZFBGixecdEoriGck4iG83tjM09ewYbWVSbcfa4=",
+                file = "my-package-1.0.0.tar.gz.overwritten",
+                dir = "my-package-1.0.0.overwritten",
+            }
+
+            test = {
+                type = "command",
+                script = "overwritten.lua",
+                flags = {"over", "written"},
+            }
+
+            build = {
+                type = "builtin",
+            }
+        "#;
+
+        let rocks_toml = RocksToml::new(rocks_toml).unwrap();
+        let partial_rockspec = PartialLuaRockspec::new(mergable_rockspec_content).unwrap();
+        let expected_rockspec = LuaRockspec::new(mergable_rockspec_content).unwrap();
+
+        let merged = rocks_toml
+            .merge(partial_rockspec)
+            .into_validated_rocks_toml()
+            .unwrap();
+
+        let sorted_package_reqs = |v: &PerPlatform<Vec<PackageReq>>| {
+            let mut v = v.current_platform().clone();
+            v.sort_by(|a, b| a.name().cmp(b.name()));
+            v
+        };
+
+        assert_eq!(merged.package(), expected_rockspec.package());
+        assert_eq!(merged.version(), expected_rockspec.version());
+        assert_eq!(merged.description(), expected_rockspec.description());
+        assert_eq!(
+            merged.supported_platforms(),
+            expected_rockspec.supported_platforms()
+        );
+        assert_eq!(
+            sorted_package_reqs(merged.dependencies()),
+            sorted_package_reqs(expected_rockspec.dependencies())
+        );
+        assert_eq!(
+            sorted_package_reqs(merged.build_dependencies()),
+            sorted_package_reqs(expected_rockspec.build_dependencies())
+        );
+        assert_eq!(
+            merged.external_dependencies(),
+            expected_rockspec.external_dependencies()
+        );
+        assert_eq!(
+            sorted_package_reqs(merged.test_dependencies()),
+            sorted_package_reqs(expected_rockspec.test_dependencies())
+        );
+        assert_eq!(merged.source(), expected_rockspec.source());
+        assert_eq!(merged.test(), expected_rockspec.test());
+        assert_eq!(merged.build(), expected_rockspec.build());
+        assert_eq!(merged.format(), expected_rockspec.format());
     }
 }
