@@ -54,6 +54,8 @@ The following table provides a brief (incomplete) comparison:
 | static type checking                                                  | :x: (planned)                | :x:                |
 | pack and upload pre-built binary rocks                                | :white_check_mark:           | :white_check_mark: |
 | add/remove dependencies                                               | :white_check_mark:           | :x:                |
+| luarocks.org manifest namespaces                                      | :x: (planned)                | :white_check_mark: |
+| luarocks.org dev packages                                             | :x: (planned)                | :white_check_mark: |
 
 [^1]: Supported via a compatibility layer that uses luarocks as a backend.
 
