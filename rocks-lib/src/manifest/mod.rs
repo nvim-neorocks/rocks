@@ -26,6 +26,8 @@ pub enum ManifestFromServerError {
     InvalidDate(#[from] httpdate::Error),
     #[error("non-ASCII characters returned in response header: {0}")]
     InvalidHeader(#[from] ToStrError),
+    #[error("error parsing manifest URL: {0}")]
+    Url(#[from] url::ParseError),
 }
 
 async fn manifest_from_server(
@@ -52,9 +54,12 @@ async fn manifest_from_server(
                 }))
             .map(|s| format!("-{}", s))
             .unwrap_or_default();
-    let url = url
-        .join(&manifest_filename)
-        .expect("could not parse the manifest URL");
+    let url = match config.namespace() {
+        Some(ns) => url
+            .join(&format!("manifests/{}/", ns))?
+            .join(&manifest_filename)?,
+        None => url.join(&manifest_filename)?,
+    };
 
     // Stores a path to the manifest cache (this allows us to operate on a manifest without
     // needing to pull it from the luarocks servers each time).
