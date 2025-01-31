@@ -110,10 +110,7 @@ impl RemotePackageDB {
                                     elements
                                         .keys()
                                         .filter(|version| {
-                                            package_req
-                                                .version_req()
-                                                .map(|req| req.matches(version))
-                                                .unwrap_or(true)
+                                            package_req.version_req().matches(version)
                                         })
                                         .sorted_by(|a, b| Ord::cmp(b, a))
                                         .collect_vec(),

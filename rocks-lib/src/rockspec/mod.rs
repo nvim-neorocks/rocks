@@ -100,11 +100,9 @@ impl<T: Rockspec> LuaVersionCompatibility for T {
             .collect_vec();
         let lua_pkg_version = lua_version.as_version();
         lua_version_reqs.is_empty()
-            || lua_version_reqs.into_iter().any(|lua| {
-                lua.version_req()
-                    .map(|req| req.matches(&lua_pkg_version))
-                    .unwrap_or(true)
-            })
+            || lua_version_reqs
+                .into_iter()
+                .any(|lua| lua.version_req().matches(&lua_pkg_version))
     }
 
     fn lua_version(&self) -> Option<LuaVersion> {
@@ -130,11 +128,7 @@ pub(crate) fn latest_lua_version(
                 ("5.2.0", LuaVersion::Lua52),
                 ("5.1.0", LuaVersion::Lua51),
             ] {
-                if lua
-                    .version_req()
-                    .map(|req| req.matches(&possibility.parse().unwrap()))
-                    .unwrap_or(true)
-                {
+                if lua.version_req().matches(&possibility.parse().unwrap()) {
                     return Some(version);
                 }
             }

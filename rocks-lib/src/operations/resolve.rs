@@ -8,10 +8,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use crate::{
     build::BuildBehaviour,
     config::Config,
-    lockfile::{
-        LocalPackageId, LocalPackageSpec, LockConstraint, Lockfile, LockfilePermissions,
-        PinnedState,
-    },
+    lockfile::{LocalPackageId, LocalPackageSpec, Lockfile, LockfilePermissions, PinnedState},
     package::PackageReq,
     progress::{MultiProgress, Progress},
     remote_package_db::RemotePackageDB,
@@ -63,11 +60,7 @@ where
                         .download_remote_rock()
                         .await?;
 
-                    let constraint = if let Some(package_req) = package.version_req() {
-                        LockConstraint::Constrained(package_req.clone())
-                    } else {
-                        LockConstraint::Unconstrained
-                    };
+                    let constraint = package.version_req().clone().into();
 
                     let dependencies = downloaded_rock
                         .rockspec()

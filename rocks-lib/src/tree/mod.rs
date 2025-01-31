@@ -156,10 +156,7 @@ impl Tree {
                     .iter()
                     .rev()
                     .filter(|package| {
-                        req.version_req()
-                            .map(|req| req.matches(package.version()))
-                            .unwrap_or(true)
-                            && filter(package)
+                        req.version_req().matches(package.version()) && filter(package)
                     })
                     .map(|package| package.id())
                     .collect_vec();
