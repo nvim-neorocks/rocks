@@ -20,7 +20,9 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: Install neovim
-        uses: rhysd/action-setup-vim@v1 # Used by the 'run' integration test
+        # Used by the 'run' integration test
+        # Custom workflow used, see: https://github.com/rhysd/action-setup-vim/pull/40
+        uses: danarnold/action-setup-vim@linux-releases
         with:
           neovim: true
       - name: Integration tests
