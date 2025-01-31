@@ -130,34 +130,48 @@ impl<'a> BinaryRockInstall<'a> {
                 let rock_manifest_content = std::fs::read_to_string(rock_manifest_file)?;
                 let output_paths = tree.rock(&package)?;
                 let rock_manifest = RockManifest::new(&rock_manifest_content)?;
-                install_manifest_entry(
-                    &rock_manifest.lib,
+                install_manifest_entries(
+                    &rock_manifest.lib.entries,
                     &unpack_dir.join("lib"),
                     &output_paths.lib,
                 )?;
-                install_manifest_entry(
-                    &rock_manifest.lua,
+                install_manifest_entries(
+                    &rock_manifest.lua.entries,
                     &unpack_dir.join("lua"),
                     &output_paths.src,
                 )?;
-                install_manifest_entry(
-                    &rock_manifest.bin,
+                install_manifest_entries(
+                    &rock_manifest.bin.entries,
                     &unpack_dir.join("bin"),
                     &output_paths.bin,
                 )?;
-                install_manifest_entry(
-                    &rock_manifest.doc,
+                install_manifest_entries(
+                    &rock_manifest.doc.entries,
                     &unpack_dir.join("doc"),
                     &output_paths.doc,
                 )?;
-                install_manifest_entry(&rock_manifest.root, &unpack_dir, &output_paths.etc)?;
+                install_manifest_entries(
+                    &rock_manifest.root.entries,
+                    &unpack_dir,
+                    &output_paths.etc,
+                )?;
+                // rename <name>-<version>.rockspec
+                let rockspec_path = output_paths.etc.join(format!(
+                    "{}-{}.rockspec",
+                    package.name(),
+                    package.version()
+                ));
+                if rockspec_path.is_file() {
+                    std::fs::copy(&rockspec_path, output_paths.rockspec_path())?;
+                    std::fs::remove_file(&rockspec_path)?;
+                }
                 Ok(package)
             }
         }
     }
 }
 
-fn install_manifest_entry(
+fn install_manifest_entries(
     entry: &HashMap<PathBuf, String>,
     src: &Path,
     dest: &Path,
@@ -173,37 +187,58 @@ fn install_manifest_entry(
 #[cfg(test)]
 mod test {
 
+    use io::Read;
+
     use crate::{
-        config::ConfigBuilder,
-        operations::{unpack_rockspec, DownloadedPackedRockBytes},
+        config::{ConfigBuilder, LuaVersion},
+        operations::{unpack_rockspec, DownloadedPackedRockBytes, Pack, Remove},
         progress::MultiProgress,
     };
 
     use super::*;
+
+    /// This relatively large integration test case tests the following:
+    ///
+    /// - Install a packed rock that was packed using luarocks 3.11 from the test resources.
+    /// - Pack the rock using our own `Pack` implementation.
+    /// - Verify that the `rock_manifest` entry of the original packed rock and our own packed rock
+    ///   are equal (this means luarocks should be able to install our packed rock).
+    /// - Uninstall the local package.
+    /// - Install the package from our packed rock.
+    /// - Verify that the contents of the install directories when installing from both packed rocks
+    ///   are the same.
     #[tokio::test]
-    async fn install_binary_rock() {
+    async fn install_binary_rock_roundtrip() {
         if std::env::var("ROCKS_SKIP_IMPURE_TESTS").unwrap_or("0".into()) == "1" {
             println!("Skipping impure test");
             return;
         }
         let content = std::fs::read("resources/test/toml-edit-0.6.0-1.linux-x86_64.rock").unwrap();
         let rock_bytes = Bytes::copy_from_slice(&content);
+        let packed_rock_file_name = "toml-edit-0.6.0-1.linux-x86_64.rock".to_string();
+        let cursor = Cursor::new(rock_bytes.clone());
+        let mut zip = zip::ZipArchive::new(cursor).unwrap();
+        let manifest_index = zip.index_for_path("rock_manifest").unwrap();
+        let mut manifest_file = zip.by_index(manifest_index).unwrap();
+        let mut content = String::new();
+        manifest_file.read_to_string(&mut content).unwrap();
+        let orig_manifest = RockManifest::new(&content).unwrap();
         let rock = DownloadedPackedRockBytes {
             name: "toml-edit".into(),
             version: "0.6.0-1".parse().unwrap(),
             bytes: rock_bytes,
-            file_name: "toml-edit-0.6.0-1.linux-x86_64.rock".into(),
+            file_name: packed_rock_file_name.clone(),
         };
         let rockspec = unpack_rockspec(&rock).await.unwrap();
-        let dir = assert_fs::TempDir::new().unwrap();
+        let install_root = assert_fs::TempDir::new().unwrap();
         let config = ConfigBuilder::new()
             .unwrap()
-            .tree(Some(dir.to_path_buf()))
+            .tree(Some(install_root.to_path_buf()))
             .build()
             .unwrap();
         let progress = MultiProgress::new();
         let bar = progress.new_bar();
-        BinaryRockInstall::new(
+        let local_package = BinaryRockInstall::new(
             &rockspec,
             RemotePackageSource::Test,
             rock.bytes,
@@ -213,5 +248,68 @@ mod test {
         .install()
         .await
         .unwrap();
+        let tree = Tree::new(
+            install_root.to_path_buf(),
+            LuaVersion::from(&config).unwrap(),
+        )
+        .unwrap();
+        let installed_rock_layout = tree.rock_layout(&local_package);
+        let orig_install_tree_integrity = installed_rock_layout.rock_path.hash().unwrap();
+        let pack_dest_dir = assert_fs::TempDir::new().unwrap();
+        let packed_rock = Pack::new(
+            pack_dest_dir.to_path_buf(),
+            tree.clone(),
+            local_package.clone(),
+        )
+        .pack()
+        .unwrap();
+        assert_eq!(
+            packed_rock
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .to_string(),
+            packed_rock_file_name.clone()
+        );
+        // let's make sure our own pack/unpack implementation roundtrips correctly
+        Remove::new(&config)
+            .package(local_package.id())
+            .remove()
+            .await
+            .unwrap();
+        let content = std::fs::read(&packed_rock).unwrap();
+        let rock_bytes = Bytes::copy_from_slice(&content);
+        let cursor = Cursor::new(rock_bytes.clone());
+        let mut zip = zip::ZipArchive::new(cursor).unwrap();
+        let manifest_index = zip.index_for_path("rock_manifest").unwrap();
+        let mut manifest_file = zip.by_index(manifest_index).unwrap();
+        let mut content = String::new();
+        manifest_file.read_to_string(&mut content).unwrap();
+        let packed_manifest = RockManifest::new(&content).unwrap();
+        assert_eq!(packed_manifest, orig_manifest);
+        let rock = DownloadedPackedRockBytes {
+            name: "toml-edit".into(),
+            version: "0.6.0-1".parse().unwrap(),
+            bytes: rock_bytes,
+            file_name: packed_rock_file_name.clone(),
+        };
+        let rockspec = unpack_rockspec(&rock).await.unwrap();
+        let bar = progress.new_bar();
+        let local_package = BinaryRockInstall::new(
+            &rockspec,
+            RemotePackageSource::Test,
+            rock.bytes,
+            &config,
+            &Progress::Progress(bar),
+        )
+        .install()
+        .await
+        .unwrap();
+        let installed_rock_layout = tree.rock_layout(&local_package);
+        assert!(installed_rock_layout.rockspec_path().is_file());
+        let new_install_tree_integrity = installed_rock_layout.rock_path.hash().unwrap();
+        assert!(orig_install_tree_integrity
+            .matches(&new_install_tree_integrity)
+            .is_some());
     }
 }

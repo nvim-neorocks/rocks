@@ -23,6 +23,7 @@ jobs:
         uses: rhysd/action-setup-vim@v1 # Used by the 'run' integration test
         with:
           neovim: true
+          version: v0.10.3
       - name: Integration tests
         run: | 
           nix develop .#${{ matrix.lua-version }} --command cargo nextest run --test "*"

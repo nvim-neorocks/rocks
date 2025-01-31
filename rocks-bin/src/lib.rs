@@ -12,6 +12,7 @@ use install::Install;
 use install_rockspec::InstallRockspec;
 use list::ListCmd;
 use outdated::Outdated;
+use pack::Pack;
 use path::Path;
 use pin::ChangePin;
 use remove::Remove;
@@ -40,6 +41,7 @@ pub mod install_lua;
 pub mod install_rockspec;
 pub mod list;
 pub mod outdated;
+pub mod pack;
 pub mod path;
 pub mod pin;
 pub mod project;
@@ -157,8 +159,8 @@ pub enum Commands {
     New(NewProject),
     /// List outdated rocks.
     Outdated(Outdated),
-    /// [UNIMPLEMENTED] Create a rock, packing sources or binaries.
-    Pack,
+    /// Create a packed rock for distribution, packing sources or binaries.
+    Pack(Pack),
     /// Return the currently configured package path.
     Path(Path),
     /// Pin an existing rock, preventing any updates to the package.

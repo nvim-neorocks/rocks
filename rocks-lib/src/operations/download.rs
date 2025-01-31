@@ -271,8 +271,8 @@ pub enum SearchAndDownloadError {
     RemotePackageDB(#[from] RemotePackageDBError),
     #[error("failed to read packed rock: {0}")]
     Zip(#[from] zip::result::ZipError),
-    #[error("{0} not found in the source rock.")]
-    RockspecNotFoundInSrcRock(String),
+    #[error("{0} not found in the packed rock.")]
+    RockspecNotFoundInPackedRock(String),
 }
 
 async fn search_and_download_src_rock(
@@ -385,7 +385,7 @@ pub(crate) async fn unpack_rockspec(
     let mut zip = zip::ZipArchive::new(cursor)?;
     let rockspec_index = (0..zip.len())
         .find(|&i| zip.by_index(i).unwrap().name().eq(&rockspec_file_name))
-        .ok_or(SearchAndDownloadError::RockspecNotFoundInSrcRock(
+        .ok_or(SearchAndDownloadError::RockspecNotFoundInPackedRock(
             rockspec_file_name,
         ))?;
     let mut rockspec_file = zip.by_index(rockspec_index)?;

@@ -2109,6 +2109,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 
 [[package]]
+name = "md5"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
+
+[[package]]
 name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3045,6 +3051,7 @@ dependencies = [
  "strum 0.26.3",
  "strum_macros 0.26.4",
  "stylua",
+ "tempdir",
  "termcolor",
  "text_trees",
  "tokio",
@@ -3086,6 +3093,7 @@ dependencies = [
  "lets_find_up",
  "lua-src",
  "luajit-src",
+ "md5",
  "mlua",
  "openssl",
  "pathdiff",
