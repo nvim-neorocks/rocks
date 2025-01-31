@@ -3,7 +3,9 @@ use std::{collections::HashMap, io, sync::Arc};
 use crate::{
     build::{Build, BuildBehaviour, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
-    lockfile::{LocalPackage, LocalPackageId, LockConstraint, Lockfile, PinnedState, ReadWrite},
+    lockfile::{
+        LocalPackage, LocalPackageId, LockConstraint, Lockfile, PinnedState, ReadOnly, ReadWrite,
+    },
     lua_rockspec::BuildBackendSpec,
     luarocks::{
         install_binary_rock::{BinaryRockInstall, InstallBinaryRockError},
@@ -37,6 +39,7 @@ pub struct Install<'a> {
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
     progress: Option<Arc<Progress<MultiProgress>>>,
+    lockfile: Option<Lockfile<ReadOnly>>,
 }
 
 impl<'a> Install<'a> {
@@ -48,6 +51,7 @@ impl<'a> Install<'a> {
             packages: Vec::new(),
             pin: PinnedState::default(),
             progress: None,
+            lockfile: None,
         }
     }
 
@@ -89,6 +93,14 @@ impl<'a> Install<'a> {
         }
     }
 
+    /// Pass a custom `Lockfile` to operate on.
+    pub fn lockfile(self, lockfile: Lockfile<ReadOnly>) -> Self {
+        Self {
+            lockfile: Some(lockfile),
+            ..self
+        }
+    }
+
     /// Install the packages.
     pub async fn install(self) -> Result<Vec<LocalPackage>, InstallError> {
         let progress = match self.progress {
@@ -102,7 +114,15 @@ impl<'a> Install<'a> {
                 RemotePackageDB::from_config(self.config, &bar).await?
             }
         };
-        install(self.packages, self.pin, package_db, self.config, progress).await
+        install(
+            self.packages,
+            self.pin,
+            package_db,
+            self.lockfile,
+            self.config,
+            progress,
+        )
+        .await
     }
 }
 
@@ -134,15 +154,23 @@ async fn install(
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
     package_db: RemotePackageDB,
+    lockfile: Option<Lockfile<ReadOnly>>,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, InstallError>
 where
 {
     let lua_version = LuaVersion::from(config)?;
-    let tree = Tree::new(config.tree().clone(), lua_version)?;
+    let mut lockfile = lockfile
+        .map_or_else(
+            || {
+                let tree = Tree::new(config.tree().clone(), lua_version)?;
 
-    let mut lockfile = tree.lockfile()?.write_guard();
+                tree.lockfile()
+            },
+            Ok,
+        )?
+        .write_guard();
 
     install_impl(
         packages,

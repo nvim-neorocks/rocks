@@ -3,7 +3,6 @@ use std::sync::Arc;
 use async_recursion::async_recursion;
 use futures::future::join_all;
 use itertools::Itertools;
-use semver::VersionReq;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
@@ -13,7 +12,7 @@ use crate::{
         LocalPackageId, LocalPackageSpec, LockConstraint, Lockfile, LockfilePermissions,
         PinnedState,
     },
-    package::{PackageReq, PackageVersionReq},
+    package::PackageReq,
     progress::{MultiProgress, Progress},
     remote_package_db::RemotePackageDB,
     rockspec::Rockspec,
@@ -64,12 +63,11 @@ where
                         .download_remote_rock()
                         .await?;
 
-                    let constraint =
-                        if *package.version_req() == PackageVersionReq::SemVer(VersionReq::STAR) {
-                            LockConstraint::Unconstrained
-                        } else {
-                            LockConstraint::Constrained(package.version_req().clone())
-                        };
+                    let constraint = if let Some(package_req) = package.version_req() {
+                        LockConstraint::Constrained(package_req.clone())
+                    } else {
+                        LockConstraint::Unconstrained
+                    };
 
                     let dependencies = downloaded_rock
                         .rockspec()

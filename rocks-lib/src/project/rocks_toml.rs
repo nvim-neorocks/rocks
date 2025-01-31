@@ -33,7 +33,10 @@ where
 
     Ok(packages.map(|pkgs| {
         pkgs.into_iter()
-            .map(|(name, version_req)| PackageReq { name, version_req })
+            .map(|(name, version_req)| PackageReq {
+                name,
+                version_req: Some(version_req),
+            })
             .collect()
     }))
 }
@@ -186,7 +189,7 @@ version = "{}""#,
                 0,
                 PackageReq {
                     name: "lua".into(),
-                    version_req: self.lua.clone(),
+                    version_req: Some(self.lua.clone()),
                 },
             );
             template.push(Dependencies(&dependencies).display_lua());
@@ -263,9 +266,11 @@ impl LuaVersionCompatibility for RocksToml {
             .collect_vec();
         let lua_pkg_version = lua_version.as_version();
         lua_version_reqs.is_empty()
-            || lua_version_reqs
-                .into_iter()
-                .any(|lua| lua.version_req().matches(&lua_pkg_version))
+            || lua_version_reqs.into_iter().any(|lua| {
+                lua.version_req()
+                    .map(|req| req.matches(&lua_pkg_version))
+                    .unwrap_or(true)
+            })
     }
 
     fn lua_version(&self) -> Option<LuaVersion> {

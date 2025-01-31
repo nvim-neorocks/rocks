@@ -158,7 +158,12 @@ impl ManifestMetadata {
 
         let (version, rock_type) = self.repository[lua_package_req.name()]
             .iter()
-            .filter(|(version, _)| lua_package_req.version_req().matches(version))
+            .filter(|(version, _)| {
+                lua_package_req
+                    .version_req()
+                    .map(|req| req.matches(version))
+                    .unwrap_or(true)
+            })
             .flat_map(|(version, rock_types)| {
                 rock_types.iter().filter_map(move |rock_type| {
                     let include = match rock_type {

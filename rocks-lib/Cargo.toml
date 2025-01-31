@@ -58,6 +58,7 @@ clean-path = "0.2.1"
 diffy = "0.4.0"
 toml = "0.8.19"
 md5 = "0.7.0"
+toml_edit = "0.22.22"
 
 [dev-dependencies]
 httptest = { version = "0.16.1" }

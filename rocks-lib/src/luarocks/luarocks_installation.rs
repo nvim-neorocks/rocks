@@ -108,9 +108,13 @@ impl LuaRocksInstallation {
         if !self.tree.match_rocks(&luarocks_req)?.is_found() {
             let rockspec = LuaRockspec::new(LUAROCKS_ROCKSPEC).unwrap();
             let pkg = Build::new(&rockspec, &self.config, progress)
-                .constraint(LockConstraint::Constrained(
-                    luarocks_req.version_req().clone(),
-                ))
+                .constraint(
+                    luarocks_req
+                        .version_req()
+                        .cloned()
+                        .map(LockConstraint::Constrained)
+                        .unwrap_or(LockConstraint::Unconstrained),
+                )
                 .build()
                 .await?;
             lockfile.add(&pkg);
