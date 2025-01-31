@@ -50,7 +50,6 @@ The following table provides a brief (incomplete) comparison:
 | resolve multiple versions of the same dependency at runtime           | :x: (planned)                | :white_check_mark: |
 | run tests with busted                                                 | :white_check_mark:           | :white_check_mark: |
 | code formatting with stylua                                           | :white_check_mark:           | :x:                |
-| linting with luacheck                                                 | :white_check_mark:           | :x:                |
 | static type checking                                                  | :x: (planned)                | :x:                |
 | pack and upload pre-built binary rocks                                | :white_check_mark:           | :white_check_mark: |
 | add/remove dependencies                                               | :white_check_mark:           | :x:                |
