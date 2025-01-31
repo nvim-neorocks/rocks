@@ -58,7 +58,11 @@ async fn manifest_from_server(
 
     // Stores a path to the manifest cache (this allows us to operate on a manifest without
     // needing to pull it from the luarocks servers each time).
-    let cache = config.cache_dir().join(&manifest_filename);
+    let cache = config.cache_dir().join(
+        // Convert the url to a directory name so we don't create too many subdirectories
+        url.to_string()
+            .replace(&[':', '*', '?', '"', '<', '>', '|', '/', '\\'][..], "_"),
+    );
 
     // Ensure all intermediate directories for the cache file are created (e.g. `~/.cache/rocks/manifest`)
     fs::create_dir_all(cache.parent().unwrap()).await?;
@@ -79,6 +83,7 @@ async fn manifest_from_server(
             if server_last_modified > last_modified_local {
                 // Since we only pulled in the headers previously we must now request the entire
                 // manifest from scratch.
+                bar.map(|bar| bar.set_message(format!("📥 Downloading updated manifest from {}", &url)));
                 let new_manifest_content = client.get(url).send().await?.text().await?;
                 fs::write(&cache, &new_manifest_content).await?;
 
@@ -254,23 +259,22 @@ impl Manifest {
         package_req: &PackageReq,
         filter: Option<RemotePackageTypeFilterSpec>,
     ) -> Option<RemotePackage> {
-        if !self.metadata().has_rock(package_req.name()) {
-            None
-        } else {
-            let (package, package_type) =
-                self.metadata().latest_match(package_req, filter).unwrap();
-            let remote_source = match package_type {
-                RemotePackageType::Rockspec => {
-                    RemotePackageSource::LuarocksRockspec(self.server_url().clone())
-                }
-                RemotePackageType::Src => {
-                    RemotePackageSource::LuarocksSrcRock(self.server_url().clone())
-                }
-                RemotePackageType::Binary => {
-                    RemotePackageSource::LuarocksBinaryRock(self.server_url().clone())
-                }
-            };
-            Some(RemotePackage::new(package, remote_source))
+        match self.metadata().latest_match(package_req, filter) {
+            None => None,
+            Some((package, package_type)) => {
+                let remote_source = match package_type {
+                    RemotePackageType::Rockspec => {
+                        RemotePackageSource::LuarocksRockspec(self.server_url().clone())
+                    }
+                    RemotePackageType::Src => {
+                        RemotePackageSource::LuarocksSrcRock(self.server_url().clone())
+                    }
+                    RemotePackageType::Binary => {
+                        RemotePackageSource::LuarocksBinaryRock(self.server_url().clone())
+                    }
+                };
+                Some(RemotePackage::new(package, remote_source))
+            }
         }
     }
 }

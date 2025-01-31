@@ -20,6 +20,8 @@ use crate::{
 
 pub mod external_deps;
 
+const DEV_PATH: &str = "dev/";
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum LuaVersion {
     #[serde(rename = "5.1")]
@@ -154,7 +156,7 @@ pub struct NoValidHomeDirectory;
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    enable_development_rockspecs: bool,
+    enable_development_packages: bool,
     server: Url,
     extra_servers: Vec<Url>,
     only_sources: Option<String>,
@@ -201,16 +203,23 @@ impl Config {
 }
 
 impl Config {
-    pub fn dev(&self) -> bool {
-        self.enable_development_rockspecs
-    }
-
     pub fn server(&self) -> &Url {
         &self.server
     }
 
     pub fn extra_servers(&self) -> &Vec<Url> {
         self.extra_servers.as_ref()
+    }
+
+    pub fn enabled_dev_servers(&self) -> Result<Vec<Url>, ConfigError> {
+        let mut enabled_dev_servers = Vec::new();
+        if self.enable_development_packages {
+            enabled_dev_servers.push(self.server().join(DEV_PATH)?);
+            for server in self.extra_servers() {
+                enabled_dev_servers.push(server.join(DEV_PATH)?);
+            }
+        }
+        Ok(enabled_dev_servers)
     }
 
     pub fn only_sources(&self) -> Option<&String> {
@@ -298,6 +307,8 @@ pub enum ConfigError {
     Project(#[from] ProjectError),
     #[error("error deserializing rocks config: {0}")]
     Deserialize(#[from] toml::de::Error),
+    #[error("error parsing URL: {0}")]
+    UrlParseError(#[from] url::ParseError),
 }
 
 #[derive(Default, Deserialize, Serialize)]
@@ -323,7 +334,7 @@ pub struct ConfigBuilder {
     cache_dir: Option<PathBuf>,
     data_dir: Option<PathBuf>,
     no_project: Option<bool>,
-    enable_development_rockspecs: Option<bool>,
+    enable_development_packages: Option<bool>,
     verbose: Option<bool>,
     timeout: Option<Duration>,
     variables: Option<HashMap<String, String>>,
@@ -352,7 +363,7 @@ impl ConfigBuilder {
 
     pub fn dev(self, dev: Option<bool>) -> Self {
         Self {
-            enable_development_rockspecs: dev,
+            enable_development_packages: dev,
             ..self
         }
     }
@@ -434,7 +445,7 @@ impl ConfigBuilder {
                 .ok()
                 .and_then(|version| LuaVersion::from_version(version).ok()));
         Ok(Config {
-            enable_development_rockspecs: self.enable_development_rockspecs.unwrap_or(false),
+            enable_development_packages: self.enable_development_packages.unwrap_or(false),
             server: self
                 .server
                 .unwrap_or_else(|| Url::parse("https://luarocks.org/").unwrap()),
@@ -473,7 +484,7 @@ impl ConfigBuilder {
 impl From<Config> for ConfigBuilder {
     fn from(value: Config) -> Self {
         ConfigBuilder {
-            enable_development_rockspecs: Some(value.enable_development_rockspecs),
+            enable_development_packages: Some(value.enable_development_packages),
             server: Some(value.server),
             extra_servers: Some(value.extra_servers),
             only_sources: value.only_sources,
