@@ -3,7 +3,7 @@ use std::{cmp::Ordering, fmt::Display, str::FromStr};
 use html_escape::decode_html_entities;
 use itertools::Itertools;
 use mlua::FromLua;
-use semver::{Comparator, Error, Op, Version, VersionReq};
+use semver::{BuildMetadata, Comparator, Error, Op, Prerelease, Version, VersionReq};
 use serde::{de, Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
@@ -221,7 +221,10 @@ pub struct PackageVersionReqError(#[from] Error);
 /// or a **Dev** version requirement, which can be one of "dev", "scm", or "git"
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum PackageVersionReq {
+    /// A PackageVersionReq that matches a SemVer version.
+    /// If there is no upper constraint, this can also match dev versions.
     SemVer(VersionReq),
+    /// A PackageVersionReq that matches only dev versions.
     Dev(String),
 }
 
@@ -240,7 +243,16 @@ impl PackageVersionReq {
             (PackageVersionReq::SemVer(version_req), PackageVersion::SemVer(semver)) => {
                 version_req.matches(&semver.version)
             }
-            (PackageVersionReq::SemVer(..), PackageVersion::DevVer(..)) => true,
+            (PackageVersionReq::SemVer(version_req), PackageVersion::DevVer(..)) => {
+                let large_version = Version {
+                    major: u64::MAX,
+                    minor: u64::MAX,
+                    patch: u64::MAX,
+                    pre: Prerelease::EMPTY,
+                    build: BuildMetadata::EMPTY,
+                };
+                version_req.matches(&large_version)
+            }
             (PackageVersionReq::Dev(..), PackageVersion::SemVer(..)) => false,
             (PackageVersionReq::Dev(name_req), PackageVersion::DevVer(devver)) => {
                 name_req.ends_with(&devver.modrev)

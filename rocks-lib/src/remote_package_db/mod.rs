@@ -1,5 +1,5 @@
 use crate::{
-    config::Config,
+    config::{Config, ConfigError},
     lockfile::{LocalPackage, Lockfile, LockfileIntegrityError, ReadOnly},
     manifest::{Manifest, ManifestError},
     package::{
@@ -24,6 +24,8 @@ enum Impl {
 pub enum RemotePackageDBError {
     #[error(transparent)]
     ManifestError(#[from] ManifestError),
+    #[error(transparent)]
+    ConfigError(#[from] ConfigError),
 }
 
 #[derive(Error, Debug)]
@@ -50,6 +52,10 @@ impl RemotePackageDB {
         progress: &Progress<ProgressBar>,
     ) -> Result<Self, RemotePackageDBError> {
         let mut manifests = Vec::new();
+        for server in config.enabled_dev_servers()? {
+            let manifest = Manifest::from_config(server, config, progress).await?;
+            manifests.push(manifest);
+        }
         for server in config.extra_servers() {
             let manifest = Manifest::from_config(server.clone(), config, progress).await?;
             manifests.push(manifest);
