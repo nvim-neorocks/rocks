@@ -456,15 +456,6 @@ impl ConfigBuilder {
             lua_version,
             tree: self
                 .tree
-                .or_else(|| {
-                    if self.no_project.unwrap_or(false) {
-                        None
-                    } else {
-                        current_project
-                            .as_ref()
-                            .map(|project| project.root().join(".rocks"))
-                    }
-                })
                 .unwrap_or_else(|| data_dir.join("tree")),
             luarocks_tree: self.luarocks_tree.unwrap_or(data_dir.join(".luarocks")),
             no_project: self.no_project.unwrap_or(false),
