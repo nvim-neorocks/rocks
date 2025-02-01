@@ -35,6 +35,7 @@ use super::{
 /// Can install multiple packages in parallel.
 pub struct Install<'a> {
     config: &'a Config,
+    tree: &'a Tree,
     package_db: Option<RemotePackageDB>,
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
@@ -44,9 +45,10 @@ pub struct Install<'a> {
 
 impl<'a> Install<'a> {
     /// Construct a new installer.
-    pub fn new(config: &'a Config) -> Self {
+    pub fn new(tree: &'a Tree, config: &'a Config) -> Self {
         Self {
             config,
+            tree,
             package_db: None,
             packages: Vec::new(),
             pin: PinnedState::default(),
@@ -119,6 +121,7 @@ impl<'a> Install<'a> {
             self.pin,
             package_db,
             self.lockfile,
+            self.tree,
             self.config,
             progress,
         )
@@ -155,22 +158,13 @@ async fn install(
     pin: PinnedState,
     package_db: RemotePackageDB,
     lockfile: Option<Lockfile<ReadOnly>>,
+    tree: &Tree,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, InstallError>
 where
 {
-    let lua_version = LuaVersion::from(config)?;
-    let mut lockfile = lockfile
-        .map_or_else(
-            || {
-                let tree = Tree::new(config.tree().clone(), lua_version)?;
-
-                tree.lockfile()
-            },
-            Ok,
-        )?
-        .write_guard();
+    let mut lockfile = lockfile.map_or_else(|| tree.lockfile(), Ok)?.write_guard();
 
     install_impl(
         packages,

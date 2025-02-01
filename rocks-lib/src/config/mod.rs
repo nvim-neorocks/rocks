@@ -454,9 +454,7 @@ impl ConfigBuilder {
             namespace: self.namespace,
             lua_dir: self.lua_dir.unwrap_or_else(|| data_dir.join("lua")),
             lua_version,
-            tree: self
-                .tree
-                .unwrap_or_else(|| data_dir.join("tree")),
+            tree: self.tree.unwrap_or_else(|| data_dir.join("tree")),
             luarocks_tree: self.luarocks_tree.unwrap_or(data_dir.join(".luarocks")),
             no_project: self.no_project.unwrap_or(false),
             verbose: self.verbose.unwrap_or(false),
