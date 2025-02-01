@@ -120,7 +120,7 @@ async fn lockfile_update() {
         .unwrap();
     let package_db: RemotePackageDB = lockfile.into();
 
-    let tree = project.tree(LuaVersion::from(&config).unwrap()).unwrap();
+    let tree = project.tree(&config).unwrap();
 
     Install::new(&tree, &config)
         .packages(

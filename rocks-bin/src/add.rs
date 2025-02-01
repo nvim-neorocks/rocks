@@ -1,6 +1,6 @@
 use eyre::{OptionExt, Result};
 use rocks_lib::{
-    config::{Config, LuaVersion},
+    config::Config,
     lockfile::PinnedState,
     operations,
     package::PackageReq,
@@ -39,8 +39,7 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
     let lockfile = project.lockfile()?;
 
     let pin = PinnedState::from(data.pin);
-    let lua_version = LuaVersion::from(&config)?;
-    let tree = project.tree(lua_version)?;
+    let tree = project.tree(&config)?;
     let db = RemotePackageDB::from_config(&config, &Progress::Progress(ProgressBar::new())).await?;
 
     let regular_packages = apply_build_behaviour(data.package_req, pin, data.force, &tree);
