@@ -65,7 +65,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         })
         .map(|dep| (BuildBehaviour::NoForce, dep.to_owned()));
 
-    Install::new(&config)
+    Install::new(&tree, &config)
         .packages(dependencies_to_install)
         .pin(pin)
         .package_db(package_db)
@@ -78,7 +78,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
             .wrap_err("error copying the project lockfile")?;
     }
 
-    build::Build::new(&rocks, &config, &progress.map(|p| p.new_bar()))
+    build::Build::new(&rocks, &tree, &config, &progress.map(|p| p.new_bar()))
         .pin(pin)
         .behaviour(BuildBehaviour::Force)
         .build()

@@ -4,7 +4,6 @@ use itertools::Itertools as _;
 use rocks_lib::{
     config::{Config, LuaVersion},
     lockfile::PinnedState,
-    tree::Tree,
 };
 use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
 
@@ -15,7 +14,7 @@ pub struct ListCmd {
 }
 
 pub fn list_installed(list_data: ListCmd, config: Config) -> Result<()> {
-    let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
+    let tree = config.tree(LuaVersion::from(&config)?)?;
     let available_rocks = tree.list()?;
 
     if list_data.porcelain {

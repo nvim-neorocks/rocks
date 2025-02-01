@@ -23,7 +23,6 @@ use crate::{
     progress::{Progress, ProgressBar},
     remote_package_source::RemotePackageSource,
     rockspec::Rockspec,
-    tree::Tree,
 };
 
 use super::rock_manifest::RockManifestError;
@@ -102,7 +101,7 @@ impl<'a> BinaryRockInstall<'a> {
 
         let lua_version = rockspec.lua_version_matches(self.config)?;
 
-        let tree = Tree::new(self.config.tree().clone(), lua_version.clone())?;
+        let tree = self.config.tree(lua_version)?;
 
         let hashes = LocalPackageHashes {
             rockspec: rockspec.hash()?,
@@ -193,6 +192,7 @@ mod test {
         config::{ConfigBuilder, LuaVersion},
         operations::{unpack_rockspec, DownloadedPackedRockBytes, Pack, Remove},
         progress::MultiProgress,
+        tree::Tree,
     };
 
     use super::*;

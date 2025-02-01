@@ -2,7 +2,7 @@ use std::{collections::HashMap, io, sync::Arc};
 
 use crate::{
     build::{Build, BuildBehaviour, BuildError},
-    config::{Config, LuaVersion, LuaVersionUnset},
+    config::{Config, LuaVersionUnset},
     lockfile::{
         LocalPackage, LocalPackageId, LockConstraint, Lockfile, PinnedState, ReadOnly, ReadWrite,
     },
@@ -171,6 +171,7 @@ where
         pin,
         Arc::new(package_db),
         config,
+        tree,
         &mut lockfile,
         progress,
     )
@@ -182,6 +183,7 @@ async fn install_impl(
     pin: PinnedState,
     package_db: Arc<RemotePackageDB>,
     config: &Config,
+    tree: &Tree,
     lockfile: &mut Lockfile<ReadWrite>,
     progress_arc: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, InstallError> {
@@ -208,6 +210,7 @@ async fn install_impl(
         let progress_arc = progress_arc.clone();
         let downloaded_rock = install_spec.downloaded_rock;
         let config = config.clone();
+        let tree = tree.clone();
         let package_db = Arc::clone(&package_db);
 
         tokio::spawn(async move {
@@ -228,6 +231,7 @@ async fn install_impl(
                         install_spec.spec.constraint(),
                         install_spec.build_behaviour,
                         pin,
+                        &tree,
                         &config,
                         progress_arc,
                     )
@@ -291,6 +295,7 @@ async fn install_rockspec(
     constraint: LockConstraint,
     behaviour: BuildBehaviour,
     pin: PinnedState,
+    tree: &Tree,
     config: &Config,
     progress_arc: Arc<Progress<MultiProgress>>,
 ) -> Result<LocalPackage, InstallError> {
@@ -310,7 +315,7 @@ async fn install_rockspec(
             .await?;
     }
 
-    let pkg = Build::new(&rockspec, config, &bar)
+    let pkg = Build::new(&rockspec, tree, config, &bar)
         .pin(pin)
         .constraint(constraint)
         .behaviour(behaviour)

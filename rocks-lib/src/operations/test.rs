@@ -90,7 +90,7 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
             .test_lua_version()
             .ok_or(RunTestsError::LuaVersionUnset),
     }?;
-    let tree = Tree::new(test.config.tree().clone(), lua_version)?;
+    let tree = test.config.tree(lua_version)?;
     // TODO(#204): Only ensure busted if running with busted (e.g. a .busted directory exists)
     ensure_busted(&tree, test.config, test.progress.clone()).await?;
     ensure_dependencies(&rocks, &tree, test.config, test.progress).await?;
@@ -150,7 +150,7 @@ pub async fn ensure_busted(
     let busted_req = PackageReq::new("busted".into(), None)?;
 
     if !tree.match_rocks(&busted_req)?.is_found() {
-        Install::new(config)
+        Install::new(tree, config)
             .package(BuildBehaviour::NoForce, busted_req)
             .progress(progress)
             .install()
@@ -186,7 +186,7 @@ async fn ensure_dependencies(
             build_behaviour.map(|it| (it, req.to_owned()))
         });
 
-    Install::new(config)
+    Install::new(tree, config)
         .packages(dependencies)
         .progress(progress)
         .install()

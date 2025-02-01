@@ -84,7 +84,7 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
             .await?;
     }
 
-    operations::Install::new(&config)
+    operations::Install::new(&tree, &config)
         .packages(regular_packages)
         .packages(build_packages)
         .packages(test_packages)

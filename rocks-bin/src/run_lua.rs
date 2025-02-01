@@ -9,7 +9,6 @@ use rocks_lib::{
     path::Paths,
     project::Project,
     rockspec::LuaVersionCompatibility,
-    tree::Tree,
 };
 
 #[derive(Args, Default)]
@@ -55,7 +54,7 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
             );
         }
     }
-    let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
+    let tree = config.tree(lua_version)?;
     let paths = Paths::from_tree(tree)?;
     let status = match Command::new(&lua_cmd)
         .args(run_lua.args.unwrap_or_default())

@@ -325,7 +325,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
 
             install(
                 build.rockspec,
-                &tree,
+                tree,
                 &output_paths,
                 &lua,
                 &build_dir,

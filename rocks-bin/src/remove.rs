@@ -7,7 +7,7 @@ use rocks_lib::{
     config::{Config, LuaVersion},
     operations,
     package::PackageReq,
-    tree::{RockMatches, Tree},
+    tree::RockMatches,
 };
 
 // NOTE: This is currently functionally equivalent
@@ -21,7 +21,7 @@ pub struct Remove {
 }
 
 pub async fn remove(remove_args: Remove, config: Config) -> Result<()> {
-    let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
+    let tree = config.tree(LuaVersion::from(&config)?)?;
 
     let package_matches = remove_args
         .packages

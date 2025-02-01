@@ -11,7 +11,7 @@ use rocks_lib::{
 pub async fn check(config: Config) -> Result<()> {
     let project = Project::current()?.ok_or_eyre("Not in a project!")?;
 
-    Install::new(&config)
+    Install::new(&project.tree(LuaVersion::from(&config)?)?, &config)
         .package(BuildBehaviour::NoForce, "luacheck".parse()?)
         .pin(Pinned)
         .progress(MultiProgress::new_arc())
