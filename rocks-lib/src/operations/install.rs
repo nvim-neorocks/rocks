@@ -2,7 +2,7 @@ use std::{collections::HashMap, io, sync::Arc};
 
 use crate::{
     build::{Build, BuildBehaviour, BuildError},
-    config::{Config, LuaVersionUnset},
+    config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{
         LocalPackage, LocalPackageId, LockConstraint, Lockfile, PinnedState, ReadOnly, ReadWrite,
     },
@@ -16,6 +16,7 @@ use crate::{
     },
     package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress, ProgressBar},
+    project::Project,
     remote_package_db::{RemotePackageDB, RemotePackageDBError, RemotePackageDbIntegrityError},
     rockspec::Rockspec,
     tree::Tree,
@@ -40,7 +41,7 @@ pub struct Install<'a> {
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
     progress: Option<Arc<Progress<MultiProgress>>>,
-    lockfile: Option<Lockfile<ReadOnly>>,
+    project: Option<&'a Project>,
 }
 
 impl<'a> Install<'a> {
@@ -53,7 +54,7 @@ impl<'a> Install<'a> {
             packages: Vec::new(),
             pin: PinnedState::default(),
             progress: None,
-            lockfile: None,
+            project: None,
         }
     }
 
@@ -95,10 +96,10 @@ impl<'a> Install<'a> {
         }
     }
 
-    /// Pass a custom `Lockfile` to operate on.
-    pub fn lockfile(self, lockfile: Lockfile<ReadOnly>) -> Self {
+    /// Attach a project to the install phase (also affects the project's `rocks.lock`).
+    pub fn project(self, project: &'a Project) -> Self {
         Self {
-            lockfile: Some(lockfile),
+            project: Some(project),
             ..self
         }
     }
@@ -120,7 +121,7 @@ impl<'a> Install<'a> {
             self.packages,
             self.pin,
             package_db,
-            self.lockfile,
+            self.project,
             self.tree,
             self.config,
             progress,
@@ -157,14 +158,15 @@ async fn install(
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
     package_db: RemotePackageDB,
-    lockfile: Option<Lockfile<ReadOnly>>,
+    project: Option<&Project>,
     tree: &Tree,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, InstallError>
 where
 {
-    let mut lockfile = lockfile.map_or_else(|| tree.lockfile(), Ok)?.write_guard();
+    let lockfile = config.tree(LuaVersion::from(config)?)?.lockfile()?;
+    let project_lockfile = project.map(|p| p.lockfile()).transpose()?;
 
     install_impl(
         packages,
@@ -172,19 +174,23 @@ where
         Arc::new(package_db),
         config,
         tree,
-        &mut lockfile,
+        lockfile,
+        project_lockfile,
         progress,
     )
     .await
 }
 
+// TODO(vhyrro): This function has too many arguments. Refactor it.
+#[allow(clippy::too_many_arguments)]
 async fn install_impl(
     packages: Vec<(BuildBehaviour, PackageReq)>,
     pin: PinnedState,
     package_db: Arc<RemotePackageDB>,
     config: &Config,
     tree: &Tree,
-    lockfile: &mut Lockfile<ReadWrite>,
+    mut lockfile: Lockfile<ReadOnly>,
+    project_lockfile: Option<Lockfile<ReadOnly>>,
     progress_arc: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, InstallError> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -269,23 +275,42 @@ async fn install_impl(
     .flatten()
     .try_collect::<_, HashMap<LocalPackageId, LocalPackage>, _>()?;
 
-    installed_packages.iter().for_each(|(id, pkg)| {
-        lockfile.add(pkg);
+    let write_dependency =
+        |lockfile: &mut Lockfile<ReadWrite>, id: &LocalPackageId, pkg: &LocalPackage| {
+            lockfile.add(pkg);
 
-        all_packages
-            .get(id)
-            .map(|pkg| pkg.spec.dependencies())
-            .unwrap_or_default()
-            .into_iter()
-            .for_each(|dependency_id| {
-                lockfile.add_dependency(
-                    pkg,
-                    installed_packages
-                        .get(dependency_id)
-                        .expect("required dependency not found"),
-                );
-            });
-    });
+            all_packages
+                .get(id)
+                .map(|pkg| pkg.spec.dependencies())
+                .unwrap_or_default()
+                .into_iter()
+                .for_each(|dependency_id| {
+                    lockfile.add_dependency(
+                        pkg,
+                        installed_packages
+                            .get(dependency_id)
+                            .expect("required dependency not found"),
+                    );
+                });
+        };
+
+    lockfile.map_then_flush(|lockfile| {
+        installed_packages
+            .iter()
+            .for_each(|(id, pkg)| write_dependency(lockfile, id, pkg));
+
+        Ok::<_, io::Error>(())
+    })?;
+
+    if let Some(mut project_lockfile) = project_lockfile {
+        project_lockfile.map_then_flush(|lockfile| {
+            installed_packages
+                .iter()
+                .for_each(|(id, pkg)| write_dependency(lockfile, id, pkg));
+
+            Ok::<_, io::Error>(())
+        })?;
+    }
 
     Ok(installed_packages.into_values().collect_vec())
 }

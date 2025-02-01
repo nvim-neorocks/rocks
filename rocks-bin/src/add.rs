@@ -36,7 +36,6 @@ pub struct Add {
 
 pub async fn add(data: Add, config: Config) -> Result<()> {
     let mut project = Project::current()?.ok_or_eyre("No project found")?;
-    let lockfile = project.lockfile()?;
 
     let pin = PinnedState::from(data.pin);
     let tree = project.tree(&config)?;
@@ -89,7 +88,7 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
         .packages(test_packages)
         .pin(pin)
         .progress(MultiProgress::new_arc())
-        .lockfile(lockfile)
+        .project(&project)
         .install()
         .await?;
 
