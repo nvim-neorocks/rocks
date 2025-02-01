@@ -7,7 +7,6 @@ use crate::{
     package::{PackageReq, PackageVersionReqError},
     path::Paths,
     remote_package_db::RemotePackageDBError,
-    tree::Tree,
 };
 use bon::Builder;
 use itertools::Itertools;
@@ -62,7 +61,7 @@ pub enum RunError {
 
 async fn run(run: Run<'_>) -> Result<(), RunError> {
     let lua_version = LuaVersion::from(run.config)?;
-    let tree = Tree::new(run.config.tree().clone(), lua_version.clone())?;
+    let tree = run.config.tree(lua_version)?;
     let paths = Paths::from_tree(tree)?;
 
     let status = match Command::new(run.command)
@@ -89,13 +88,15 @@ pub enum InstallCmdError {
     InstallError(#[from] InstallError),
     PackageVersionReqError(#[from] PackageVersionReqError),
     RemotePackageDBError(#[from] RemotePackageDBError),
+    Io(#[from] io::Error),
+    LuaVersionUnset(#[from] LuaVersionUnset),
 }
 
 /// Ensure that a command is installed.
 /// This defaults to the local project tree if cwd is a project root.
 pub async fn install_command(command: &str, config: &Config) -> Result<(), InstallCmdError> {
     let package_req = PackageReq::new(command.into(), None)?;
-    Install::new(config)
+    Install::new(&config.tree(LuaVersion::from(config)?)?, config)
         .package(BuildBehaviour::NoForce, package_req)
         .install()
         .await?;

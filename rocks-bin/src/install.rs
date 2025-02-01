@@ -5,7 +5,6 @@ use rocks_lib::{
     operations,
     package::PackageReq,
     progress::MultiProgress,
-    tree::Tree,
 };
 
 use crate::utils::install::apply_build_behaviour;
@@ -28,12 +27,12 @@ pub async fn install(data: Install, config: Config) -> Result<()> {
     let pin = PinnedState::from(data.pin);
 
     let lua_version = LuaVersion::from(&config)?;
-    let tree = Tree::new(config.tree().clone(), lua_version)?;
+    let tree = config.tree(lua_version)?;
 
     let packages = apply_build_behaviour(data.package_req, pin, data.force, &tree);
 
     // TODO(vhyrro): If the tree doesn't exist then error out.
-    operations::Install::new(&config)
+    operations::Install::new(&tree, &config)
         .packages(packages)
         .pin(pin)
         .progress(MultiProgress::new_arc())

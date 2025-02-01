@@ -3,7 +3,7 @@ use eyre::Result;
 use rocks_lib::config::LuaVersion;
 use rocks_lib::lockfile::PinnedState;
 use rocks_lib::progress::{MultiProgress, ProgressBar};
-use rocks_lib::{config::Config, operations, tree::Tree};
+use rocks_lib::{config::Config, operations};
 
 #[derive(Args)]
 pub struct Update {}
@@ -12,10 +12,10 @@ pub async fn update(config: Config) -> Result<()> {
     let progress = MultiProgress::new_arc();
     progress.map(|p| p.add(ProgressBar::from("🔎 Looking for updates...".to_string())));
 
-    let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
+    let tree = config.tree(LuaVersion::from(&config)?)?;
     let lockfile = tree.lockfile()?;
 
-    operations::Update::new(&config)
+    operations::Update::new(&tree, &config)
         .packages(
             lockfile
                 .rocks()

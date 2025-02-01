@@ -66,7 +66,7 @@ impl<'a> Remove<'a> {
             Some(p) => p,
             None => MultiProgress::new_arc(),
         };
-        let tree = Tree::new(self.config.tree().clone(), LuaVersion::from(self.config)?)?;
+        let tree = self.config.tree(LuaVersion::from(self.config)?)?;
         remove(self.packages, tree, &Arc::clone(&progress)).await
     }
 }

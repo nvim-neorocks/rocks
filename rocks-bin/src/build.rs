@@ -13,7 +13,7 @@ use rocks_lib::{
     progress::MultiProgress,
     project::Project,
     remote_package_db::RemotePackageDB,
-    rockspec::{LuaVersionCompatibility, Rockspec},
+    rockspec::Rockspec,
 };
 
 #[derive(Args, Default)]
@@ -45,9 +45,8 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     };
 
     bar.map(|b| b.finish_and_clear());
+    let tree = project.tree(&config)?;
     let rocks = project.new_local_rockspec()?;
-    let lua_version = rocks.lua_version_matches(&config)?;
-    let tree = project.tree(lua_version)?;
 
     // Ensure all dependencies are installed first
     let dependencies = rocks
@@ -65,7 +64,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         })
         .map(|dep| (BuildBehaviour::NoForce, dep.to_owned()));
 
-    Install::new(&config)
+    Install::new(&tree, &config)
         .packages(dependencies_to_install)
         .pin(pin)
         .package_db(package_db)
@@ -78,7 +77,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
             .wrap_err("error copying the project lockfile")?;
     }
 
-    build::Build::new(&rocks, &config, &progress.map(|p| p.new_bar()))
+    build::Build::new(&rocks, &tree, &config, &progress.map(|p| p.new_bar()))
         .pin(pin)
         .behaviour(BuildBehaviour::Force)
         .build()

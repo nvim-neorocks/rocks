@@ -37,7 +37,9 @@ async fn builtin_build() {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    Build::new(&rockspec, &config, &Progress::Progress(bar))
+    let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
+
+    Build::new(&rockspec, &tree, &config, &Progress::Progress(bar))
         .behaviour(Force)
         .build()
         .await
@@ -63,7 +65,9 @@ async fn make_build() {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    Build::new(&rockspec, &config, &Progress::Progress(bar))
+    let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
+
+    Build::new(&rockspec, &tree, &config, &Progress::Progress(bar))
         .behaviour(Force)
         .build()
         .await
@@ -115,7 +119,10 @@ async fn lockfile_update() {
         .await
         .unwrap();
     let package_db: RemotePackageDB = lockfile.into();
-    Install::new(&config)
+
+    let tree = project.tree(&config).unwrap();
+
+    Install::new(&tree, &config)
         .packages(
             dependencies
                 .iter()
@@ -143,7 +150,9 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    Build::new(&rockspec, &config, &Progress::Progress(bar))
+    let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
+
+    Build::new(&rockspec, &tree, &config, &Progress::Progress(bar))
         .behaviour(Force)
         .build()
         .await

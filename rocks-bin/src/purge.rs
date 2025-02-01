@@ -3,11 +3,10 @@ use inquire::Confirm;
 use rocks_lib::{
     config::{Config, LuaVersion},
     progress::{MultiProgress, ProgressBar},
-    tree::Tree,
 };
 
 pub async fn purge(config: Config) -> Result<()> {
-    let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
+    let tree = config.tree(LuaVersion::from(&config)?)?;
 
     let len = tree.list()?.len();
 

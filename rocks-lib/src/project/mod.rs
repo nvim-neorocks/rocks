@@ -9,15 +9,15 @@ use std::{
 use thiserror::Error;
 
 use crate::{
-    config::LuaVersion,
+    config::{Config, LuaVersion},
     lockfile::{Lockfile, ReadOnly},
     lua_rockspec::{
-        ExternalDependencySpec, LuaRockspec, PartialLuaRockspec, PartialRockspecError,
-        RockSourceSpec, RockspecError,
+        ExternalDependencySpec, LuaRockspec, LuaVersionError, PartialLuaRockspec,
+        PartialRockspecError, RockSourceSpec, RockspecError,
     },
     package::PackageReq,
     remote_package_db::RemotePackageDB,
-    rockspec::Rockspec,
+    rockspec::{LuaVersionCompatibility, Rockspec},
     tree::Tree,
 };
 
@@ -55,6 +55,13 @@ pub enum DependencyType {
     Build(Vec<PackageReq>),
     Test(Vec<PackageReq>),
     External(HashMap<String, ExternalDependencySpec>),
+}
+
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub enum ProjectTreeError {
+    Io(#[from] io::Error),
+    LuaVersionError(#[from] LuaVersionError),
 }
 
 #[derive(Clone, Debug)]
@@ -166,8 +173,15 @@ impl Project {
         Ok(rocks)
     }
 
-    pub fn tree(&self, lua_version: LuaVersion) -> io::Result<Tree> {
-        Tree::new(self.root.join(".rocks"), lua_version)
+    pub fn tree(&self, config: &Config) -> Result<Tree, ProjectTreeError> {
+        Ok(Tree::new(
+            self.root.join(".rocks"),
+            self.lua_version(config)?,
+        )?)
+    }
+
+    pub fn lua_version(&self, config: &Config) -> Result<LuaVersion, LuaVersionError> {
+        self.rocks().lua_version_matches(config)
     }
 
     pub async fn add(

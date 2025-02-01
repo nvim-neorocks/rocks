@@ -48,6 +48,8 @@ pub struct Build<'a, R: Rockspec + HasIntegrity> {
     #[builder(start_fn)]
     rockspec: &'a R,
     #[builder(start_fn)]
+    tree: &'a Tree,
+    #[builder(start_fn)]
     config: &'a Config,
     #[builder(start_fn)]
     progress: &'a Progress<ProgressBar>,
@@ -248,7 +250,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
 
     let lua_version = build.rockspec.lua_version_matches(build.config)?;
 
-    let tree = Tree::new(build.config.tree().clone(), lua_version.clone())?;
+    let tree = build.tree;
 
     let temp_dir = tempdir::TempDir::new(&build.rockspec.package().to_string())?;
 
@@ -323,7 +325,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
 
             install(
                 build.rockspec,
-                &tree,
+                tree,
                 &output_paths,
                 &lua,
                 &build_dir,

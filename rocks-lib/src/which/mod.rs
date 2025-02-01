@@ -8,7 +8,6 @@ use crate::{
     config::{Config, LuaVersion, LuaVersionUnset},
     lua_rockspec::LuaModule,
     package::PackageReq,
-    tree::Tree,
 };
 
 /// A rocks module finder.
@@ -57,7 +56,7 @@ pub enum WhichError {
 
 fn do_search(which: Which<'_>) -> Result<PathBuf, WhichError> {
     let config = which.config;
-    let tree = Tree::new(config.tree().clone(), LuaVersion::from(config)?)?;
+    let tree = config.tree(LuaVersion::from(config)?)?;
     let lockfile = tree.lockfile()?;
     let local_packages = if which.packages.is_empty() {
         lockfile

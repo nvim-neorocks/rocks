@@ -11,6 +11,7 @@ use crate::{
     package::{PackageReq, RockConstraintUnsatisfied},
     progress::{MultiProgress, Progress},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
+    tree::Tree,
 };
 
 use super::{Install, InstallError, Remove, RemoveError};
@@ -21,6 +22,8 @@ use super::{Install, InstallError, Remove, RemoveError};
 #[derive(Builder)]
 #[builder(start_fn = new, finish_fn(name = _update, vis = ""))]
 pub struct Update<'a> {
+    #[builder(start_fn)]
+    tree: &'a Tree,
     #[builder(start_fn)]
     config: &'a Config,
 
@@ -66,6 +69,7 @@ impl<State: update_builder::State> UpdateBuilder<'_, State> {
         update(
             new_self.packages,
             package_db,
+            new_self.tree,
             new_self.config,
             new_self.progress,
         )
@@ -88,6 +92,7 @@ pub enum UpdateError {
 async fn update(
     packages: Vec<(LocalPackage, PackageReq)>,
     package_db: RemotePackageDB,
+    tree: &Tree,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), UpdateError> {
@@ -108,7 +113,7 @@ async fn update(
         println!("Nothing to update.");
         Ok(())
     } else {
-        Install::new(config)
+        Install::new(tree, config)
             .packages(
                 updatable
                     .iter()

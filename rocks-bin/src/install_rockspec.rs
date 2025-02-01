@@ -14,7 +14,6 @@ use rocks_lib::{
     progress::MultiProgress,
     project::Project,
     rockspec::{LuaVersionCompatibility, Rockspec},
-    tree::Tree,
 };
 
 #[derive(Args, Default)]
@@ -42,7 +41,7 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
     let content = std::fs::read_to_string(path)?;
     let rockspec = LuaRockspec::new(&content)?;
     let lua_version = rockspec.lua_version_matches(&config)?;
-    let tree = Tree::new(config.tree().clone(), lua_version)?;
+    let tree = config.tree(lua_version)?;
 
     // Ensure all dependencies are installed first
     let dependencies = rockspec
@@ -63,7 +62,7 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
         })
         .map(|dep| (BuildBehaviour::NoForce, dep.to_owned()));
 
-    Install::new(&config)
+    Install::new(&tree, &config)
         .packages(dependencies_to_install)
         .pin(pin)
         .progress(progress_arc)
@@ -75,7 +74,7 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
             .wrap_err("error creating project lockfile.")?;
     }
 
-    build::Build::new(&rockspec, &config, &progress.map(|p| p.new_bar()))
+    build::Build::new(&rockspec, &tree, &config, &progress.map(|p| p.new_bar()))
         .pin(pin)
         .behaviour(BuildBehaviour::Force)
         .build()

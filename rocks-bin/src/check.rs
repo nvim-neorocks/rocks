@@ -1,7 +1,7 @@
 use eyre::{OptionExt, Result};
 use rocks_lib::{
     build::BuildBehaviour,
-    config::{Config, LuaVersion},
+    config::Config,
     lockfile::PinnedState::Pinned,
     operations::{Install, Run},
     progress::MultiProgress,
@@ -11,7 +11,7 @@ use rocks_lib::{
 pub async fn check(config: Config) -> Result<()> {
     let project = Project::current()?.ok_or_eyre("Not in a project!")?;
 
-    Install::new(&config)
+    Install::new(&project.tree(&config)?, &config)
         .package(BuildBehaviour::NoForce, "luacheck".parse()?)
         .pin(Pinned)
         .progress(MultiProgress::new_arc())
@@ -21,12 +21,7 @@ pub async fn check(config: Config) -> Result<()> {
     Run::new("luacheck", &config)
         .arg(project.root().to_string_lossy())
         .arg("--exclude-files")
-        .arg(
-            project
-                .tree(LuaVersion::from(&config)?)?
-                .root()
-                .to_string_lossy(),
-        )
+        .arg(project.tree(&config)?.root().to_string_lossy())
         .run()
         .await?;
 

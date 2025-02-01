@@ -6,7 +6,6 @@ use rocks_lib::{
     package::PackageReq,
     progress::{MultiProgress, Progress},
     rockspec::Rockspec,
-    tree::Tree,
 };
 
 #[derive(Args)]
@@ -15,8 +14,7 @@ pub struct Info {
 }
 
 pub async fn info(data: Info, config: Config) -> Result<()> {
-    // TODO(vhyrro): Add `Tree::from(&Config)`
-    let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
+    let tree = config.tree(LuaVersion::from(&config)?)?;
 
     let progress = MultiProgress::new();
     let bar = Progress::Progress(progress.new_bar());

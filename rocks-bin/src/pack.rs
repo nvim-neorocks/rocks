@@ -66,12 +66,12 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
     };
     let result: Result<PathBuf> = match package_or_rockspec {
         PackageOrRockspec::Package(package_req) => {
-            let default_tree = Tree::new(config.tree().clone(), lua_version.clone())?;
+            let default_tree = config.tree(lua_version.clone())?;
             match default_tree.match_rocks(&package_req)? {
                 rocks_lib::tree::RockMatches::NotFound(_) => {
                     let temp_dir = TempDir::new("rocks-pack")?.into_path();
                     let tree = Tree::new(temp_dir.clone(), lua_version.clone())?;
-                    let packages = Install::new(&config)
+                    let packages = Install::new(&tree, &config)
                         .package(BuildBehaviour::Force, package_req)
                         .progress(progress)
                         .install()
@@ -118,7 +118,7 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
             let bar = progress.map(|p| p.new_bar());
             let tree = Tree::new(temp_dir.clone(), lua_version.clone())?;
             let config = config.with_tree(temp_dir);
-            let package = Build::new(&rockspec, &config, &bar).build().await?;
+            let package = Build::new(&rockspec, &tree, &config, &bar).build().await?;
             let rock_path = operations::Pack::new(dest_dir, tree, package).pack()?;
             Ok(rock_path)
         }

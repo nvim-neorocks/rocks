@@ -23,7 +23,7 @@ pub struct Doc {
 }
 
 pub async fn doc(args: Doc, config: Config) -> Result<()> {
-    let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
+    let tree = config.tree(LuaVersion::from(&config)?)?;
     let package_id = match tree.match_rocks(&args.package)? {
         RockMatches::NotFound(package_req) => {
             Err(eyre!("No package matching {} found.", package_req))

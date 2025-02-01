@@ -7,7 +7,6 @@ use rocks_lib::{
     config::{Config, LuaVersion},
     progress::{MultiProgress, Progress},
     remote_package_db::RemotePackageDB,
-    tree::Tree,
 };
 use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
 
@@ -20,7 +19,7 @@ pub struct Outdated {
 pub async fn outdated(outdated_data: Outdated, config: Config) -> Result<()> {
     let progress = MultiProgress::new();
     let bar = Progress::Progress(progress.new_bar());
-    let tree = Tree::new(config.tree().clone(), LuaVersion::from(&config)?)?;
+    let tree = config.tree(LuaVersion::from(&config)?)?;
 
     let package_db = RemotePackageDB::from_config(&config, &bar).await?;
 

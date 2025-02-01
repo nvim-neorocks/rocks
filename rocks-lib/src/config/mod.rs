@@ -9,6 +9,7 @@ use thiserror::Error;
 use url::Url;
 
 use crate::rockspec::LuaVersionCompatibility;
+use crate::tree::Tree;
 use crate::{
     build::{
         utils,
@@ -238,9 +239,8 @@ impl Config {
         self.lua_version.as_ref()
     }
 
-    // TODO(vhyrro): Return `&Tree` instead
-    pub fn tree(&self) -> &PathBuf {
-        &self.tree
+    pub fn tree(&self, version: LuaVersion) -> io::Result<Tree> {
+        Tree::new(self.tree.clone(), version)
     }
 
     /// The tree in which to install luarocks for use as a compatibility layer
@@ -454,18 +454,7 @@ impl ConfigBuilder {
             namespace: self.namespace,
             lua_dir: self.lua_dir.unwrap_or_else(|| data_dir.join("lua")),
             lua_version,
-            tree: self
-                .tree
-                .or_else(|| {
-                    if self.no_project.unwrap_or(false) {
-                        None
-                    } else {
-                        current_project
-                            .as_ref()
-                            .map(|project| project.root().join(".rocks"))
-                    }
-                })
-                .unwrap_or_else(|| data_dir.join("tree")),
+            tree: self.tree.unwrap_or_else(|| data_dir.join("tree")),
             luarocks_tree: self.luarocks_tree.unwrap_or(data_dir.join(".luarocks")),
             no_project: self.no_project.unwrap_or(false),
             verbose: self.verbose.unwrap_or(false),

@@ -8,7 +8,6 @@ use rocks_lib::{
     path::Paths,
     project::Project,
     rockspec::LuaVersionCompatibility,
-    tree::Tree,
 };
 use which::which;
 
@@ -28,7 +27,7 @@ pub async fn run(run: Run, config: Config) -> Result<()> {
         Some(prj) => prj.rocks().lua_version_matches(&config)?,
         None => LuaVersion::from(&config)?,
     };
-    let tree = Tree::new(config.tree().clone(), lua_version.clone())?;
+    let tree = config.tree(lua_version)?;
     let paths = Paths::from_tree(tree)?;
     unsafe {
         // safe as long as this is single-threaded

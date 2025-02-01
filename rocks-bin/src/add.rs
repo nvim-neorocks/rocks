@@ -1,6 +1,6 @@
 use eyre::{OptionExt, Result};
 use rocks_lib::{
-    config::{Config, LuaVersion},
+    config::Config,
     lockfile::PinnedState,
     operations,
     package::PackageReq,
@@ -36,11 +36,9 @@ pub struct Add {
 
 pub async fn add(data: Add, config: Config) -> Result<()> {
     let mut project = Project::current()?.ok_or_eyre("No project found")?;
-    let lockfile = project.lockfile()?;
 
     let pin = PinnedState::from(data.pin);
-    let lua_version = LuaVersion::from(&config)?;
-    let tree = project.tree(lua_version)?;
+    let tree = project.tree(&config)?;
     let db = RemotePackageDB::from_config(&config, &Progress::Progress(ProgressBar::new())).await?;
 
     let regular_packages = apply_build_behaviour(data.package_req, pin, data.force, &tree);
@@ -84,13 +82,13 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
             .await?;
     }
 
-    operations::Install::new(&config)
+    operations::Install::new(&tree, &config)
         .packages(regular_packages)
         .packages(build_packages)
         .packages(test_packages)
         .pin(pin)
         .progress(MultiProgress::new_arc())
-        .lockfile(lockfile)
+        .project(&project)
         .install()
         .await?;
 
