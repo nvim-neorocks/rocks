@@ -13,7 +13,7 @@ use thiserror::Error;
 use crate::{
     build::{Build, BuildBehaviour, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
-    lockfile::{LocalPackage, LocalPackageId, LockConstraint, PinnedState},
+    lockfile::{LocalPackage, LocalPackageId, PinnedState},
     lua_installation::LuaInstallation,
     lua_rockspec::{LuaRockspec, RockspecFormat},
     operations::{get_all_dependencies, SearchAndDownloadError},
@@ -108,13 +108,7 @@ impl LuaRocksInstallation {
         if !self.tree.match_rocks(&luarocks_req)?.is_found() {
             let rockspec = LuaRockspec::new(LUAROCKS_ROCKSPEC).unwrap();
             let pkg = Build::new(&rockspec, &self.config, progress)
-                .constraint(
-                    luarocks_req
-                        .version_req()
-                        .cloned()
-                        .map(LockConstraint::Constrained)
-                        .unwrap_or(LockConstraint::Unconstrained),
-                )
+                .constraint(luarocks_req.version_req().clone().into())
                 .build()
                 .await?;
             lockfile.add(&pkg);

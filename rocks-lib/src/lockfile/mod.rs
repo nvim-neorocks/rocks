@@ -424,6 +424,16 @@ impl LockConstraint {
     }
 }
 
+impl From<PackageVersionReq> for LockConstraint {
+    fn from(value: PackageVersionReq) -> Self {
+        if value.is_any() {
+            Self::Unconstrained
+        } else {
+            Self::Constrained(value)
+        }
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum LockConstraintParseError {
     #[error("Invalid constraint in LuaPackage: {0}")]
@@ -519,11 +529,7 @@ impl<P: LockfilePermissions> Lockfile<P> {
                         None => true,
                     })
                     .rev()
-                    .find(|package| {
-                        req.version_req()
-                            .unwrap_or(&PackageVersionReq::any())
-                            .matches(package.version())
-                    })
+                    .find(|package| req.version_req().matches(package.version()))
             })?
             .cloned()
     }
@@ -534,11 +540,7 @@ impl<P: LockfilePermissions> Lockfile<P> {
             Some(packages) => packages
                 .iter()
                 .rev()
-                .filter(|package| {
-                    req.version_req()
-                        .map(|req| req.matches(package.version()))
-                        .unwrap_or(true)
-                })
+                .filter(|package| req.version_req().matches(package.version()))
                 .map(|package| package.id())
                 .collect_vec(),
             None => Vec::default(),

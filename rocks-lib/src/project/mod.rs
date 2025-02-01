@@ -215,19 +215,20 @@ impl Project {
             | DependencyType::Build(ref deps)
             | DependencyType::Test(ref deps) => {
                 for dep in deps {
-                    table[dep.name().to_string()] = toml_edit::value(
-                        dep.version_req().map(|v| v.to_string()).unwrap_or(
-                            package_db
-                                .latest_version(dep.name())
-                                // This condition should never be reached, as the package should
-                                // have been found in the database or an error should have been
-                                // reported prior.
-                                // Still worth making an error message for this in the future,
-                                // though.
-                                .expect("unable to query latest version for package")
-                                .to_string(),
-                        ),
-                    );
+                    let dep_version_str = if dep.version_req().is_any() {
+                        package_db
+                            .latest_version(dep.name())
+                            // This condition should never be reached, as the package should
+                            // have been found in the database or an error should have been
+                            // reported prior.
+                            // Still worth making an error message for this in the future,
+                            // though.
+                            .expect("unable to query latest version for package")
+                            .to_string()
+                    } else {
+                        dep.version_req().to_string()
+                    };
+                    table[dep.name().to_string()] = toml_edit::value(dep_version_str);
                 }
             }
             DependencyType::External(ref deps) => {

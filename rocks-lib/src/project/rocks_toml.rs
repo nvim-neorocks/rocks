@@ -33,10 +33,7 @@ where
 
     Ok(packages.map(|pkgs| {
         pkgs.into_iter()
-            .map(|(name, version_req)| PackageReq {
-                name,
-                version_req: Some(version_req),
-            })
+            .map(|(name, version_req)| PackageReq { name, version_req })
             .collect()
     }))
 }
@@ -152,7 +149,7 @@ impl RocksToml {
                     .into_iter()
                     .chain(std::iter::once(PackageReq {
                         name: "lua".into(),
-                        version_req: rocks.lua,
+                        version_req: rocks.lua.unwrap_or(PackageVersionReq::any()),
                     }))
                     .collect(),
             ),
@@ -220,7 +217,13 @@ impl RocksToml {
                 .and_then(|deps| {
                     deps.iter()
                         .find(|dep| dep.name == "lua".into())
-                        .and_then(|dep| dep.version_req.clone())
+                        .and_then(|dep| {
+                            if dep.version_req.is_any() {
+                                None
+                            } else {
+                                Some(dep.version_req.clone())
+                            }
+                        })
                 })
                 .or(self.lua),
             build: other.build.unwrap_or(self.build),
@@ -275,7 +278,7 @@ version = "{}""#,
                 0,
                 PackageReq {
                     name: "lua".into(),
-                    version_req: Some(self.lua.clone()),
+                    version_req: self.lua.clone(),
                 },
             );
             template.push(Dependencies(&dependencies).display_lua());
@@ -352,11 +355,9 @@ impl LuaVersionCompatibility for RocksToml {
             .collect_vec();
         let lua_pkg_version = lua_version.as_version();
         lua_version_reqs.is_empty()
-            || lua_version_reqs.into_iter().any(|lua| {
-                lua.version_req()
-                    .map(|req| req.matches(&lua_pkg_version))
-                    .unwrap_or(true)
-            })
+            || lua_version_reqs
+                .into_iter()
+                .any(|lua| lua.version_req().matches(&lua_pkg_version))
     }
 
     fn lua_version(&self) -> Option<LuaVersion> {

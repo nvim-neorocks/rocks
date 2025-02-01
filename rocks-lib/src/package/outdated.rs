@@ -11,10 +11,10 @@ use super::{version::PackageVersion, PackageName, PackageReq, PackageSpec, Packa
 pub struct RockNotFound(PackageName);
 
 #[derive(Error, Debug)]
-#[error("rock {} has no version that satisfies constraint {}", .name, .constraint.as_ref().map(|c| c.to_string()).unwrap_or("any".into()))]
+#[error("rock {} has no version that satisfies constraint {}", .name, .constraint.to_string())]
 pub struct RockConstraintUnsatisfied {
     name: PackageName,
-    constraint: Option<PackageVersionReq>,
+    constraint: PackageVersionReq,
 }
 
 impl PackageSpec {
