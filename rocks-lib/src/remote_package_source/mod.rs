@@ -10,7 +10,7 @@ const PLUS: &str = "+";
 // because adding variants would be a breaking change.
 
 /// The source of a remote package.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub(crate) enum RemotePackageSource {
     LuarocksRockspec(Url),
     LuarocksSrcRock(Url),

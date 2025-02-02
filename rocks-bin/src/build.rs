@@ -8,11 +8,10 @@ use rocks_lib::{
     build::{self, BuildBehaviour},
     config::Config,
     lockfile::PinnedState,
-    operations::Install,
+    operations::{Install, Sync},
     package::PackageName,
     progress::MultiProgress,
     project::Project,
-    remote_package_db::RemotePackageDB,
     rockspec::Rockspec,
 };
 
@@ -25,10 +24,6 @@ pub struct Build {
     /// Ignore the project's existing lockfile.
     #[arg(long)]
     ignore_lockfile: bool,
-
-    /// Do not create a lockfile.
-    #[arg(long)]
-    no_lock: bool,
 }
 
 pub async fn build(data: Build, config: Config) -> Result<()> {
@@ -37,44 +32,54 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     let progress_arc = MultiProgress::new_arc();
     let progress = Arc::clone(&progress_arc);
 
-    let bar = progress.map(|p| p.new_bar());
-    let package_db = match project.try_lockfile()? {
-        None => RemotePackageDB::from_config(&config, &bar).await?,
-        Some(_) if data.ignore_lockfile => RemotePackageDB::from_config(&config, &bar).await?,
-        Some(lockfile) => lockfile.into(),
-    };
-
-    bar.map(|b| b.finish_and_clear());
     let tree = project.tree(&config)?;
     let rocks = project.new_local_rockspec()?;
 
-    // Ensure all dependencies are installed first
+    let lockfile = match project.try_lockfile()? {
+        None => None,
+        Some(_) if data.ignore_lockfile => None,
+        Some(lockfile) => Some(lockfile),
+    };
+
     let dependencies = rocks
         .dependencies()
         .current_platform()
         .iter()
         .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
+        .cloned()
         .collect_vec();
 
-    let dependencies_to_install = dependencies
-        .into_iter()
-        .filter(|req| {
-            tree.match_rocks(req)
-                .is_ok_and(|rock_match| !rock_match.is_found())
-        })
-        .map(|dep| (BuildBehaviour::NoForce, dep.to_owned()));
+    match lockfile {
+        Some(mut project_lockfile) => {
+            Sync::new(&tree, &mut project_lockfile, &config)
+                .progress(progress.clone())
+                .packages(dependencies)
+                .sync()
+                .await
+                .wrap_err(
+                    "
+syncing with the project lockfile failed.
+Use --ignore-lockfile to force a new build.
+",
+                )?;
+        }
+        None => {
+            let dependencies_to_install = dependencies
+                .into_iter()
+                .filter(|req| {
+                    tree.match_rocks(req)
+                        .is_ok_and(|rock_match| !rock_match.is_found())
+                })
+                .map(|dep| (BuildBehaviour::NoForce, dep));
 
-    Install::new(&tree, &config)
-        .packages(dependencies_to_install)
-        .pin(pin)
-        .package_db(package_db)
-        .progress(progress_arc)
-        .install()
-        .await?;
-
-    if !data.no_lock {
-        std::fs::copy(tree.lockfile_path(), project.lockfile_path())
-            .wrap_err("error copying the project lockfile")?;
+            Install::new(&tree, &config)
+                .packages(dependencies_to_install)
+                .project(&project)
+                .pin(pin)
+                .progress(progress.clone())
+                .install()
+                .await?;
+        }
     }
 
     build::Build::new(&rocks, &tree, &config, &progress.map(|p| p.new_bar()))

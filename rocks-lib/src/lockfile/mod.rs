@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::Display;
 use std::io::{self, Write};
@@ -202,7 +203,7 @@ impl LocalPackageSpec {
 }
 
 // TODO(vhyrro): Move to `package/local.rs`
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LocalPackage {
     pub(crate) spec: LocalPackageSpec,
     pub(crate) source: RemotePackageSource,
@@ -212,6 +213,10 @@ pub struct LocalPackage {
 impl LocalPackage {
     pub fn into_package_spec(self) -> PackageSpec {
         PackageSpec::new(self.spec.name, self.spec.version)
+    }
+
+    pub fn as_package_spec(&self) -> PackageSpec {
+        PackageSpec::new(self.spec.name.clone(), self.spec.version.clone())
     }
 }
 
@@ -375,7 +380,7 @@ impl mlua::UserData for LocalPackage {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Hash)]
 pub struct LocalPackageHashes {
     pub rockspec: Integrity,
     pub source: Integrity,
@@ -473,7 +478,7 @@ pub struct Lockfile<P: LockfilePermissions> {
     version: String,
     // NOTE: We cannot directly serialize to a `Sha256` object as they don't implement serde traits.
     rocks: HashMap<LocalPackageId, LocalPackage>,
-    entrypoints: Vec<LocalPackageId>,
+    entrypoints: HashSet<LocalPackageId>,
 }
 
 #[derive(Error, Debug)]
@@ -484,6 +489,13 @@ pub enum LockfileIntegrityError {
     SourceIntegrityMismatch { expected: Integrity, got: Integrity },
     #[error("package {0} version {1} with pinned state {2} and constraint {3} not found in the lockfile.")]
     PackageNotFound(PackageName, PackageVersion, PinnedState, String),
+}
+
+/// A specification for syncing a list of packages with a lockfile
+#[derive(Debug, Default)]
+pub(crate) struct PackageSyncSpec {
+    pub to_add: Vec<PackageReq>,
+    pub to_remove: Vec<LocalPackage>,
 }
 
 impl<P: LockfilePermissions> Lockfile<P> {
@@ -552,42 +564,41 @@ impl<P: LockfilePermissions> Lockfile<P> {
         &self,
         package: &LocalPackage,
     ) -> Result<(), LockfileIntegrityError> {
-        match self.get(&package.id()) {
-            Some(expected_package) => {
-                if package
-                    .hashes
-                    .rockspec
-                    .matches(&expected_package.hashes.rockspec)
-                    .is_none()
-                {
-                    return Err(LockfileIntegrityError::RockspecIntegrityMismatch {
-                        expected: expected_package.hashes.rockspec.clone(),
-                        got: package.hashes.rockspec.clone(),
-                    });
+        // NOTE: We can't query by ID, because when installing from a lockfile (e.g. during sync),
+        // the constraint is always `==`.
+        match self.list().get(package.name()) {
+            None => Err(integrity_err_not_found(package)),
+            Some(rocks) => match rocks
+                .iter()
+                .find(|rock| rock.version() == package.version())
+            {
+                None => Err(integrity_err_not_found(package)),
+                Some(expected_package) => {
+                    if package
+                        .hashes
+                        .rockspec
+                        .matches(&expected_package.hashes.rockspec)
+                        .is_none()
+                    {
+                        return Err(LockfileIntegrityError::RockspecIntegrityMismatch {
+                            expected: expected_package.hashes.rockspec.clone(),
+                            got: package.hashes.rockspec.clone(),
+                        });
+                    }
+                    if package
+                        .hashes
+                        .source
+                        .matches(&expected_package.hashes.source)
+                        .is_none()
+                    {
+                        return Err(LockfileIntegrityError::SourceIntegrityMismatch {
+                            expected: expected_package.hashes.source.clone(),
+                            got: package.hashes.source.clone(),
+                        });
+                    }
+                    Ok(())
                 }
-                if package
-                    .hashes
-                    .source
-                    .matches(&expected_package.hashes.source)
-                    .is_none()
-                {
-                    return Err(LockfileIntegrityError::SourceIntegrityMismatch {
-                        expected: expected_package.hashes.source.clone(),
-                        got: package.hashes.source.clone(),
-                    });
-                }
-                Ok(())
-            }
-            None => Err(LockfileIntegrityError::PackageNotFound(
-                package.name().clone(),
-                package.version().clone(),
-                package.spec.pinned,
-                package
-                    .spec
-                    .constraint
-                    .clone()
-                    .unwrap_or("UNCONSTRAINED".into()),
-            )),
+            },
         }
     }
 
@@ -614,7 +625,7 @@ impl<P: LockfilePermissions> Lockfile<P> {
 }
 
 impl Lockfile<ReadOnly> {
-    pub(crate) fn new(filepath: PathBuf) -> io::Result<Lockfile<ReadOnly>> {
+    pub fn new(filepath: PathBuf) -> io::Result<Lockfile<ReadOnly>> {
         // Ensure that the lockfile exists
         match File::options().create_new(true).write(true).open(&filepath) {
             Ok(mut file) => {
@@ -639,6 +650,62 @@ impl Lockfile<ReadOnly> {
         new.filepath = filepath;
 
         Ok(new)
+    }
+
+    /// Synchronise a list of packages with this lockfile,
+    /// producing a report of packages to add and packages to remove.
+    ///
+    /// NOTE: The reason we produce a report and don't add/remove packages
+    /// here is because packages need to be installed in order to be added.
+    pub(crate) fn package_sync_spec(&self, packages: &[PackageReq]) -> PackageSyncSpec {
+        let (entrypoints_to_keep, entrypoints_to_remove): (Vec<LocalPackage>, Vec<LocalPackage>) =
+            self.entrypoints
+                .iter()
+                .map(|id| {
+                    self.get(id)
+                        .expect("entrypoint not found in malformed lockfile.")
+                })
+                .cloned()
+                .partition(|local_pkg| {
+                    packages
+                        .iter()
+                        .any(|req| req.matches(&local_pkg.as_package_spec()))
+                });
+
+        let packages_to_keep: HashSet<&LocalPackage> = entrypoints_to_keep
+            .iter()
+            .flat_map(|local_pkg| self.get_all_dependencies(&local_pkg.id()))
+            .collect();
+
+        let to_add = packages
+            .iter()
+            .filter(|pkg| self.has_rock(pkg, None).is_none())
+            .cloned()
+            .collect_vec();
+
+        let to_remove = entrypoints_to_remove
+            .iter()
+            .flat_map(|local_pkg| self.get_all_dependencies(&local_pkg.id()))
+            .filter(|dependency| !packages_to_keep.contains(dependency))
+            .cloned()
+            .collect_vec();
+
+        PackageSyncSpec { to_add, to_remove }
+    }
+
+    /// Return all dependencies of a package, including itself
+    fn get_all_dependencies(&self, id: &LocalPackageId) -> HashSet<&LocalPackage> {
+        let mut packages = HashSet::new();
+        if let Some(local_pkg) = self.get(id) {
+            packages.insert(local_pkg);
+            packages.extend(
+                local_pkg
+                    .dependencies()
+                    .iter()
+                    .flat_map(|id| self.get_all_dependencies(id)),
+            );
+        }
+        packages
     }
 
     /// Creates a temporary, writeable lockfile which can never flush.
@@ -720,6 +787,12 @@ impl Lockfile<ReadWrite> {
 
     pub(crate) fn remove_by_id(&mut self, target: &LocalPackageId) {
         self.rocks.remove(target);
+        self.entrypoints.remove(target);
+    }
+
+    pub(crate) fn sync_lockfile(&mut self, other: &Lockfile<ReadOnly>) {
+        self.rocks = other.rocks.clone();
+        self.entrypoints = other.entrypoints.clone();
     }
 
     // TODO: `fn entrypoints() -> Vec<LockedRock>`
@@ -800,6 +873,19 @@ impl mlua::UserData for Lockfile<ReadWrite> {
         });
         methods.add_method_mut("flush", |_, this, ()| this.flush().into_lua_err());
     }
+}
+
+fn integrity_err_not_found(package: &LocalPackage) -> LockfileIntegrityError {
+    LockfileIntegrityError::PackageNotFound(
+        package.name().clone(),
+        package.version().clone(),
+        package.spec.pinned,
+        package
+            .spec
+            .constraint
+            .clone()
+            .unwrap_or("UNCONSTRAINED".into()),
+    )
 }
 
 #[cfg(test)]
@@ -888,5 +974,90 @@ mod tests {
         let tree = Tree::new(temp.to_path_buf(), Lua51).unwrap();
 
         let _ = tree.lockfile().unwrap().write_guard(); // Try to create the lockfile but don't actually do anything with it.
+    }
+
+    fn get_test_lockfile() -> Lockfile<ReadOnly> {
+        let sample_tree = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources/test/sample-tree/5.1/lock.json");
+        Lockfile::new(sample_tree).unwrap()
+    }
+
+    #[test]
+    fn test_sync_spec() {
+        let lockfile = get_test_lockfile();
+        let packages = vec![
+            PackageReq::parse("neorg@8.8.1-1").unwrap(),
+            PackageReq::parse("lua-cjson@2.1.0-1").unwrap(),
+            PackageReq::parse("nonexistent").unwrap(),
+        ];
+
+        let sync_spec = lockfile.package_sync_spec(&packages);
+
+        assert_eq!(sync_spec.to_add.len(), 1);
+
+        // Should remove:
+        // - say (not requested)
+        // - neorg 8.0.0-1 (older version)
+        // - dependencies unique to neorg 8.0.0-1
+        assert!(sync_spec
+            .to_remove
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "say"
+                && pkg.version() == &"1.4.1-3".parse().unwrap()));
+        assert!(sync_spec
+            .to_remove
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "neorg"
+                && pkg.version() == &"8.0.0-1".parse().unwrap()));
+        assert!(sync_spec
+            .to_remove
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "lua-utils.nvim"
+                && pkg.constraint() == LockConstraint::Unconstrained));
+        assert!(sync_spec
+            .to_remove
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "nvim-nio"
+                && pkg.constraint() == LockConstraint::Unconstrained));
+
+        // Should keep dependencies of neorg 8.8.1-1
+        assert!(!sync_spec
+            .to_remove
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "nvim-nio"
+                && pkg.constraint()
+                    == LockConstraint::Constrained(">=1.7.0, <1.8.0".parse().unwrap())));
+        assert!(!sync_spec
+            .to_remove
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "lua-utils.nvim"
+                && pkg.constraint() == LockConstraint::Constrained("=1.0.2".parse().unwrap())));
+        assert!(!sync_spec
+            .to_remove
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "plenary.nvim"
+                && pkg.constraint() == LockConstraint::Constrained("=0.1.4".parse().unwrap())));
+        assert!(!sync_spec
+            .to_remove
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "nui.nvim"
+                && pkg.constraint() == LockConstraint::Constrained("=0.3.0".parse().unwrap())));
+        assert!(!sync_spec
+            .to_remove
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "pathlib.nvim"
+                && pkg.constraint()
+                    == LockConstraint::Constrained(">=2.2.0, <2.3.0".parse().unwrap())));
+    }
+
+    #[test]
+    fn test_sync_spec_empty() {
+        let lockfile = get_test_lockfile();
+        let packages = vec![];
+        let sync_spec = lockfile.package_sync_spec(&packages);
+
+        // Should remove all packages
+        assert!(sync_spec.to_add.is_empty());
+        assert_eq!(sync_spec.to_remove.len(), lockfile.rocks().len());
     }
 }

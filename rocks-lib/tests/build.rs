@@ -1,21 +1,10 @@
 use std::path::PathBuf;
 
-use assert_fs::prelude::PathCopy;
-use itertools::Itertools;
 use rocks_lib::{
-    build::{
-        Build,
-        BuildBehaviour::{self, Force},
-    },
+    build::{Build, BuildBehaviour::Force},
     config::{ConfigBuilder, LuaVersion},
-    lockfile::PinnedState,
     lua_rockspec::LuaRockspec,
-    operations::{Install, LockfileUpdate},
-    package::PackageName,
     progress::{MultiProgress, Progress},
-    project::Project,
-    remote_package_db::RemotePackageDB,
-    rockspec::Rockspec,
 };
 use tempdir::TempDir;
 
@@ -88,51 +77,6 @@ async fn command_build() {
         return;
     }
     test_build_rockspec("resources/test/luaposix-35.1-1.rockspec".into()).await
-}
-
-#[tokio::test]
-async fn lockfile_update() {
-    let config = ConfigBuilder::new()
-        .unwrap()
-        .tree(Some(assert_fs::TempDir::new().unwrap().path().into()))
-        .build()
-        .unwrap();
-    let sample_project: PathBuf = "resources/test/sample-project-lockfile-missing-deps".into();
-    let project_root = assert_fs::TempDir::new().unwrap();
-    project_root.copy_from(&sample_project, &["**"]).unwrap();
-    let project_root: PathBuf = project_root.path().into();
-    let project = Project::from(project_root).unwrap().unwrap();
-    let dependencies = project
-        .rocks()
-        .into_validated_rocks_toml()
-        .unwrap()
-        .dependencies()
-        .current_platform()
-        .iter()
-        .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
-        .cloned()
-        .collect_vec();
-    let mut lockfile = project.try_lockfile().unwrap().unwrap();
-    LockfileUpdate::new(&mut lockfile, &config)
-        .packages(dependencies.clone())
-        .add_missing_packages()
-        .await
-        .unwrap();
-    let package_db: RemotePackageDB = lockfile.into();
-
-    let tree = project.tree(&config).unwrap();
-
-    Install::new(&tree, &config)
-        .packages(
-            dependencies
-                .iter()
-                .map(|dep| (BuildBehaviour::NoForce, dep.to_owned())),
-        )
-        .pin(PinnedState::Unpinned)
-        .package_db(package_db)
-        .install()
-        .await
-        .unwrap();
 }
 
 async fn test_build_rockspec(rockspec_path: PathBuf) {
