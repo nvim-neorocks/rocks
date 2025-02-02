@@ -17,7 +17,7 @@ pub struct Paths {
 }
 
 impl Paths {
-    pub fn from_tree(tree: Tree) -> io::Result<Self> {
+    pub fn new(tree: Tree) -> io::Result<Self> {
         let paths = tree
             .list()?
             .into_iter()
@@ -61,6 +61,12 @@ impl Paths {
         path.prepend(self.path());
         path
     }
+
+    pub fn prepend(&mut self, other: &Self) {
+        self.src.prepend(&other.src);
+        self.lib.prepend(&other.lib);
+        self.bin.prepend(&other.bin);
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, Default, Serialize)]
@@ -78,6 +84,7 @@ impl PackagePath {
     pub fn joined(&self) -> String {
         self.0
             .iter()
+            .unique()
             .map(|path| path.to_string_lossy())
             .join(LUA_PATH_SEPARATOR)
     }
@@ -119,7 +126,7 @@ impl BinPath {
         self.0.is_empty()
     }
     pub fn joined(&self) -> String {
-        env::join_paths(self.0.iter())
+        env::join_paths(self.0.iter().unique())
             .expect("Failed to join bin paths.")
             .to_string_lossy()
             .to_string()

@@ -2,7 +2,7 @@ use std::{collections::HashMap, io, sync::Arc};
 
 use crate::{
     build::{Build, BuildBehaviour, BuildError},
-    config::{Config, LuaVersion, LuaVersionUnset},
+    config::{Config, LuaVersionUnset},
     lockfile::{
         LocalPackage, LocalPackageId, LockConstraint, Lockfile, PinnedState, ReadOnly, ReadWrite,
     },
@@ -16,7 +16,7 @@ use crate::{
     },
     package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress, ProgressBar},
-    project::Project,
+    project::{Project, ProjectTreeError},
     remote_package_db::{RemotePackageDB, RemotePackageDBError, RemotePackageDbIntegrityError},
     rockspec::Rockspec,
     tree::Tree,
@@ -152,6 +152,8 @@ pub enum InstallError {
     InstallBinaryRockError(PackageName, InstallBinaryRockError),
     #[error("integrity error for package {0}: {1}\n")]
     Integrity(PackageName, RemotePackageDbIntegrityError),
+    #[error(transparent)]
+    ProjectTreeError(#[from] ProjectTreeError),
 }
 
 async fn install(
@@ -165,15 +167,16 @@ async fn install(
 ) -> Result<Vec<LocalPackage>, InstallError>
 where
 {
-    let lockfile = config.tree(LuaVersion::from(config)?)?.lockfile()?;
+    let lockfile = tree.lockfile()?;
     let project_lockfile = project.map(|p| p.lockfile()).transpose()?;
+    let tree = project.map_or(Ok(tree.clone()), |p| p.tree(config))?;
 
     install_impl(
         packages,
         pin,
         Arc::new(package_db),
         config,
-        tree,
+        &tree,
         lockfile,
         project_lockfile,
         progress,

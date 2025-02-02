@@ -62,7 +62,7 @@ pub enum RunError {
 async fn run(run: Run<'_>) -> Result<(), RunError> {
     let lua_version = LuaVersion::from(run.config)?;
     let tree = run.config.tree(lua_version)?;
-    let paths = Paths::from_tree(tree)?;
+    let paths = Paths::new(tree)?;
 
     let status = match Command::new(run.command)
         .args(run.args)

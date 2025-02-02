@@ -74,7 +74,7 @@ impl Default for Shell {
 
 pub async fn path(path_data: Path, config: Config) -> Result<()> {
     let tree = config.tree(LuaVersion::from(&config)?)?;
-    let paths = Paths::from_tree(tree)?;
+    let paths = Paths::new(tree)?;
     let cmd = path_data.cmd.unwrap_or_default();
     let prepend = path_data.prepend;
     match cmd {

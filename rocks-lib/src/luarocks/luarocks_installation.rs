@@ -238,7 +238,7 @@ impl LuaRocksInstallation {
         cwd: &Path,
         lua: &LuaInstallation,
     ) -> Result<(), ExecLuaRocksError> {
-        let luarocks_paths = Paths::from_tree(self.tree)?;
+        let luarocks_paths = Paths::new(self.tree)?;
         // Ensure a pure environment so we can do parallel builds
         let temp_dir = TempDir::new("rocks-run-luarocks").unwrap();
         let luarocks_config_content = format!(

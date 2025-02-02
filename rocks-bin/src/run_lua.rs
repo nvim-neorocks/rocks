@@ -55,7 +55,17 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
         }
     }
     let tree = config.tree(lua_version)?;
-    let paths = Paths::from_tree(tree)?;
+
+    let paths = if let Some(project) = project {
+        let mut paths = Paths::new(tree)?;
+
+        paths.prepend(&Paths::new(project.tree(&config)?)?);
+
+        paths
+    } else {
+        Paths::new(tree)?
+    };
+
     let status = match Command::new(&lua_cmd)
         .args(run_lua.args.unwrap_or_default())
         .env("PATH", paths.path_prepended().joined())
