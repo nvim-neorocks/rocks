@@ -1,7 +1,10 @@
 //! Structs and utilities for `lux.toml`
 
+use crate::rockspec::ambassador_impl_LocalRockspec;
+use crate::rockspec::RockBinaries;
 use std::{collections::HashMap, path::PathBuf};
 
+use ambassador::Delegate;
 use itertools::Itertools;
 use serde::{Deserialize, Deserializer};
 use thiserror::Error;
@@ -40,13 +43,9 @@ where
 }
 
 #[derive(Debug, Error)]
-pub enum ProjectTomlValidationError {
-    #[error("no source url provided")]
-    NoSource,
+pub enum LocalProjectTomlValidationError {
     #[error("no lua version provided")]
     NoLuaVersion,
-    #[error(transparent)]
-    RockSourceError(#[from] RockSourceError),
     #[error(transparent)]
     TestSpecError(#[from] TestSpecError),
     #[error(transparent)]
@@ -57,11 +56,21 @@ pub enum ProjectTomlValidationError {
     CopyDirectoriesContainRockspecName(Option<String>),
 }
 
+#[derive(Debug, Error)]
+pub enum RemoteProjectTomlValidationError {
+    #[error("no source url provided")]
+    NoSource,
+    #[error(transparent)]
+    LocalProjectTomlValidationError(#[from] LocalProjectTomlValidationError),
+    #[error(transparent)]
+    RockSourceError(#[from] RockSourceError),
+}
+
 /// The `lux.toml` file.
 /// The only required fields are `package` and `build`, which are required to build a project using `lux build`.
 /// The rest of the fields are optional, but are required to build a rockspec.
 #[derive(Clone, Debug, Deserialize)]
-pub struct ProjectToml {
+pub struct PartialProjectToml {
     pub(crate) package: PackageName,
     pub(crate) version: PackageVersion,
     pub(crate) build: BuildSpecInternal,
@@ -86,9 +95,8 @@ pub struct ProjectToml {
     pub(crate) test: Option<TestSpecInternal>,
 }
 
-/// Equivalent to [`ProjectToml`], but with all fields required
 #[derive(Debug)]
-pub struct ProjectTomlValidated {
+pub struct LocalProjectToml {
     package: PackageName,
     version: PackageVersion,
     lua: PackageVersionReq,
@@ -99,23 +107,29 @@ pub struct ProjectTomlValidated {
     build_dependencies: PerPlatform<Vec<PackageReq>>,
     external_dependencies: PerPlatform<HashMap<String, ExternalDependencySpec>>,
     test_dependencies: PerPlatform<Vec<PackageReq>>,
-    source: PerPlatform<RemoteRockSource>,
     test: PerPlatform<TestSpec>,
     build: PerPlatform<BuildSpec>,
 
     // Used for simpler serialization
-    internal: ProjectToml,
+    internal: PartialProjectToml,
 }
 
-impl ProjectToml {
+#[derive(Debug, Delegate)]
+#[delegate(LocalRockspec, target = "local")]
+pub struct RemoteProjectToml {
+    local: LocalProjectToml,
+    source: PerPlatform<RemoteRockSource>,
+}
+
+impl PartialProjectToml {
     pub fn new(str: &str) -> Result<Self, toml::de::Error> {
         toml::from_str(str)
     }
 
-    pub fn into_validated(&self) -> Result<ProjectTomlValidated, ProjectTomlValidationError> {
+    pub fn into_local(&self) -> Result<LocalProjectToml, LocalProjectTomlValidationError> {
         let project = self.clone();
 
-        let validated = ProjectTomlValidated {
+        let validated = LocalProjectToml {
             internal: project.clone(),
 
             package: project.package,
@@ -123,7 +137,7 @@ impl ProjectToml {
             lua: project
                 .lua
                 .clone()
-                .ok_or(ProjectTomlValidationError::NoLuaVersion)?,
+                .ok_or(LocalProjectTomlValidationError::NoLuaVersion)?,
             description: project.description.unwrap_or_default(),
             supported_platforms: PlatformSupport::parse(
                 &project
@@ -157,14 +171,11 @@ impl ProjectToml {
                 project.external_dependencies.unwrap_or_default(),
             ),
             test_dependencies: PerPlatform::new(project.test_dependencies.unwrap_or_default()),
-            source: PerPlatform::new(RemoteRockSource::from_platform_overridable(
-                project.source.ok_or(ProjectTomlValidationError::NoSource)?,
-            )?),
             test: PerPlatform::new(TestSpec::from_platform_overridable(
                 project.test.clone().unwrap_or_default(),
             )?),
             build: PerPlatform::new(BuildSpec::from_internal_spec(project.build.clone())?),
-            rockspec_format: self.rockspec_format.clone(),
+            rockspec_format: project.rockspec_format.clone(),
         };
 
         let rockspec_file_name = format!("{}-{}.rockspec", validated.package, validated.version);
@@ -175,7 +186,7 @@ impl ProjectToml {
             .copy_directories
             .contains(&PathBuf::from(&rockspec_file_name))
         {
-            return Err(ProjectTomlValidationError::CopyDirectoriesContainRockspecName(None));
+            return Err(LocalProjectTomlValidationError::CopyDirectoriesContainRockspecName(None));
         }
 
         for (platform, build_override) in &validated.build.per_platform {
@@ -184,12 +195,25 @@ impl ProjectToml {
                 .contains(&PathBuf::from(&rockspec_file_name))
             {
                 return Err(
-                    ProjectTomlValidationError::CopyDirectoriesContainRockspecName(Some(
+                    LocalProjectTomlValidationError::CopyDirectoriesContainRockspecName(Some(
                         platform.to_string(),
                     )),
                 );
             }
         }
+
+        Ok(validated)
+    }
+
+    pub fn into_remote(&self) -> Result<RemoteProjectToml, RemoteProjectTomlValidationError> {
+        let validated = RemoteProjectToml {
+            source: PerPlatform::new(RemoteRockSource::from_platform_overridable(
+                self.source
+                    .clone()
+                    .ok_or(RemoteProjectTomlValidationError::NoSource)?,
+            )?),
+            local: self.into_local()?,
+        };
 
         Ok(validated)
     }
@@ -207,7 +231,7 @@ impl ProjectToml {
     /// Merge the `ProjectToml` struct with an unvalidated `LuaRockspec`.
     /// The final merged struct can then be validated.
     pub fn merge(self, other: PartialLuaRockspec) -> Self {
-        ProjectToml {
+        PartialProjectToml {
             package: other.package.unwrap_or(self.package),
             version: other.version.unwrap_or(self.version),
             lua: other
@@ -249,70 +273,70 @@ impl ProjectToml {
     }
 }
 
-impl ProjectTomlValidated {
+impl RemoteProjectToml {
     pub fn to_rockspec_string(&self) -> String {
         let starter = format!(
             r#"
 rockspec_format = "{}"
 package = "{}"
 version = "{}""#,
-            self.rockspec_format.as_ref().unwrap_or(&"3.0".into()),
-            self.package,
-            self.version
+            self.local.rockspec_format.as_ref().unwrap_or(&"3.0".into()),
+            self.local.package,
+            self.local.version
         );
 
         let mut template = Vec::new();
 
-        if self.description != RockDescription::default() {
-            template.push(self.description.display_lua());
+        if self.local.description != RockDescription::default() {
+            template.push(self.local.description.display_lua());
         }
 
-        if self.supported_platforms != PlatformSupport::default() {
-            template.push(self.supported_platforms.display_lua());
+        if self.local.supported_platforms != PlatformSupport::default() {
+            template.push(self.local.supported_platforms.display_lua());
         }
 
         {
-            let mut dependencies = self.internal.dependencies.clone().unwrap_or_default();
+            let mut dependencies = self.local.internal.dependencies.clone().unwrap_or_default();
             dependencies.insert(
                 0,
                 PackageReq {
                     name: "lua".into(),
-                    version_req: self.lua.clone(),
+                    version_req: self.local.lua.clone(),
                 },
             );
             template.push(Dependencies(&dependencies).display_lua());
         }
 
-        match self.internal.build_dependencies {
+        match self.local.internal.build_dependencies {
             Some(ref build_dependencies) if !build_dependencies.is_empty() => {
                 template.push(BuildDependencies(build_dependencies).display_lua());
             }
             _ => {}
         }
 
-        match self.internal.external_dependencies {
+        match self.local.internal.external_dependencies {
             Some(ref external_dependencies) if !external_dependencies.is_empty() => {
                 template.push(ExternalDependencies(external_dependencies).display_lua());
             }
             _ => {}
         }
 
-        match self.internal.test_dependencies {
+        match self.local.internal.test_dependencies {
             Some(ref test_dependencies) if !test_dependencies.is_empty() => {
                 template.push(TestDependencies(test_dependencies).display_lua());
             }
             _ => {}
         }
 
-        if let Some(ref source) = self.internal.source {
+        if let Some(ref source) = self.local.internal.source {
             template.push(source.display_lua());
         }
 
-        if let Some(ref test) = self.internal.test {
+        if let Some(ref test) = self.local.internal.test {
             template.push(test.display_lua());
         }
 
-        template.push(self.internal.build.display_lua());
+        template.push(self.local.internal.build.display_lua());
 
         std::iter::once(starter)
             .chain(template.into_iter().map(|kv| kv.to_string()))
@@ -327,7 +351,7 @@ version = "{}""#,
 // This is automatically implemented for `RocksTomlValidated` by `Rockspec`,
 // but we also add a special implementation for `ProjectToml` (as providing a lua version)
 // is required even by the non-validated struct.
-impl LuaVersionCompatibility for ProjectToml {
+impl LuaVersionCompatibility for PartialProjectToml {
     fn validate_lua_version(&self, config: &Config) -> Result<(), LuaVersionError> {
         let _ = self.lua_version_matches(config)?;
         Ok(())
@@ -381,7 +405,7 @@ impl LuaVersionCompatibility for ProjectToml {
     }
 }
 
-impl LocalRockspec for ProjectTomlValidated {
+impl LocalRockspec for LocalProjectToml {
     fn package(&self) -> &PackageName {
         &self.package
     }
@@ -435,7 +459,7 @@ impl LocalRockspec for ProjectTomlValidated {
     }
 }
 
-impl RemoteRockspec for ProjectTomlValidated {
+impl RemoteRockspec for RemoteProjectToml {
     fn source(&self) -> &PerPlatform<RemoteRockSource> {
         &self.source
     }
@@ -457,7 +481,7 @@ mod tests {
         rockspec::{LocalRockspec, RemoteRockspec},
     };
 
-    use super::ProjectToml;
+    use super::PartialProjectToml;
 
     #[test]
     fn project_toml_parsing() {
@@ -479,8 +503,8 @@ mod tests {
         type = "builtin"
         "#;
 
-        let project = ProjectToml::new(project_toml).unwrap();
-        let _ = project.into_validated().unwrap();
+        let project = PartialProjectToml::new(project_toml).unwrap();
+        let _ = project.into_remote().unwrap();
 
         let project_toml = r#"
         package = "my-package"
@@ -531,8 +555,8 @@ mod tests {
         type = "builtin"
         "#;
 
-        let project = ProjectToml::new(project_toml).unwrap();
-        let _ = project.into_validated().unwrap();
+        let project = PartialProjectToml::new(project_toml).unwrap();
+        let _ = project.into_remote().unwrap();
     }
 
     #[test]
@@ -646,12 +670,8 @@ mod tests {
 
         let expected_rockspec = RemoteLuaRockspec::new(expected_rockspec).unwrap();
 
-        let project_toml = ProjectToml::new(project_toml).unwrap();
-        let rockspec = project_toml
-            .into_validated()
-            .unwrap()
-            .to_rockspec()
-            .unwrap();
+        let project_toml = PartialProjectToml::new(project_toml).unwrap();
+        let rockspec = project_toml.into_remote().unwrap().to_rockspec().unwrap();
 
         let sorted_package_reqs = |v: &PerPlatform<Vec<PackageReq>>| {
             let mut v = v.current_platform().clone();
@@ -798,14 +818,11 @@ mod tests {
             }
         "#;
 
-        let project_toml = ProjectToml::new(project_toml).unwrap();
+        let project_toml = PartialProjectToml::new(project_toml).unwrap();
         let partial_rockspec = PartialLuaRockspec::new(mergable_rockspec_content).unwrap();
         let expected_rockspec = RemoteLuaRockspec::new(mergable_rockspec_content).unwrap();
 
-        let merged = project_toml
-            .merge(partial_rockspec)
-            .into_validated()
-            .unwrap();
+        let merged = project_toml.merge(partial_rockspec).into_remote().unwrap();
 
         let sorted_package_reqs = |v: &PerPlatform<Vec<PackageReq>>| {
             let mut v = v.current_platform().clone();
