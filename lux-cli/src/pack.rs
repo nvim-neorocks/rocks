@@ -9,7 +9,7 @@ use lux_lib::{
     operations::{self, Install},
     package::PackageReq,
     progress::MultiProgress,
-    project::{project_toml::ProjectToml, Project},
+    project::{project_toml::PartialProjectToml, Project},
     tree::Tree,
 };
 use tempdir::TempDir;
@@ -107,8 +107,8 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
                 .as_str()
             {
                 ".rockspec" => Ok(RemoteLuaRockspec::new(&content)?),
-                ".toml" => Ok(ProjectToml::new(&content)?
-                    .into_validated()?
+                ".toml" => Ok(PartialProjectToml::new(&content)?
+                    .into_remote()?
                     .to_rockspec()?),
                 _ => Err(eyre!(
                     "expected a path to a .rockspec or lux.toml or a package requirement."

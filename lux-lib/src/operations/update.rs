@@ -121,7 +121,7 @@ async fn update_project(
     args: Update<'_>,
     package_db: RemotePackageDB,
 ) -> Result<Vec<LocalPackage>, UpdateError> {
-    let toml = project.toml().into_validated().unwrap(); // TODO(mrcjkb): rebase on vhyrro's build refactor
+    let toml = project.toml().into_local().unwrap();
     let mut project_lockfile = project.lockfile()?.write_guard();
     let tree = project.tree(args.config)?;
 

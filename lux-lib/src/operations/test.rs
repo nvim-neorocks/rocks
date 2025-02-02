@@ -6,8 +6,8 @@ use crate::{
     package::{PackageName, PackageReq, PackageVersionReqError},
     path::Paths,
     progress::{MultiProgress, Progress},
-    project::{project_toml::ProjectTomlValidationError, Project, ProjectTreeError},
-    rockspec::{LocalRockspec, RemoteRockspec},
+    project::{project_toml::LocalProjectTomlValidationError, Project, ProjectTreeError},
+    rockspec::LocalRockspec,
     tree::Tree,
 };
 use bon::Builder;
@@ -81,13 +81,13 @@ pub enum RunTestsError {
     #[error(transparent)]
     Tree(#[from] ProjectTreeError),
     #[error(transparent)]
-    ProjectTomlValidation(#[from] ProjectTomlValidationError),
+    ProjectTomlValidation(#[from] LocalProjectTomlValidationError),
     #[error("failed to sync dependencies: {0}")]
     Sync(#[from] SyncError),
 }
 
 async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
-    let rocks = test.project.toml().into_validated()?;
+    let rocks = test.project.toml().into_local()?;
     let project_tree = test.project.tree(test.config)?;
     let test_tree = test.project.test_tree(test.config)?;
     std::fs::create_dir_all(test_tree.root())?;
@@ -197,7 +197,7 @@ pub async fn ensure_busted(
 /// Ensure dependencies and test dependencies are installed
 /// This defaults to the local project tree if cwd is a project root.
 async fn ensure_dependencies(
-    rockspec: &impl RemoteRockspec,
+    rockspec: &impl LocalRockspec,
     project_tree: &Tree,
     test_tree: &Tree,
     config: &Config,
