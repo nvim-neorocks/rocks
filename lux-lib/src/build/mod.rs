@@ -411,7 +411,7 @@ mod tests {
         config::{ConfigBuilder, LuaVersion},
         lua_installation::LuaInstallation,
         progress::MultiProgress,
-        project::project_toml::ProjectToml,
+        project::project_toml::PartialProjectToml,
         tree::RockLayout,
     };
 
@@ -437,9 +437,9 @@ mod tests {
             std::fs::read("resources/test/sample-project-no-build-spec/lux.toml").unwrap(),
         )
         .unwrap();
-        let rockspec = ProjectToml::new(&rockspec_content)
+        let rockspec = PartialProjectToml::new(&rockspec_content)
             .unwrap()
-            .into_validated()
+            .into_remote()
             .unwrap();
         let progress = Progress::Progress(MultiProgress::new());
         run_build(

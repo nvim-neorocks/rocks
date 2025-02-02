@@ -7,7 +7,7 @@ use lux_lib::{
     lockfile::ProjectLockfile,
     operations,
     package::PackageReq,
-    project::{project_toml::ProjectToml, PROJECT_TOML},
+    project::{project_toml::PartialProjectToml, PROJECT_TOML},
     rockspec::LocalRockspec,
 };
 
@@ -62,9 +62,9 @@ pub async fn sync(args: Sync, config: Config) -> Result<()> {
     if let Some(dependencies) = manifest_path
         .map(|manifest_path| -> Result<Vec<PackageReq>> {
             let content = std::fs::read_to_string(&manifest_path)?;
-            let toml = ProjectToml::new(&content)?;
+            let toml = PartialProjectToml::new(&content)?;
             Ok(toml
-                .into_validated()?
+                .into_remote()?
                 .dependencies()
                 .current_platform()
                 .clone())
