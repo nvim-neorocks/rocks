@@ -12,8 +12,9 @@ use crate::{
         BuildSpec, BuildSpecInternal, BuildSpecInternalError, DisplayAsLuaKV, ExternalDependencies,
         ExternalDependencySpec, FromPlatformOverridable, LuaRockspec, LuaVersionError,
         PartialLuaRockspec, PerPlatform, PlatformIdentifier, PlatformSupport,
-        PlatformValidationError, RockDescription, RockSource, RockSourceError, RockSourceInternal,
-        RockspecError, RockspecFormat, TestSpec, TestSpecError, TestSpecInternal,
+        PlatformValidationError, Remote, RockDescription, RockSource, RockSourceError,
+        RockSourceInternal, RockspecError, RockspecFormat, RockspecType, TestSpec, TestSpecError,
+        TestSpecInternal,
     },
     package::{
         BuildDependencies, Dependencies, PackageName, PackageReq, PackageVersion,
@@ -87,7 +88,7 @@ pub struct RocksToml {
 
 /// Equivalent to [`RocksToml`], but with all fields required
 #[derive(Debug)]
-pub struct RocksTomlValidated {
+pub struct RocksTomlValidated<T: RockspecType> {
     package: PackageName,
     version: PackageVersion,
     lua: PackageVersionReq,
@@ -98,7 +99,7 @@ pub struct RocksTomlValidated {
     build_dependencies: PerPlatform<Vec<PackageReq>>,
     external_dependencies: PerPlatform<HashMap<String, ExternalDependencySpec>>,
     test_dependencies: PerPlatform<Vec<PackageReq>>,
-    source: PerPlatform<RockSource>,
+    source: PerPlatform<RockSource<T>>,
     test: PerPlatform<TestSpec>,
     build: PerPlatform<BuildSpec>,
 
@@ -113,12 +114,16 @@ impl RocksToml {
 
     pub fn into_validated_rocks_toml(
         &self,
-    ) -> Result<RocksTomlValidated, RocksTomlValidationError> {
+    ) -> Result<RocksTomlValidated<Remote>, RocksTomlValidationError>
+where
+        //T: RockspecType,
+        //RockSource<T>:
+        //    FromPlatformOverridable<RockSourceInternal, RockSource<T>, Err = RockSourceError>,
+    {
         let rocks = self.clone();
 
         let validated = RocksTomlValidated {
             internal: rocks.clone(),
-
             package: rocks.package,
             version: rocks.version,
             lua: rocks
@@ -250,7 +255,7 @@ impl RocksToml {
     }
 }
 
-impl RocksTomlValidated {
+impl<T: RockspecType> RocksTomlValidated<T> {
     pub fn to_rockspec_string(&self) -> String {
         let starter = format!(
             r#"
@@ -382,7 +387,9 @@ impl LuaVersionCompatibility for RocksToml {
     }
 }
 
-impl Rockspec for RocksTomlValidated {
+impl<T: RockspecType> Rockspec for RocksTomlValidated<T> {
+    type RType = T;
+
     fn package(&self) -> &PackageName {
         &self.package
     }
@@ -415,7 +422,7 @@ impl Rockspec for RocksTomlValidated {
         &self.test_dependencies
     }
 
-    fn source(&self) -> &PerPlatform<RockSource> {
+    fn source(&self) -> &PerPlatform<RockSource<T>> {
         &self.source
     }
 
@@ -427,7 +434,7 @@ impl Rockspec for RocksTomlValidated {
         &self.test
     }
 
-    fn source_mut(&mut self) -> &mut PerPlatform<RockSource> {
+    fn source_mut(&mut self) -> &mut PerPlatform<RockSource<T>> {
         &mut self.source
     }
 

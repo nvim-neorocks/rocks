@@ -3,6 +3,7 @@ use std::{io, process::Command, sync::Arc};
 use crate::{
     build::BuildBehaviour,
     config::Config,
+    lua_rockspec::RockspecType,
     package::{PackageName, PackageReq, PackageVersionReqError},
     path::Paths,
     progress::{MultiProgress, Progress},
@@ -162,8 +163,8 @@ pub async fn ensure_busted(
 
 /// Ensure dependencies and test dependencies are installed
 /// This defaults to the local project tree if cwd is a project root.
-async fn ensure_dependencies(
-    rockspec: &impl Rockspec,
+async fn ensure_dependencies<T: RockspecType>(
+    rockspec: &impl Rockspec<RType = T>,
     tree: &Tree,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,

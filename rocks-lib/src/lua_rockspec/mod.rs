@@ -39,9 +39,26 @@ pub enum RockspecError {
     LuaTable(#[from] LuaTableError),
 }
 
+pub trait RockspecType {
+    type SourceType: PartialEq + Clone + ::std::fmt::Debug + DeserializeOwned;
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Local;
+#[derive(Clone, Debug, PartialEq)]
+pub struct Remote;
+
+impl RockspecType for Local {
+    type SourceType = Option<RockSourceSpec>;
+}
+
+impl RockspecType for Remote {
+    type SourceType = RockSourceSpec;
+}
+
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
-pub struct LuaRockspec {
+pub struct LuaRockspec<T: RockspecType = Remote> {
     /// The file format version. Example: "1.0"
     rockspec_format: Option<RockspecFormat>,
     /// The name of the package. Example: "luasocket"
@@ -54,7 +71,7 @@ pub struct LuaRockspec {
     build_dependencies: PerPlatform<Vec<PackageReq>>,
     external_dependencies: PerPlatform<HashMap<String, ExternalDependencySpec>>,
     test_dependencies: PerPlatform<Vec<PackageReq>>,
-    source: PerPlatform<RockSource>,
+    source: PerPlatform<RockSource<T>>,
     build: PerPlatform<BuildSpec>,
     test: PerPlatform<TestSpec>,
     /// The original content of this rockspec, needed by luarocks
@@ -63,7 +80,7 @@ pub struct LuaRockspec {
     hash: Integrity,
 }
 
-impl LuaRockspec {
+impl LuaRockspec<Remote> {
     pub fn new(rockspec_content: &str) -> Result<Self, RockspecError> {
         let lua = Lua::new();
         lua.load(rockspec_content).exec()?;
@@ -110,7 +127,9 @@ impl LuaRockspec {
     }
 }
 
-impl Rockspec for LuaRockspec {
+impl<T: RockspecType> Rockspec for LuaRockspec<T> {
+    type RType = T;
+
     fn package(&self) -> &PackageName {
         &self.package
     }
@@ -139,7 +158,7 @@ impl Rockspec for LuaRockspec {
         &self.test_dependencies
     }
 
-    fn source(&self) -> &PerPlatform<RockSource> {
+    fn source(&self) -> &PerPlatform<RockSource<T>> {
         &self.source
     }
 
@@ -155,7 +174,7 @@ impl Rockspec for LuaRockspec {
         &self.supported_platforms
     }
 
-    fn source_mut(&mut self) -> &mut PerPlatform<RockSource> {
+    fn source_mut(&mut self) -> &mut PerPlatform<RockSource<T>> {
         &mut self.source
     }
 

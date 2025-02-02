@@ -1,3 +1,4 @@
+use crate::lua_rockspec::Remote;
 use crate::rockspec::LuaVersionCompatibility;
 use crate::rockspec::Rockspec;
 use std::{io, path::Path};
@@ -26,7 +27,7 @@ pub enum LuarocksBuildError {
     ExecLuaRocksError(#[from] ExecLuaRocksError),
 }
 
-pub(crate) async fn build<R: Rockspec>(
+pub(crate) async fn build<R: Rockspec<RType = Remote>>(
     rockspec: &R,
     output_paths: &RockLayout,
     lua: &LuaInstallation,
@@ -54,7 +55,7 @@ pub(crate) async fn build<R: Rockspec>(
     install(rockspec, &luarocks_tree.into_path(), output_paths, config)
 }
 
-fn install<R: Rockspec>(
+fn install<R: Rockspec<RType = Remote>>(
     rockspec: &R,
     luarocks_tree: &Path,
     output_paths: &RockLayout,

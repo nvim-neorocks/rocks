@@ -478,7 +478,7 @@ pub struct Lockfile<P: LockfilePermissions> {
 
 #[derive(Error, Debug)]
 pub enum LockfileIntegrityError {
-    #[error("rockspec integirty mismatch.\nExpected: {expected}\nBut got: {got}")]
+    #[error("rockspec integrity mismatch.\nExpected: {expected}\nBut got: {got}")]
     RockspecIntegrityMismatch { expected: Integrity, got: Integrity },
     #[error("source integrity mismatch.\nExpected: {expected}\nBut got: {got}")]
     SourceIntegrityMismatch { expected: Integrity, got: Integrity },

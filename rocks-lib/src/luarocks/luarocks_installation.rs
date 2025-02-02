@@ -15,7 +15,7 @@ use crate::{
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{LocalPackage, LocalPackageId, PinnedState},
     lua_installation::LuaInstallation,
-    lua_rockspec::{LuaRockspec, RockspecFormat},
+    lua_rockspec::{LuaRockspec, Remote, RockspecFormat},
     operations::{get_all_dependencies, SearchAndDownloadError},
     package::PackageReq,
     path::Paths,
@@ -117,7 +117,7 @@ impl LuaRocksInstallation {
         Ok(())
     }
 
-    pub async fn install_build_dependencies<R: Rockspec>(
+    pub async fn install_build_dependencies<R: Rockspec<RType = Remote>>(
         &self,
         build_backend: &str,
         rocks: &R,

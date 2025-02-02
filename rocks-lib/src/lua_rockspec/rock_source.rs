@@ -8,12 +8,12 @@ use thiserror::Error;
 
 use super::{
     DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue, FromPlatformOverridable, PartialOverride,
-    PerPlatform, PerPlatformWrapper, PlatformOverridable,
+    PerPlatform, PerPlatformWrapper, PlatformOverridable, RockspecType,
 };
 
 #[derive(Deserialize, Clone, Debug, PartialEq)]
-pub struct RockSource {
-    pub source_spec: RockSourceSpec,
+pub struct RockSource<T: RockspecType> {
+    pub source_spec: T::SourceType,
     pub integrity: Option<Integrity>,
     pub archive_name: Option<String>,
     pub unpack_dir: Option<PathBuf>,
@@ -29,7 +29,7 @@ pub enum RockSourceError {
     SourceUrl(#[from] SourceUrlError),
 }
 
-impl FromPlatformOverridable<RockSourceInternal, Self> for RockSource {
+impl FromPlatformOverridable<RockSourceInternal, Self> for RockSource<super::Remote> {
     type Err = RockSourceError;
 
     fn from_platform_overridable(internal: RockSourceInternal) -> Result<Self, Self::Err> {
@@ -80,7 +80,81 @@ impl FromPlatformOverridable<RockSourceInternal, Self> for RockSource {
     }
 }
 
-impl FromLua for PerPlatform<RockSource> {
+impl FromPlatformOverridable<RockSourceInternal, Self> for RockSource<super::Local> {
+    type Err = RockSourceError;
+
+    fn from_platform_overridable(internal: RockSourceInternal) -> Result<Self, Self::Err> {
+        match internal.url {
+            Some(url) => {
+                let url = SourceUrl::from_str(&url)?;
+
+                // The rockspec.source table allows invalid combinations
+                // This ensures that invalid combinations are caught while parsing.
+                let source_spec = match (url, internal.tag, internal.branch, internal.module) {
+                    (source, None, None, None) => {
+                        Ok(RockSourceSpec::default_from_source_url(source))
+                    }
+                    (SourceUrl::Cvs(url), None, None, Some(module)) => {
+                        Ok(RockSourceSpec::Cvs(CvsSource { url, module }))
+                    }
+                    (SourceUrl::Git(url), Some(tag), None, None) => {
+                        Ok(RockSourceSpec::Git(GitSource {
+                            url,
+                            checkout_ref: Some(tag),
+                        }))
+                    }
+                    (SourceUrl::Git(url), None, Some(branch), None) => {
+                        Ok(RockSourceSpec::Git(GitSource {
+                            url,
+                            checkout_ref: Some(branch),
+                        }))
+                    }
+                    (SourceUrl::Mercurial(url), Some(tag), None, None) => {
+                        Ok(RockSourceSpec::Mercurial(MercurialSource {
+                            url,
+                            checkout_ref: Some(tag),
+                        }))
+                    }
+                    (SourceUrl::Mercurial(url), None, Some(branch), None) => {
+                        Ok(RockSourceSpec::Mercurial(MercurialSource {
+                            url,
+                            checkout_ref: Some(branch),
+                        }))
+                    }
+                    (SourceUrl::Sscm(url), None, None, Some(module)) => {
+                        Ok(RockSourceSpec::Sscm(SscmSource { url, module }))
+                    }
+                    (SourceUrl::Svn(url), tag, None, module) => {
+                        Ok(RockSourceSpec::Svn(SvnSource { url, tag, module }))
+                    }
+                    _ => Err(RockSourceError::InvalidCombination),
+                }?;
+
+                Ok(RockSource {
+                    source_spec: Some(source_spec),
+                    integrity: internal.hash,
+                    archive_name: internal.file,
+                    unpack_dir: internal.dir,
+                })
+            }
+            None => Ok(RockSource {
+                source_spec: None,
+                integrity: internal.hash,
+                archive_name: internal.file,
+                unpack_dir: internal.dir,
+            }),
+        }
+    }
+}
+
+impl FromLua for PerPlatform<RockSource<super::Local>> {
+    fn from_lua(value: Value, lua: &Lua) -> mlua::Result<Self> {
+        let wrapper = PerPlatformWrapper::from_lua(value, lua)?;
+        Ok(wrapper.un_per_platform)
+    }
+}
+
+impl FromLua for PerPlatform<RockSource<super::Remote>> {
     fn from_lua(value: Value, lua: &Lua) -> mlua::Result<Self> {
         let wrapper = PerPlatformWrapper::from_lua(value, lua)?;
         Ok(wrapper.un_per_platform)

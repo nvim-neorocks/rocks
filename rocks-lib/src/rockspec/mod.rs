@@ -11,13 +11,15 @@ use crate::{
     config::{Config, LuaVersion},
     lua_rockspec::{
         BuildSpec, ExternalDependencySpec, LuaVersionError, PerPlatform, PlatformSupport,
-        RockDescription, RockSource, RockspecFormat, TestSpec,
+        RockDescription, RockSource, RockspecFormat, RockspecType, TestSpec,
     },
     package::{PackageName, PackageReq, PackageVersion},
 };
 
 /// A trait for querying information about a project from either a rockspec or `rocks.toml` file.
 pub trait Rockspec {
+    type RType: RockspecType;
+
     fn package(&self) -> &PackageName;
     fn version(&self) -> &PackageVersion;
     fn description(&self) -> &RockDescription;
@@ -27,11 +29,11 @@ pub trait Rockspec {
     fn external_dependencies(&self) -> &PerPlatform<HashMap<String, ExternalDependencySpec>>;
     fn test_dependencies(&self) -> &PerPlatform<Vec<PackageReq>>;
 
-    fn source(&self) -> &PerPlatform<RockSource>;
+    fn source(&self) -> &PerPlatform<RockSource<Self::RType>>;
     fn build(&self) -> &PerPlatform<BuildSpec>;
     fn test(&self) -> &PerPlatform<TestSpec>;
 
-    fn source_mut(&mut self) -> &mut PerPlatform<RockSource>;
+    fn source_mut(&mut self) -> &mut PerPlatform<RockSource<Self::RType>>;
     fn build_mut(&mut self) -> &mut PerPlatform<BuildSpec>;
     fn test_mut(&mut self) -> &mut PerPlatform<TestSpec>;
 
@@ -72,7 +74,7 @@ pub trait LuaVersionCompatibility {
     fn test_lua_version(&self) -> Option<LuaVersion>;
 }
 
-impl<T: Rockspec> LuaVersionCompatibility for T {
+impl<T: RockspecType, R: Rockspec<RType = T>> LuaVersionCompatibility for R {
     fn validate_lua_version(&self, config: &Config) -> Result<(), LuaVersionError> {
         let _ = self.lua_version_matches(config)?;
         Ok(())

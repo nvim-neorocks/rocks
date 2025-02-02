@@ -16,6 +16,7 @@ use thiserror::Error;
 
 use crate::config::Config;
 use crate::hash::HasIntegrity;
+use crate::lua_rockspec::Remote;
 use crate::lua_rockspec::RockSourceSpec;
 use crate::operations;
 use crate::package::PackageSpec;
@@ -29,7 +30,7 @@ use super::DownloadSrcRockError;
 /// over how a package should be fetched.
 #[derive(Builder)]
 #[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
-pub struct FetchSrc<'a, R: Rockspec> {
+pub struct FetchSrc<'a, R: Rockspec<RType = Remote>> {
     #[builder(start_fn)]
     dest_dir: &'a Path,
     #[builder(start_fn)]
@@ -40,7 +41,7 @@ pub struct FetchSrc<'a, R: Rockspec> {
     progress: &'a Progress<ProgressBar>,
 }
 
-impl<R: Rockspec, State> FetchSrcBuilder<'_, R, State>
+impl<R: Rockspec<RType = Remote>, State> FetchSrcBuilder<'_, R, State>
 where
     State: fetch_src_builder::State + fetch_src_builder::IsComplete,
 {
@@ -120,7 +121,9 @@ pub enum FetchSrcRockError {
     Io(#[from] io::Error),
 }
 
-async fn do_fetch_src<R: Rockspec>(fetch: &FetchSrc<'_, R>) -> Result<Integrity, FetchSrcError> {
+async fn do_fetch_src<R: Rockspec<RType = Remote>>(
+    fetch: &FetchSrc<'_, R>,
+) -> Result<Integrity, FetchSrcError> {
     let rockspec = fetch.rockspec;
     let rock_source = rockspec.source().current_platform();
     let progress = fetch.progress;
