@@ -18,7 +18,7 @@ pub async fn check(config: Config) -> Result<()> {
         .install()
         .await?;
 
-    Run::new("luacheck", &config)
+    Run::new("luacheck", Some(&project), &config)
         .arg(project.root().to_string_lossy())
         .arg("--exclude-files")
         .arg(project.tree(&config)?.root().to_string_lossy())
