@@ -1,5 +1,7 @@
 use lets_find_up::{find_up_with, FindUpKind, FindUpOptions};
-use project_toml::{ProjectToml, ProjectTomlValidationError};
+use project_toml::{
+    LocalProjectTomlValidationError, PartialProjectToml, RemoteProjectTomlValidationError,
+};
 use std::{
     collections::HashMap,
     io,
@@ -30,7 +32,7 @@ pub const EXTRA_ROCKSPEC: &str = "extra.rockspec";
 #[error(transparent)]
 pub enum ProjectError {
     Io(#[from] io::Error),
-    Project(#[from] ProjectTomlValidationError),
+    Project(#[from] LocalProjectTomlValidationError),
     Toml(#[from] toml::de::Error),
     #[error("error when parsing `extra.rockspec`: {0}")]
     Rockspec(#[from] PartialRockspecError),
@@ -39,7 +41,7 @@ pub enum ProjectError {
 #[derive(Error, Debug)]
 #[error(transparent)]
 pub enum IntoRockspecError {
-    RocksTomlValidationError(#[from] ProjectTomlValidationError),
+    RocksTomlValidationError(#[from] RemoteProjectTomlValidationError),
     RockspecError(#[from] LuaRockspecError),
 }
 
@@ -69,7 +71,7 @@ pub struct Project {
     /// The path where the `lux.toml` resides.
     root: PathBuf,
     /// The parsed lux.toml.
-    toml: ProjectToml,
+    toml: PartialProjectToml,
 }
 
 impl Project {
@@ -95,7 +97,7 @@ impl Project {
 
                 let mut project = Project {
                     root: root.to_path_buf(),
-                    toml: ProjectToml::new(&toml_content)?,
+                    toml: PartialProjectToml::new(&toml_content)?,
                 };
 
                 if let Some(extra_rockspec) = project.extra_rockspec()? {
@@ -144,12 +146,12 @@ impl Project {
         &self.root
     }
 
-    pub fn toml(&self) -> &ProjectToml {
+    pub fn toml(&self) -> &PartialProjectToml {
         &self.toml
     }
 
     pub fn rockspec(&self) -> Result<RemoteLuaRockspec, IntoRockspecError> {
-        Ok(self.toml().into_validated()?.to_rockspec()?)
+        Ok(self.toml().into_remote()?.to_rockspec()?)
     }
 
     pub fn extra_rockspec(&self) -> Result<Option<PartialLuaRockspec>, PartialRockspecError> {
@@ -394,7 +396,7 @@ mod tests {
         // Reparse the lux.toml (not usually necessary, but we want to test that the file was
         // written correctly)
         let project = Project::from(&project_root).unwrap().unwrap();
-        let validated_toml = project.toml().into_validated().unwrap();
+        let validated_toml = project.toml().into_local().unwrap();
         assert_eq!(
             strip_lua(validated_toml.dependencies().current_platform()),
             expected_dependencies
@@ -429,7 +431,7 @@ mod tests {
 
         assert!(extra_rockspec.is_some());
 
-        let rocks = project.toml().into_validated().unwrap();
+        let rocks = project.toml().into_remote().unwrap();
 
         assert_eq!(rocks.package().to_string(), "custom-package");
         assert_eq!(rocks.version().to_string(), "2.0.0-1");

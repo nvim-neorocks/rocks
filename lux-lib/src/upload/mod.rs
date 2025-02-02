@@ -1,7 +1,7 @@
 use std::env;
 use std::io::Read;
 
-use crate::project::project_toml::ProjectTomlValidationError;
+use crate::project::project_toml::RemoteProjectTomlValidationError;
 use crate::rockspec::LocalRockspec;
 use crate::TOOL_VERSION;
 use crate::{config::Config, project::Project};
@@ -109,7 +109,7 @@ pub enum UploadError {
     ToolCheck(#[from] ToolCheckError),
     UserCheck(#[from] UserCheckError),
     ApiKeyUnspecified(#[from] ApiKeyUnspecified),
-    ValidationError(#[from] ProjectTomlValidationError),
+    ValidationError(#[from] RemoteProjectTomlValidationError),
 }
 
 pub struct ApiKey(String);
@@ -195,7 +195,7 @@ async fn upload_from_project(
     helpers::ensure_tool_version(&client, config.server()).await?;
     helpers::ensure_user_exists(&client, api_key, config.server()).await?;
 
-    let rocks = project.toml().into_validated()?;
+    let rocks = project.toml().into_remote()?;
 
     if helpers::rock_exists(
         &client,
