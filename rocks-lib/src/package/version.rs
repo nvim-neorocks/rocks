@@ -1,4 +1,8 @@
-use std::{cmp::Ordering, fmt::Display, str::FromStr};
+use std::{
+    cmp::{self, Ordering},
+    fmt::Display,
+    str::FromStr,
+};
 
 use html_escape::decode_html_entities;
 use itertools::Itertools;
@@ -118,8 +122,9 @@ impl FromStr for PackageVersion {
                 specrev,
             }));
         }
+
         Ok(PackageVersion::SemVer(SemVer {
-            component_count: text.chars().filter(|c| *c == '.').count() + 1,
+            component_count: cmp::min(text.chars().filter(|c| *c == '.').count() + 1, 3),
             version: parse_version(modrev)?,
             specrev,
         }))
@@ -347,7 +352,8 @@ fn is_dev_version_str(text: &str) -> bool {
 /// Parses a Version from a string, automatically supplying any missing details (i.e. missing
 /// minor/patch sections).
 fn parse_version(s: &str) -> Result<Version, Error> {
-    Version::parse(&append_minor_patch_if_missing(s.to_string()))
+    let version_str = correct_version_string(s);
+    Version::parse(&version_str)
 }
 
 /// Transform LuaRocks constraints into constraints that can be parsed by the semver crate.
@@ -371,7 +377,7 @@ fn parse_version_req(version_constraints: &str) -> Result<VersionReq, Error> {
 fn parse_pessimistic_version_constraint(version_constraint: String) -> Result<String, Error> {
     // pessimistic operator
     let min_version_str = &version_constraint[2..].trim();
-    let min_version = Version::parse(&append_minor_patch_if_missing(min_version_str.to_string()))?;
+    let min_version = Version::parse(&correct_version_string(min_version_str))?;
 
     let max_version = match min_version_str.matches('.').count() {
         0 => Version {
@@ -391,12 +397,33 @@ fn parse_pessimistic_version_constraint(version_constraint: String) -> Result<St
     Ok(format!(">= {min_version}, < {max_version}"))
 }
 
-/// Recursively append .0 until the version string has a minor or patch version
-fn append_minor_patch_if_missing(version: String) -> String {
-    if version.matches('.').count() < 2 {
-        append_minor_patch_if_missing(version + ".0")
+/// ┻━┻ ︵╰(°□°╰) Luarocks allows for an arbitrary number of version digits
+/// This function attempts to correct a non-semver compliant version string,
+/// by swapping the third '.' out with a '-', converting the non-semver
+/// compliant digits to a pre-release identifier.
+fn correct_version_string(version: &str) -> String {
+    let version = append_minor_patch_if_missing(version);
+    let parts: Vec<&str> = version.split('.').collect();
+    if parts.len() > 3 {
+        let corrected_version = format!(
+            "{}.{}.{}-{}",
+            parts[0],
+            parts[1],
+            parts[2],
+            parts[3..].join(".")
+        );
+        corrected_version
     } else {
-        version
+        version.to_string()
+    }
+}
+
+/// Recursively append .0 until the version string has a minor or patch version
+fn append_minor_patch_if_missing(version: &str) -> String {
+    if version.matches('.').count() < 2 {
+        append_minor_patch_if_missing(&format!("{}.0", version))
+    } else {
+        version.to_string()
     }
 }
 
@@ -434,6 +461,30 @@ mod tests {
             PackageVersion::parse("1.0.0-1").unwrap(),
             PackageVersion::SemVer(SemVer {
                 version: "1.0.0".parse().unwrap(),
+                component_count: 3,
+                specrev: 1
+            })
+        );
+        assert_eq!(
+            PackageVersion::parse("1.0.0-10-1").unwrap(),
+            PackageVersion::SemVer(SemVer {
+                version: "1.0.0-10".parse().unwrap(),
+                component_count: 3,
+                specrev: 1
+            })
+        );
+        assert_eq!(
+            PackageVersion::parse("1.0.0.10-1").unwrap(),
+            PackageVersion::SemVer(SemVer {
+                version: "1.0.0-10".parse().unwrap(),
+                component_count: 3,
+                specrev: 1
+            })
+        );
+        assert_eq!(
+            PackageVersion::parse("1.0.0.10.0-1").unwrap(),
+            PackageVersion::SemVer(SemVer {
+                version: "1.0.0-10.0".parse().unwrap(),
                 component_count: 3,
                 specrev: 1
             })
