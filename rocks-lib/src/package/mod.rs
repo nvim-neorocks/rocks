@@ -175,8 +175,8 @@ impl PackageReq {
             version_req,
         })
     }
-    pub fn parse(pkg_constraints: &String) -> Result<Self, PackageReqParseError> {
-        Self::from_str(&pkg_constraints.to_string())
+    pub fn parse(pkg_constraints: &str) -> Result<Self, PackageReqParseError> {
+        Self::from_str(pkg_constraints)
     }
     pub fn name(&self) -> &PackageName {
         &self.name
