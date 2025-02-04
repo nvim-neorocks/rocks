@@ -21,6 +21,7 @@ use command::CommandError;
 use external_dependency::{ExternalDependencyError, ExternalDependencyInfo};
 
 use indicatif::style::TemplateError;
+use itertools::Itertools;
 use luarocks::LuarocksBuildError;
 use make::MakeError;
 use patch::{Patch, PatchError};
@@ -301,7 +302,20 @@ async fn do_build<R: Rockspec + HasIntegrity>(
             let rock_source = build.rockspec.source().current_platform();
             let build_dir = match &rock_source.unpack_dir {
                 Some(unpack_dir) => temp_dir.path().join(unpack_dir),
-                None => temp_dir.path().into(),
+                None => {
+                    // Some older rockspecs don't specify a source.dir.
+                    // If there exists a single directory after unpacking,
+                    // we assume it's the source directory.
+                    let entries = std::fs::read_dir(temp_dir.path())?
+                        .filter_map(Result::ok)
+                        .filter(|f| f.path().is_dir())
+                        .collect_vec();
+                    if entries.len() == 1 {
+                        temp_dir.path().join(entries.first().unwrap().path())
+                    } else {
+                        temp_dir.path().into()
+                    }
+                }
             };
 
             Patch::new(
