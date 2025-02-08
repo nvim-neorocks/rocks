@@ -95,7 +95,7 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
     ensure_busted(&tree, test.config, test.progress.clone()).await?;
     ensure_dependencies(&rocks, &tree, test.config, test.progress).await?;
     let tree_root = &tree.root().clone();
-    let paths = Paths::from_tree(tree)?;
+    let paths = Paths::new(tree)?;
     let mut command = Command::new("busted");
     let mut command = command
         .current_dir(test.project.root())

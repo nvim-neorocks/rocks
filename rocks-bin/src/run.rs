@@ -28,7 +28,7 @@ pub async fn run(run: Run, config: Config) -> Result<()> {
         None => LuaVersion::from(&config)?,
     };
     let tree = config.tree(lua_version)?;
-    let paths = Paths::from_tree(tree)?;
+    let paths = Paths::new(tree)?;
     unsafe {
         // safe as long as this is single-threaded
         env::set_var("PATH", paths.path_prepended().joined());
