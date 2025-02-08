@@ -1,27 +1,11 @@
 ---
 source: rocks-lib/src/lockfile/mod.rs
-assertion_line: 831
+assertion_line: 913
 expression: lockfile
 ---
 {
   "version": "1.0.0",
   "rocks": {
-    "028a2b47c550e0e17bd2952c7444b6bf64687b3cd6b59573a066a21f545466b8": {
-      "name": "lua-cjson",
-      "version": "2.1.0-1",
-      "pinned": false,
-      "dependencies": [],
-      "constraint": "=2.1.0",
-      "binaries": [
-        "json2lua",
-        "lua2json"
-      ],
-      "source": "luarocks_rockspec+https://luarocks.org/",
-      "hashes": {
-        "rockspec": "sha256-L/6Yon2ek6NnEeifAy3qsnT2cMCB8IdaCgVeu3+1lvs=",
-        "source": "sha256-23r4ScVV0aR09yn+Sla1Uw6b57JHSet6fEdKfHIHuXI="
-      }
-    },
     "04bfd5b08a74ba37c05241ef51d7afc47e1f3379c872dca34d99031b1ea7b855": {
       "name": "neorg",
       "version": "8.0.0-1",
@@ -36,6 +20,19 @@ expression: lockfile
       "hashes": {
         "rockspec": "sha256-7FQ1jtFfZQQ9IYtLwS14TcFsTWXM4xMnnpQh80GHpP0=",
         "source": "sha256-YRQaq7LRoIK6qrc1djC/z4aPVhdcuw1IKxsZuddJKu4="
+      }
+    },
+    "085d597b2652e6dd9793a12fc57fca6d63575201113ba0bfe197f941264eb83f": {
+      "name": "say",
+      "version": "1.4.1-3",
+      "pinned": false,
+      "dependencies": [],
+      "constraint": ">=1.4.0",
+      "binaries": [],
+      "source": "luarocks_rockspec+https://luarocks.org/",
+      "hashes": {
+        "rockspec": "sha256-WFKt1iWeyjO9A8SG0KUX8tkS9JvMqoVM8CKBUguuK0Y=",
+        "source": "sha256-U/+kJsMluDdls8rg05kSGrqZTVSaOQUj9C4o+E4s3t8="
       }
     },
     "306b1bc37b09349a902e436efffb1161bbbdb46fafd5dc54b6e071ef5259b68a": {
@@ -55,13 +52,15 @@ expression: lockfile
       "name": "luassert",
       "version": "1.9.0-1",
       "pinned": false,
-      "dependencies": [],
+      "dependencies": [
+        "085d597b2652e6dd9793a12fc57fca6d63575201113ba0bfe197f941264eb83f"
+      ],
       "constraint": null,
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
       "hashes": {
         "rockspec": "sha256-rTPvF/GK/jMnH/q4wbwTCGBFELWh+JcvHeOCFAbIf64=",
-        "source": "sha256-gjQwg+hak1QBRbNSnuACqFfLVLsQBTZETYf1cxtntBA="
+        "source": "sha256-IpU2ZSDa3eZ0FtOVEW5XrmdfShQ+yLXmEJMSeBpOId4="
       }
     },
     "77a8e249ed3119392da5a9f20c88954cacf7ac6d2ccb7b78e037a218c6afc166": {
@@ -128,7 +127,7 @@ expression: lockfile
       "source": "luarocks_rockspec+https://luarocks.org/",
       "hashes": {
         "rockspec": "sha256-C33kdZVqHui1mOd+J2/HbvmvYOntTMzfJ3YBtj4v51k=",
-        "source": "sha256-dZ1wtEeg4wCNRxoKgWJYraaGTvxh62T8QrjnYLL878Y="
+        "source": "sha256-AR0RA3SSi1HIlRCdWXx5KrBE5bBT1ILLerSk52j/xxU="
       }
     },
     "b49da3f0e8cc9fd87681b92011f04fbe1d9acedcdb1bae652040e5c16d33be29": {
@@ -165,6 +164,22 @@ expression: lockfile
         "source": "sha256-0sVLXN+aDxmb2lxvhjUGgg8XFyu8DMl2i2RA+TjUbu8="
       }
     },
+    "e7c4c9fcd3cb6fe33c1c0a2ab8cdbbe8ee81d11334277d1f5631c80317770769": {
+      "name": "lua-cjson",
+      "version": "2.1.0-1",
+      "pinned": false,
+      "dependencies": [],
+      "constraint": null,
+      "binaries": [
+        "json2lua",
+        "lua2json"
+      ],
+      "source": "luarocks_rockspec+https://luarocks.org/",
+      "hashes": {
+        "rockspec": "sha256-L/6Yon2ek6NnEeifAy3qsnT2cMCB8IdaCgVeu3+1lvs=",
+        "source": "sha256-23r4ScVV0aR09yn+Sla1Uw6b57JHSet6fEdKfHIHuXI="
+      }
+    },
     "f98575efb520794ce8828bf0f5088047e745c27cd102cde14d4f6ad933efa00d": {
       "name": "say",
       "version": "1.4.1-3",
@@ -175,7 +190,7 @@ expression: lockfile
       "source": "luarocks_rockspec+https://luarocks.org/",
       "hashes": {
         "rockspec": "sha256-WFKt1iWeyjO9A8SG0KUX8tkS9JvMqoVM8CKBUguuK0Y=",
-        "source": "sha256-fSuemVTFtTtO7twWd4RrqSRFPaeoMQnLkb9Y6s4zuxI="
+        "source": "sha256-U/+kJsMluDdls8rg05kSGrqZTVSaOQUj9C4o+E4s3t8="
       }
     },
     "fb56666f3cfc66910e00c89bcfa81361660a0a4edfd528baadbedcd4ac89390a": {
@@ -193,9 +208,9 @@ expression: lockfile
     }
   },
   "entrypoints": [
-    "028a2b47c550e0e17bd2952c7444b6bf64687b3cd6b59573a066a21f545466b8",
     "04bfd5b08a74ba37c05241ef51d7afc47e1f3379c872dca34d99031b1ea7b855",
     "bf813f9f333f9efc8108b86386ea8a2a7aeaff1d5cdf470449d5e5242e3794d3",
+    "e7c4c9fcd3cb6fe33c1c0a2ab8cdbbe8ee81d11334277d1f5631c80317770769",
     "f98575efb520794ce8828bf0f5088047e745c27cd102cde14d4f6ad933efa00d"
   ]
 }

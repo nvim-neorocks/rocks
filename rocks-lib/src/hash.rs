@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use git2::Repository;
 use itertools::Itertools;
 use ssri::{Algorithm, Integrity, IntegrityOpts};
 use std::fs::File;
@@ -52,6 +53,34 @@ impl HasIntegrity for Bytes {
     }
 }
 
+impl HasIntegrity for Repository {
+    fn hash(&self) -> io::Result<Integrity> {
+        let mut integrity_opts = IntegrityOpts::new().algorithm(Algorithm::Sha256);
+
+        let odb = self
+            .odb()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+        let mut objects = Vec::new();
+        odb.foreach(|oid| {
+            if let Ok(obj) = odb.read(*oid) {
+                objects.push((*oid, obj.data().to_vec()));
+            }
+            true
+        })
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+        // Sort by OID to ensure deterministic order
+        objects.sort_by_key(|(oid, _)| *oid);
+
+        for (_, data) in objects {
+            integrity_opts.input(&data);
+        }
+
+        Ok(integrity_opts.result())
+    }
+}
+
 fn hash_file(path: &Path, integrity_opts: &mut IntegrityOpts) -> io::Result<()> {
     let mut file = File::open(path)?;
     let mut buffer = Vec::new();
@@ -64,6 +93,7 @@ fn hash_file(path: &Path, integrity_opts: &mut IntegrityOpts) -> io::Result<()> 
 mod tests {
     use super::*;
     use assert_fs::prelude::*;
+    use git2::{Index, Signature, Time};
     use std::fs::write;
 
     #[test]
@@ -179,5 +209,121 @@ mod tests {
         let hash2 = temp2.path().to_path_buf().hash().unwrap();
 
         assert_ne!(hash1, hash2);
+    }
+
+    fn make_signature() -> Result<Signature<'static>, git2::Error> {
+        let time = Time::new(1234567890, 0);
+        Signature::new("Test User", "test@example.com", &time)
+    }
+
+    fn create_commit(
+        repo: &Repository,
+        tree: &git2::Tree,
+        message: &str,
+        parents: &[&git2::Commit],
+    ) -> Result<git2::Oid, git2::Error> {
+        let sig = make_signature()?;
+        repo.commit(Some("HEAD"), &sig, &sig, message, tree, parents)
+    }
+
+    fn add_file_to_index(
+        repo: &Repository,
+        index: &mut Index,
+        name: &str,
+        content: &[u8],
+    ) -> Result<(), git2::Error> {
+        let path = repo.workdir().unwrap().join(name);
+        std::fs::write(&path, content).unwrap();
+        index.add_path(Path::new(name))?;
+        index.write()?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_empty_repo_hash() {
+        let repo_dir = assert_fs::TempDir::new().unwrap();
+        let repo = Repository::init(repo_dir.path()).unwrap();
+        repo.hash().unwrap();
+    }
+
+    #[test]
+    fn test_hash_is_reproducible() {
+        let repo_dir = assert_fs::TempDir::new().unwrap();
+        let repo = Repository::init(repo_dir.path()).unwrap();
+        let mut index = repo.index().unwrap();
+
+        add_file_to_index(&repo, &mut index, "test.txt", b"test content").unwrap();
+        let tree_id = index.write_tree().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+        create_commit(&repo, &tree, "test commit", &[]).unwrap();
+
+        let hash1 = repo.hash().unwrap();
+        let hash2 = repo.hash().unwrap();
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_repository_hash_differs_with_different_content() {
+        let repo_dir = assert_fs::TempDir::new().unwrap();
+        let repo = Repository::init(repo_dir.path()).unwrap();
+
+        let test_content = b"test content";
+        let file_path = repo_dir.path().join("test.txt");
+        std::fs::write(&file_path, test_content).unwrap();
+
+        let mut index = repo.index().unwrap();
+        index.add_path(Path::new("test.txt")).unwrap();
+        index.write().unwrap();
+
+        let tree_id = index.write_tree().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+
+        let sig = make_signature().unwrap();
+
+        let initial_commit = repo
+            .commit(Some("HEAD"), &sig, &sig, "initial commit", &tree, &[])
+            .unwrap();
+
+        let hash1 = repo.hash().unwrap();
+
+        let different_content = b"different content";
+        std::fs::write(&file_path, different_content).unwrap();
+
+        index.add_path(Path::new("test.txt")).unwrap();
+        index.write().unwrap();
+        let tree_id = index.write_tree().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+        let parent_commit = repo.find_commit(initial_commit).unwrap();
+        repo.commit(
+            Some("HEAD"),
+            &sig,
+            &sig,
+            "second commit",
+            &tree,
+            &[&parent_commit],
+        )
+        .unwrap();
+
+        let hash2 = repo.hash().unwrap();
+
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_repository_hash_with_all_object_types_reproducible() {
+        let repo_dir = assert_fs::TempDir::new().unwrap();
+        let repo = Repository::init(repo_dir.path()).unwrap();
+        let mut index = repo.index().unwrap();
+        add_file_to_index(&repo, &mut index, "test.txt", b"test content").unwrap();
+        let tree_id = index.write_tree().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+        let commit_id = create_commit(&repo, &tree, "test commit", &[]).unwrap();
+        let sig = make_signature().unwrap();
+        let commit = repo.find_commit(commit_id).unwrap();
+        repo.tag("v1.0.0", commit.as_object(), &sig, "test tag", false)
+            .unwrap();
+        let hash1 = repo.hash().unwrap();
+        let hash2 = repo.hash().unwrap();
+        assert_eq!(hash1, hash2);
     }
 }
