@@ -3,9 +3,11 @@ use std::{io, process::Command};
 use crate::{
     build::BuildBehaviour,
     config::{Config, LuaVersion, LuaVersionUnset},
+    lua_rockspec::LuaVersionError,
     operations::Install,
     package::{PackageReq, PackageVersionReqError},
     path::Paths,
+    project::{Project, ProjectTreeError},
     remote_package_db::RemotePackageDBError,
 };
 use bon::Builder;
@@ -21,6 +23,8 @@ use super::InstallError;
 pub struct Run<'a> {
     #[builder(start_fn)]
     command: &'a str,
+    #[builder(start_fn)]
+    project: Option<&'a Project>,
     #[builder(start_fn)]
     config: &'a Config,
 
@@ -57,12 +61,25 @@ pub enum RunError {
     LuaVersionUnset(#[from] LuaVersionUnset),
     #[error(transparent)]
     Io(#[from] io::Error),
+    #[error(transparent)]
+    LuaVersionError(#[from] LuaVersionError),
+    #[error(transparent)]
+    ProjectTreeError(#[from] ProjectTreeError),
 }
 
 async fn run(run: Run<'_>) -> Result<(), RunError> {
-    let lua_version = LuaVersion::from(run.config)?;
-    let tree = run.config.tree(lua_version)?;
-    let paths = Paths::new(tree)?;
+    let lua_version = run
+        .project
+        .map(|project| project.lua_version(run.config))
+        .transpose()?
+        .unwrap_or(LuaVersion::from(run.config)?);
+
+    let user_tree = run.config.tree(lua_version)?;
+    let mut paths = Paths::new(user_tree)?;
+
+    if let Some(project) = run.project {
+        paths.prepend(&Paths::new(project.tree(run.config)?)?);
+    }
 
     let status = match Command::new(run.command)
         .args(run.args)
