@@ -13,5 +13,9 @@ async fn run_nlua() {
         .build()
         .unwrap();
     install_command("nlua", &config).await.unwrap();
-    Run::new("nlua", &config).arg("-v").run().await.unwrap();
+    Run::new("nlua", None, &config)
+        .arg("-v")
+        .run()
+        .await
+        .unwrap();
 }

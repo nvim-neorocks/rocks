@@ -39,7 +39,7 @@ pub async fn run(run: Run, config: Config) -> Result<()> {
             None => install_command(&run.command, &config).await?,
         }
     };
-    operations::Run::new(&run.command, &config)
+    operations::Run::new(&run.command, project.as_ref(), &config)
         .args(run.args.unwrap_or_default())
         .run()
         .await?;
