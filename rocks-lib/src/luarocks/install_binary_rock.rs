@@ -230,7 +230,7 @@ mod test {
             file_name: packed_rock_file_name.clone(),
         };
         let rockspec = unpack_rockspec(&rock).await.unwrap();
-        let install_root = assert_fs::TempDir::new().unwrap();
+        let install_root = PathBuf::from("/tmp/old/"); //assert_fs::TempDir::new().unwrap();
         let config = ConfigBuilder::new()
             .unwrap()
             .tree(Some(install_root.to_path_buf()))
@@ -255,6 +255,7 @@ mod test {
         .unwrap();
         let installed_rock_layout = tree.rock_layout(&local_package);
         let orig_install_tree_integrity = installed_rock_layout.rock_path.hash().unwrap();
+
         let pack_dest_dir = assert_fs::TempDir::new().unwrap();
         let packed_rock = Pack::new(
             pack_dest_dir.to_path_buf(),
@@ -271,6 +272,7 @@ mod test {
                 .to_string(),
             packed_rock_file_name.clone()
         );
+
         // let's make sure our own pack/unpack implementation roundtrips correctly
         Remove::new(&config)
             .package(local_package.id())
@@ -308,8 +310,6 @@ mod test {
         let installed_rock_layout = tree.rock_layout(&local_package);
         assert!(installed_rock_layout.rockspec_path().is_file());
         let new_install_tree_integrity = installed_rock_layout.rock_path.hash().unwrap();
-        assert!(orig_install_tree_integrity
-            .matches(&new_install_tree_integrity)
-            .is_some());
+        assert_eq!(orig_install_tree_integrity, new_install_tree_integrity);
     }
 }
