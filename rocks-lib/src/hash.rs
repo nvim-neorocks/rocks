@@ -1,11 +1,10 @@
 use bytes::Bytes;
-use itertools::Itertools;
+use nix_nar::Encoder;
 use ssri::{Algorithm, Integrity, IntegrityOpts};
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use tempdir::TempDir;
-use walkdir::WalkDir;
 
 pub trait HasIntegrity {
     fn hash(&self) -> io::Result<Integrity>;
@@ -15,15 +14,12 @@ impl HasIntegrity for PathBuf {
     fn hash(&self) -> io::Result<Integrity> {
         let mut integrity_opts = IntegrityOpts::new().algorithm(Algorithm::Sha256);
         if self.is_dir() {
-            for relative_path in WalkDir::new(self)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .filter(|e| !e.file_type().is_dir())
-                .map(|e| e.path().strip_prefix(self).unwrap().to_path_buf())
-                .sorted()
-            {
-                hash_file(&self.join(relative_path), &mut integrity_opts)?;
-            }
+            // NOTE: To ensure our source hashes are compatible with Nix,
+            // we encode the path to the Nix Archive (NAR) format.
+            let mut enc = Encoder::new(self).map_err(io::Error::other)?;
+            let mut nar_bytes = Vec::new();
+            io::copy(&mut enc, &mut nar_bytes)?;
+            integrity_opts.input(nar_bytes);
         } else if self.is_file() {
             hash_file(self, &mut integrity_opts)?;
         }
@@ -64,7 +60,31 @@ fn hash_file(path: &Path, integrity_opts: &mut IntegrityOpts) -> io::Result<()> 
 mod tests {
     use super::*;
     use assert_fs::prelude::*;
-    use std::fs::write;
+    use std::{fs::write, process::Command};
+
+    #[cfg(unix)]
+    /// Compute nix-hash --sri --type sha256 .
+    fn nix_hash(path: &Path) -> Integrity {
+        let ssri_str = Command::new("nix-hash")
+            .args(vec!["--sri", "--type", "sha256"])
+            .arg(path)
+            .output()
+            .unwrap()
+            .stdout;
+        dbg!(String::from_utf8_lossy(&ssri_str)).parse().unwrap()
+    }
+
+    #[cfg(unix)]
+    /// Compute nix-hash --sri --type sha256 --flat .
+    fn nix_hash_file(path: &Path) -> Integrity {
+        let ssri_str = Command::new("nix-hash")
+            .args(vec!["--sri", "--type", "sha256", "--flat"])
+            .arg(path)
+            .output()
+            .unwrap()
+            .stdout;
+        dbg!(String::from_utf8_lossy(&ssri_str)).parse().unwrap()
+    }
 
     #[test]
     fn test_hash_empty_dir() {
@@ -72,17 +92,37 @@ mod tests {
         let hash1 = temp.path().to_path_buf().hash().unwrap();
         let hash2 = temp.path().to_path_buf().hash().unwrap();
         assert_eq!(hash1, hash2);
+        let nix_hash = nix_hash(temp.path());
+        assert_eq!(hash1, nix_hash);
     }
 
     #[test]
-    fn test_hash_single_file() {
+    #[cfg(unix)]
+    fn test_hash_file() {
+        let temp = assert_fs::TempDir::new().unwrap();
+        let file = temp.child("test.txt");
+        file.write_str("test content").unwrap();
+
+        let hash = file.path().to_path_buf().hash().unwrap();
+        let nix_hash = nix_hash_file(file.path());
+        assert_eq!(hash, nix_hash);
+    }
+
+    #[test]
+    fn test_hash_dir_with_single_file() {
         let temp = assert_fs::TempDir::new().unwrap();
         let file = temp.child("test.txt");
         file.write_str("test content").unwrap();
 
         let hash1 = temp.path().to_path_buf().hash().unwrap();
         let hash2 = temp.path().to_path_buf().hash().unwrap();
-        assert_eq!(hash1, hash2)
+        assert_eq!(hash1, hash2);
+
+        #[cfg(unix)]
+        {
+            let nix_hash = nix_hash(temp.path());
+            assert_eq!(hash1, nix_hash);
+        }
     }
 
     #[test]
@@ -101,6 +141,12 @@ mod tests {
         let hash2 = temp2.path().to_path_buf().hash().unwrap();
 
         assert_eq!(hash1, hash2);
+
+        #[cfg(unix)]
+        {
+            let nix_hash = nix_hash(temp.path());
+            assert_eq!(hash1, nix_hash);
+        }
     }
 
     #[test]
@@ -120,21 +166,6 @@ mod tests {
         write(temp2.child("b/file3.txt").path(), "content 3").unwrap();
         write(temp2.child("a/file2.txt").path(), "content 2").unwrap();
         write(temp2.child("a/b/file1.txt").path(), "content 1").unwrap();
-        let hash2 = temp2.path().to_path_buf().hash().unwrap();
-
-        assert_eq!(hash1, hash2);
-    }
-
-    #[test]
-    fn test_hash_with_empty_directories() {
-        let temp = assert_fs::TempDir::new().unwrap();
-
-        temp.child("empty_dir").create_dir_all().unwrap();
-        write(temp.child("file.txt").path(), "content").unwrap();
-        let hash1 = temp.path().to_path_buf().hash().unwrap();
-
-        let temp2 = assert_fs::TempDir::new().unwrap();
-        write(temp2.child("file.txt").path(), "content").unwrap();
         let hash2 = temp2.path().to_path_buf().hash().unwrap();
 
         assert_eq!(hash1, hash2);
@@ -179,5 +210,11 @@ mod tests {
         let hash2 = temp2.path().to_path_buf().hash().unwrap();
 
         assert_ne!(hash1, hash2);
+
+        #[cfg(unix)]
+        {
+            let nix_hash = nix_hash(temp.path());
+            assert_eq!(hash1, nix_hash);
+        }
     }
 }

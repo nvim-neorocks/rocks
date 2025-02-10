@@ -36,6 +36,7 @@
           cargo-nextest
           zlib # used for checking external dependencies
           lua
+          nix # we use nix-hash in tests
         ];
 
         postBuild = ''

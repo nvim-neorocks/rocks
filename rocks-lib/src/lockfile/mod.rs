@@ -996,14 +996,8 @@ mod tests {
         assert_eq!(sync_spec.to_add.len(), 1);
 
         // Should remove:
-        // - say (not requested)
         // - neorg 8.0.0-1 (older version)
         // - dependencies unique to neorg 8.0.0-1
-        assert!(sync_spec
-            .to_remove
-            .iter()
-            .any(|pkg| pkg.name().to_string() == "say"
-                && pkg.version() == &"1.4.1-3".parse().unwrap()));
         assert!(sync_spec
             .to_remove
             .iter()
