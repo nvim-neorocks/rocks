@@ -5,7 +5,8 @@ use rocks::{
     add, build, check, config,
     debug::Debug,
     doc, download, fetch, format, info, install, install_lua, install_rockspec, list, outdated,
-    pack, path, pin, project, purge, remove, run, run_lua, search, test, uninstall, unpack, update,
+    pack, path, pin, project, purge, remove, run, run_lua, search, sync, test, uninstall, unpack,
+    update,
     upload::{self},
     which, Cli, Commands,
 };
@@ -39,6 +40,7 @@ async fn main() {
 
     match cli.command {
         Commands::Search(search_data) => search::search(search_data, config).await.unwrap(),
+        Commands::Sync(sync_args) => sync::sync(sync_args, config).await.unwrap(),
         Commands::Download(download_data) => {
             download::download(download_data, config).await.unwrap()
         }

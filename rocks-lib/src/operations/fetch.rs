@@ -127,6 +127,7 @@ async fn do_fetch_src<R: Rockspec>(fetch: &FetchSrc<'_, R>) -> Result<Integrity,
             progress.map(|p| p.set_message(format!("🦠 Cloning {}", url)));
 
             let mut fetch_options = FetchOptions::new();
+            fetch_options.update_fetchhead(false);
             if git.checkout_ref.is_none() {
                 fetch_options.depth(1);
             };
@@ -138,6 +139,8 @@ async fn do_fetch_src<R: Rockspec>(fetch: &FetchSrc<'_, R>) -> Result<Integrity,
                 let (object, _) = repo.revparse_ext(commit_hash)?;
                 repo.checkout_tree(&object, None)?;
             }
+            // The .git directory is not deterministic
+            std::fs::remove_dir_all(dest_dir.join(".git"))?;
             fetch.dest_dir.hash()?
         }
         RockSourceSpec::Url(url) => {

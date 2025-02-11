@@ -220,7 +220,6 @@ async fn install_impl(
         let downloaded_rock = install_spec.downloaded_rock;
         let config = config.clone();
         let tree = tree.clone();
-        let package_db = Arc::clone(&package_db);
 
         tokio::spawn(async move {
             let rockspec = downloaded_rock.rockspec();
@@ -265,10 +264,6 @@ async fn install_impl(
                     "rocks does not yet support installing .src.rock packages without a rockspec"
                 ),
             };
-
-            package_db
-                .validate_integrity(&pkg)
-                .map_err(|err| InstallError::Integrity(pkg.name().clone(), err))?;
 
             Ok::<_, InstallError>((pkg.id(), pkg))
         })

@@ -1,6 +1,6 @@
 use crate::{
     config::{Config, ConfigError},
-    lockfile::{LocalPackage, Lockfile, LockfileIntegrityError, ReadOnly},
+    lockfile::{Lockfile, LockfileIntegrityError, ReadOnly},
     manifest::{Manifest, ManifestError},
     package::{
         PackageName, PackageReq, PackageSpec, PackageVersion, RemotePackage,
@@ -153,17 +153,6 @@ impl RemotePackageDB {
         match self.find(package_req, filter, &Progress::NoProgress) {
             Ok(result) => Some(result.package),
             Err(_) => None,
-        }
-    }
-
-    /// Validate the integrity of an installed package.
-    pub(crate) fn validate_integrity(
-        &self,
-        package: &LocalPackage,
-    ) -> Result<(), RemotePackageDbIntegrityError> {
-        match &self.0 {
-            Impl::LuarocksManifests(_) => Ok(()),
-            Impl::Lockfile(lockfile) => Ok(lockfile.validate_integrity(package)?),
         }
     }
 }
