@@ -26,6 +26,9 @@ use walkdir::WalkDir;
 use zip::write::SimpleFileOptions;
 use zip::ZipWriter;
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 /// A binary rock packer
 #[derive(Builder)]
 #[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
@@ -174,7 +177,14 @@ fn add_rock_entry(
     let mut buffer = Vec::new();
     f.read_to_end(&mut buffer)?;
     let digest = md5::compute(&buffer);
+
+    #[cfg(unix)]
+    let options = SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Stored)
+        .unix_permissions(f.metadata()?.permissions().mode());
+    #[cfg(windows)]
     let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+
     zip.start_file(zip_dir.join(&relative_path).to_string_lossy(), options)?;
     zip.write_all(&buffer)?;
     Ok((relative_path, format!("{:x}", digest)))
