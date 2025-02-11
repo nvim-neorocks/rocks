@@ -6,8 +6,7 @@ use rocks_lib::{
     config::{Config, LuaVersion},
     path::{BinPath, PackagePath, Paths},
 };
-use strum::{EnumString, VariantNames};
-use strum_macros::Display;
+use strum_macros::{Display, EnumString, VariantNames};
 
 use clap::{Args, ValueEnum};
 
