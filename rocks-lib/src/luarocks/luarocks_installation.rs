@@ -74,7 +74,7 @@ pub struct LuaRocksInstallation {
     pub config: Config,
 }
 
-const LUAROCKS_VERSION: &str = "3.11.1-1";
+pub(crate) const LUAROCKS_VERSION: &str = "3.11.1-1";
 
 const LUAROCKS_ROCKSPEC: &str = "
 rockspec_format = '3.0'
@@ -94,6 +94,14 @@ impl LuaRocksInstallation {
             config,
         };
         Ok(luarocks_installation)
+    }
+
+    pub fn tree(&self) -> &Tree {
+        &self.tree
+    }
+
+    pub fn config(&self) -> &Config {
+        &self.config
     }
 
     pub async fn ensure_installed(
