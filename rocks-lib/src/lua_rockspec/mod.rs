@@ -590,17 +590,6 @@ mod tests {
         version = '1.0.0-1'\n
         source = {\n
             url = 'git+https://hub.com/example-project/',\n
-            module = 'bar',\n
-        }\n
-        "
-        .to_string();
-        let _rockspec = LuaRockspec::new(&rockspec_content).unwrap_err();
-        let rockspec_content = "
-        rockspec_format = '1.0'\n
-        package = 'foo'\n
-        version = '1.0.0-1'\n
-        source = {\n
-            url = 'git+https://hub.com/example-project/',\n
             tag = 'bar',\n
             file = 'foo.tar.gz',\n
         }\n
@@ -938,8 +927,8 @@ mod tests {
                     branch = 'mac',\n
                 },\n
                 windows = {\n
-                    url = 'cvs://foo.cvs',\n
-                    module = 'win',\n
+                    url = 'git+https://winhub.com/example-project/.git',\n
+                    branch = 'win',\n
                 },\n
             },\n
         }\n
@@ -972,9 +961,9 @@ mod tests {
                 .get(&PlatformIdentifier::Windows)
                 .map(|it| it.source_spec.clone())
                 .unwrap(),
-            RockSourceSpec::Cvs(CvsSource {
-                url: "cvs://foo.cvs".into(),
-                module: "win".into(),
+            RockSourceSpec::Git(GitSource {
+                url: "https://winhub.com/example-project/.git".parse().unwrap(),
+                checkout_ref: Some("win".into())
             })
         );
         let rockspec_content = "
