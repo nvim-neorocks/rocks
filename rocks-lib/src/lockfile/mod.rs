@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::error::Error;
 use std::fmt::Display;
 use std::io::{self, Write};
@@ -477,8 +477,9 @@ pub struct Lockfile<P: LockfilePermissions> {
     // TODO: Serialize this directly into a `Version`
     version: String,
     // NOTE: We cannot directly serialize to a `Sha256` object as they don't implement serde traits.
-    rocks: HashMap<LocalPackageId, LocalPackage>,
-    entrypoints: HashSet<LocalPackageId>,
+    // NOTE: We want to retain ordering of rocks and entrypoints when de/serializing.
+    rocks: BTreeMap<LocalPackageId, LocalPackage>,
+    entrypoints: Vec<LocalPackageId>,
 }
 
 #[derive(Error, Debug)]
@@ -503,7 +504,7 @@ impl<P: LockfilePermissions> Lockfile<P> {
         &self.version
     }
 
-    pub fn rocks(&self) -> &HashMap<LocalPackageId, LocalPackage> {
+    pub fn rocks(&self) -> &BTreeMap<LocalPackageId, LocalPackage> {
         &self.rocks
     }
 
@@ -658,19 +659,22 @@ impl Lockfile<ReadOnly> {
     /// NOTE: The reason we produce a report and don't add/remove packages
     /// here is because packages need to be installed in order to be added.
     pub(crate) fn package_sync_spec(&self, packages: &[PackageReq]) -> PackageSyncSpec {
-        let (entrypoints_to_keep, entrypoints_to_remove): (Vec<LocalPackage>, Vec<LocalPackage>) =
-            self.entrypoints
-                .iter()
-                .map(|id| {
-                    self.get(id)
-                        .expect("entrypoint not found in malformed lockfile.")
-                })
-                .cloned()
-                .partition(|local_pkg| {
-                    packages
-                        .iter()
-                        .any(|req| req.matches(&local_pkg.as_package_spec()))
-                });
+        let (entrypoints_to_keep, entrypoints_to_remove): (
+            HashSet<LocalPackage>,
+            HashSet<LocalPackage>,
+        ) = self
+            .entrypoints
+            .iter()
+            .map(|id| {
+                self.get(id)
+                    .expect("entrypoint not found in malformed lockfile.")
+            })
+            .cloned()
+            .partition(|local_pkg| {
+                packages
+                    .iter()
+                    .any(|req| req.matches(&local_pkg.as_package_spec()))
+            });
 
         let packages_to_keep: HashSet<&LocalPackage> = entrypoints_to_keep
             .iter()
@@ -787,7 +791,7 @@ impl Lockfile<ReadWrite> {
 
     pub(crate) fn remove_by_id(&mut self, target: &LocalPackageId) {
         self.rocks.remove(target);
-        self.entrypoints.remove(target);
+        self.entrypoints.retain(|x| x != target);
     }
 
     pub(crate) fn sync_lockfile(&mut self, other: &Lockfile<ReadOnly>) {
