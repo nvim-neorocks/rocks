@@ -469,6 +469,14 @@ impl LockfilePermissions for ReadOnly {}
 impl LockfilePermissions for ReadWrite {}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+struct LocalPackageLock {
+    // NOTE: We cannot directly serialize to a `Sha256` object as they don't implement serde traits.
+    // NOTE: We want to retain ordering of rocks and entrypoints when de/serializing.
+    rocks: BTreeMap<LocalPackageId, LocalPackage>,
+    entrypoints: Vec<LocalPackageId>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Lockfile<P: LockfilePermissions> {
     #[serde(skip)]
     filepath: PathBuf,
@@ -476,10 +484,8 @@ pub struct Lockfile<P: LockfilePermissions> {
     _marker: PhantomData<P>,
     // TODO: Serialize this directly into a `Version`
     version: String,
-    // NOTE: We cannot directly serialize to a `Sha256` object as they don't implement serde traits.
-    // NOTE: We want to retain ordering of rocks and entrypoints when de/serializing.
-    rocks: BTreeMap<LocalPackageId, LocalPackage>,
-    entrypoints: Vec<LocalPackageId>,
+    #[serde(flatten)]
+    lock: LocalPackageLock,
 }
 
 #[derive(Error, Debug)]
@@ -505,11 +511,11 @@ impl<P: LockfilePermissions> Lockfile<P> {
     }
 
     pub fn rocks(&self) -> &BTreeMap<LocalPackageId, LocalPackage> {
-        &self.rocks
+        &self.lock.rocks
     }
 
     pub fn get(&self, id: &LocalPackageId) -> Option<&LocalPackage> {
-        self.rocks.get(id)
+        self.lock.rocks.get(id)
     }
 
     pub(crate) fn list(&self) -> HashMap<PackageName, Vec<LocalPackage>> {
@@ -605,12 +611,14 @@ impl<P: LockfilePermissions> Lockfile<P> {
 
     fn flush(&mut self) -> io::Result<()> {
         let dependencies = self
+            .lock
             .rocks
             .iter()
             .flat_map(|(_, rock)| rock.dependencies())
             .collect_vec();
 
-        self.entrypoints = self
+        self.lock.entrypoints = self
+            .lock
             .rocks
             .keys()
             .filter(|id| !dependencies.iter().contains(&id))
@@ -663,6 +671,7 @@ impl Lockfile<ReadOnly> {
             HashSet<LocalPackage>,
             HashSet<LocalPackage>,
         ) = self
+            .lock
             .entrypoints
             .iter()
             .map(|id| {
@@ -718,8 +727,7 @@ impl Lockfile<ReadOnly> {
             _marker: PhantomData,
             filepath: self.filepath,
             version: self.version,
-            rocks: self.rocks,
-            entrypoints: self.entrypoints,
+            lock: self.lock,
         }
     }
 
@@ -767,20 +775,21 @@ impl Lockfile<ReadOnly> {
 
 impl Lockfile<ReadWrite> {
     pub fn add(&mut self, rock: &LocalPackage) {
-        self.rocks.insert(rock.id(), rock.clone());
+        self.lock.rocks.insert(rock.id(), rock.clone());
     }
 
     pub fn add_dependency(&mut self, target: &LocalPackage, dependency: &LocalPackage) {
         let target_id = target.id();
         let dependency_id = dependency.id();
 
-        self.rocks
+        self.lock
+            .rocks
             .entry(target_id)
             .and_modify(|rock| rock.spec.dependencies.push(dependency_id));
 
         // Since rocks entries are mutable, we only add the dependency if it
         // has not already been added.
-        if !self.rocks.contains_key(&dependency.id()) {
+        if !self.lock.rocks.contains_key(&dependency.id()) {
             self.add(dependency);
         }
     }
@@ -790,13 +799,12 @@ impl Lockfile<ReadWrite> {
     }
 
     pub(crate) fn remove_by_id(&mut self, target: &LocalPackageId) {
-        self.rocks.remove(target);
-        self.entrypoints.retain(|x| x != target);
+        self.lock.rocks.remove(target);
+        self.lock.entrypoints.retain(|x| x != target);
     }
 
     pub(crate) fn sync_lockfile(&mut self, other: &Lockfile<ReadOnly>) {
-        self.rocks = other.rocks.clone();
-        self.entrypoints = other.entrypoints.clone();
+        self.lock = other.lock.clone();
     }
 
     // TODO: `fn entrypoints() -> Vec<LockedRock>`
