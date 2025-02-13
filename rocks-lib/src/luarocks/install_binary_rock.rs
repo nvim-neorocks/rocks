@@ -8,7 +8,6 @@ use bytes::Bytes;
 use tempdir::TempDir;
 use thiserror::Error;
 
-use crate::rockspec::LuaVersionCompatibility;
 use crate::{
     build::{
         external_dependency::{ExternalDependencyError, ExternalDependencyInfo},
@@ -24,6 +23,7 @@ use crate::{
     remote_package_source::RemotePackageSource,
     rockspec::Rockspec,
 };
+use crate::{lockfile::RemotePackageSourceUrl, rockspec::LuaVersionCompatibility};
 
 use super::rock_manifest::RockManifestError;
 
@@ -107,11 +107,18 @@ impl<'a> BinaryRockInstall<'a> {
             rockspec: rockspec.hash()?,
             source: self.rock_bytes.hash()?,
         };
+        let source_url = match &self.source {
+            RemotePackageSource::LuarocksBinaryRock(url) => {
+                Some(RemotePackageSourceUrl::Url { url: url.clone() })
+            }
+            _ => None,
+        };
         let mut package = LocalPackage::from(
             &PackageSpec::new(rockspec.package().clone(), rockspec.version().clone()),
             self.constraint,
             rockspec.binaries(),
             self.source,
+            source_url,
             hashes,
         );
         package.spec.pinned = self.pin;

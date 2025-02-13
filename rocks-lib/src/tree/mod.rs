@@ -360,6 +360,7 @@ mod tests {
             LockConstraint::Unconstrained,
             RockBinaries::default(),
             RemotePackageSource::Test,
+            None,
             mock_hashes.clone(),
         );
 
@@ -385,6 +386,7 @@ mod tests {
             LockConstraint::Unconstrained,
             RockBinaries::default(),
             RemotePackageSource::Test,
+            None,
             mock_hashes.clone(),
         );
 
@@ -462,6 +464,7 @@ mod tests {
                 LockConstraint::Unconstrained,
                 RockBinaries::default(),
                 RemotePackageSource::Test,
+                None,
                 mock_hashes.clone(),
             ))
             .unwrap();

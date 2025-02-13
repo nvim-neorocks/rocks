@@ -1,6 +1,6 @@
 ---
 source: rocks-lib/src/tree/mod.rs
-assertion_line: 436
+assertion_line: 438
 expression: sorted_result
 ---
 - - lua-cjson
@@ -25,3 +25,4 @@ expression: sorted_result
   - - 0.1.4-1
 - - say
   - - 1.4.1-3
+    - 1.4.1-3

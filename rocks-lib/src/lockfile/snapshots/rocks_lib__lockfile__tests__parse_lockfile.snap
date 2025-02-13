@@ -1,27 +1,11 @@
 ---
 source: rocks-lib/src/lockfile/mod.rs
-assertion_line: 913
+assertion_line: 1226
 expression: lockfile
 ---
 {
   "version": "1.0.0",
   "rocks": {
-    "028a2b47c550e0e17bd2952c7444b6bf64687b3cd6b59573a066a21f545466b8": {
-      "name": "lua-cjson",
-      "version": "2.1.0-1",
-      "pinned": false,
-      "dependencies": [],
-      "constraint": "=2.1.0",
-      "binaries": [
-        "lua2json",
-        "json2lua"
-      ],
-      "source": "luarocks_rockspec+https://luarocks.org/",
-      "hashes": {
-        "rockspec": "sha256-L/6Yon2ek6NnEeifAy3qsnT2cMCB8IdaCgVeu3+1lvs=",
-        "source": "sha256-23r4ScVV0aR09yn+Sla1Uw6b57JHSet6fEdKfHIHuXI="
-      }
-    },
     "04bfd5b08a74ba37c05241ef51d7afc47e1f3379c872dca34d99031b1ea7b855": {
       "name": "neorg",
       "version": "8.0.0-1",
@@ -33,6 +17,10 @@ expression: lockfile
       "constraint": "=8.0.0",
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
+      "source_url": {
+        "type": "url",
+        "url": "https://github.com/nvim-neorg/neorg/archive/v8.0.0.zip"
+      },
       "hashes": {
         "rockspec": "sha256-7FQ1jtFfZQQ9IYtLwS14TcFsTWXM4xMnnpQh80GHpP0=",
         "source": "sha256-YRQaq7LRoIK6qrc1djC/z4aPVhdcuw1IKxsZuddJKu4="
@@ -46,6 +34,10 @@ expression: lockfile
       "constraint": ">=1.4.0",
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
+      "source_url": {
+        "type": "git",
+        "url": "https://github.com/lunarmodules/say.git"
+      },
       "hashes": {
         "rockspec": "sha256-WFKt1iWeyjO9A8SG0KUX8tkS9JvMqoVM8CKBUguuK0Y=",
         "source": "sha256-IjNkK1leVtYgbEjUqguVMjbdW+0BHAOCE0pazrVuF50="
@@ -59,6 +51,10 @@ expression: lockfile
       "constraint": ">=1.8.0",
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
+      "source_url": {
+        "type": "url",
+        "url": "https://github.com/nvim-neotest/nvim-nio/archive/21f5324bfac14e22ba26553caf69ec76ae8a7662.zip"
+      },
       "hashes": {
         "rockspec": "sha256-QL5OCZFBGixecdEoriGck4iG83tjM09ewYbWVSbcfa4=",
         "source": "sha256-5x+iHduNdyVjS6+OrqfDh17g9o2tP2YFFqKEsK6Z5zw="
@@ -74,6 +70,10 @@ expression: lockfile
       "constraint": null,
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
+      "source_url": {
+        "type": "git",
+        "url": "https://github.com/lunarmodules/luassert.git"
+      },
       "hashes": {
         "rockspec": "sha256-rTPvF/GK/jMnH/q4wbwTCGBFELWh+JcvHeOCFAbIf64=",
         "source": "sha256-jjdB95Vr5iVsh5T7E84WwZMW6/5H2k2R/ny2VBs2l3I="
@@ -87,6 +87,10 @@ expression: lockfile
       "constraint": ">=1.7.0, <1.8.0",
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
+      "source_url": {
+        "type": "url",
+        "url": "https://github.com/nvim-neotest/nvim-nio/archive/v1.7.0.zip"
+      },
       "hashes": {
         "rockspec": "sha256-BeisoicovxazR188FBSEKxr5FBrxpIL0Ss+vCdCQ1Aw=",
         "source": "sha256-xuO1/iMXJnyKI8DkQO80TCTKMYmqOmc/bhlb9pDx6dY="
@@ -100,6 +104,10 @@ expression: lockfile
       "constraint": null,
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
+      "source_url": {
+        "type": "url",
+        "url": "https://github.com/nvim-neorg/lua-utils.nvim/archive/v1.0.2.zip"
+      },
       "hashes": {
         "rockspec": "sha256-Kc8mdjLRaL063VWYjGAWSYySYKmFgZXF+Qoa0TaRIWg=",
         "source": "sha256-fpGplQuldzNCYUMISOfGKgD080JKDxbZNb8Rch00Yxs="
@@ -113,6 +121,10 @@ expression: lockfile
       "constraint": null,
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
+      "source_url": {
+        "type": "url",
+        "url": "https://github.com/nvim-neotest/nvim-nio/archive/21f5324bfac14e22ba26553caf69ec76ae8a7662.zip"
+      },
       "hashes": {
         "rockspec": "sha256-QL5OCZFBGixecdEoriGck4iG83tjM09ewYbWVSbcfa4=",
         "source": "sha256-5x+iHduNdyVjS6+OrqfDh17g9o2tP2YFFqKEsK6Z5zw="
@@ -128,6 +140,10 @@ expression: lockfile
       "constraint": ">=2.2.0, <2.3.0",
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
+      "source_url": {
+        "type": "url",
+        "url": "https://github.com/pysan3/pathlib.nvim/archive/v2.2.3.zip"
+      },
       "hashes": {
         "rockspec": "sha256-kdDMqznWlwP9wIqlzPrZ5qEDp6edhlkaasAcQzWTmmM=",
         "source": "sha256-fNO24tL8wApI8j3rk2mdLf5wbbjlUzsvCxki3n0xRw8="
@@ -141,6 +157,10 @@ expression: lockfile
       "constraint": "=0.3.0",
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
+      "source_url": {
+        "type": "git",
+        "url": "https://github.com/MunifTanjim/nui.nvim.git"
+      },
       "hashes": {
         "rockspec": "sha256-C33kdZVqHui1mOd+J2/HbvmvYOntTMzfJ3YBtj4v51k=",
         "source": "sha256-L0ebXtv794357HOAgT17xlEJsmpqIHGqGlYfDB20WTo="
@@ -156,6 +176,10 @@ expression: lockfile
       "constraint": "=0.1.4",
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
+      "source_url": {
+        "type": "url",
+        "url": "https://github.com/nvim-lua/plenary.nvim/archive/v0.1.4.zip"
+      },
       "hashes": {
         "rockspec": "sha256-0EdepFBCsLc5D7HJKX66yMw/NbIgCmQib/+yqpJ9FFE=",
         "source": "sha256-cJ2EfkbTOiEJ8IPVnoO77alXynBv+nJ2ql/vfYOTSJI="
@@ -175,9 +199,50 @@ expression: lockfile
       "constraint": "=8.8.1",
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
+      "source_url": {
+        "type": "url",
+        "url": "https://github.com/nvim-neorg/neorg/archive/v8.8.1.zip"
+      },
       "hashes": {
         "rockspec": "sha256-fjnKNY8OIDpq2eZYea3v/uM4vna4OxpO+IA0LCcN+Cc=",
         "source": "sha256-0sVLXN+aDxmb2lxvhjUGgg8XFyu8DMl2i2RA+TjUbu8="
+      }
+    },
+    "e7c4c9fcd3cb6fe33c1c0a2ab8cdbbe8ee81d11334277d1f5631c80317770769": {
+      "name": "lua-cjson",
+      "version": "2.1.0-1",
+      "pinned": false,
+      "dependencies": [],
+      "constraint": null,
+      "binaries": [
+        "lua2json",
+        "json2lua"
+      ],
+      "source": "luarocks_rockspec+https://luarocks.org/",
+      "source_url": {
+        "type": "url",
+        "url": "http://www.kyne.com.au/~mark/software/download/lua-cjson-2.1.0.zip"
+      },
+      "hashes": {
+        "rockspec": "sha256-L/6Yon2ek6NnEeifAy3qsnT2cMCB8IdaCgVeu3+1lvs=",
+        "source": "sha256-23r4ScVV0aR09yn+Sla1Uw6b57JHSet6fEdKfHIHuXI="
+      }
+    },
+    "f98575efb520794ce8828bf0f5088047e745c27cd102cde14d4f6ad933efa00d": {
+      "name": "say",
+      "version": "1.4.1-3",
+      "pinned": false,
+      "dependencies": [],
+      "constraint": null,
+      "binaries": [],
+      "source": "luarocks_rockspec+https://luarocks.org/",
+      "source_url": {
+        "type": "git",
+        "url": "https://github.com/lunarmodules/say.git"
+      },
+      "hashes": {
+        "rockspec": "sha256-WFKt1iWeyjO9A8SG0KUX8tkS9JvMqoVM8CKBUguuK0Y=",
+        "source": "sha256-IjNkK1leVtYgbEjUqguVMjbdW+0BHAOCE0pazrVuF50="
       }
     },
     "fb56666f3cfc66910e00c89bcfa81361660a0a4edfd528baadbedcd4ac89390a": {
@@ -188,6 +253,10 @@ expression: lockfile
       "constraint": "=1.0.2",
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
+      "source_url": {
+        "type": "url",
+        "url": "https://github.com/nvim-neorg/lua-utils.nvim/archive/v1.0.2.zip"
+      },
       "hashes": {
         "rockspec": "sha256-Kc8mdjLRaL063VWYjGAWSYySYKmFgZXF+Qoa0TaRIWg=",
         "source": "sha256-fpGplQuldzNCYUMISOfGKgD080JKDxbZNb8Rch00Yxs="
@@ -195,8 +264,9 @@ expression: lockfile
     }
   },
   "entrypoints": [
-    "028a2b47c550e0e17bd2952c7444b6bf64687b3cd6b59573a066a21f545466b8",
     "04bfd5b08a74ba37c05241ef51d7afc47e1f3379c872dca34d99031b1ea7b855",
-    "bf813f9f333f9efc8108b86386ea8a2a7aeaff1d5cdf470449d5e5242e3794d3"
+    "bf813f9f333f9efc8108b86386ea8a2a7aeaff1d5cdf470449d5e5242e3794d3",
+    "e7c4c9fcd3cb6fe33c1c0a2ab8cdbbe8ee81d11334277d1f5631c80317770769",
+    "f98575efb520794ce8828bf0f5088047e745c27cd102cde14d4f6ad933efa00d"
   ]
 }

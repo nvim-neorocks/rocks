@@ -11,6 +11,7 @@ use serde::{de, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use ssri::Integrity;
 use thiserror::Error;
+use url::Url;
 
 use crate::package::{
     PackageName, PackageReq, PackageSpec, PackageVersion, PackageVersionReq,
@@ -202,11 +203,20 @@ impl LocalPackageSpec {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase", tag = "type")]
+pub(crate) enum RemotePackageSourceUrl {
+    Git { url: String }, // GitUrl doesn't have all the trait instances we need
+    Url { url: Url },
+    File { path: PathBuf },
+}
+
 // TODO(vhyrro): Move to `package/local.rs`
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LocalPackage {
     pub(crate) spec: LocalPackageSpec,
     pub(crate) source: RemotePackageSource,
+    source_url: Option<RemotePackageSourceUrl>,
     hashes: LocalPackageHashes,
 }
 
@@ -230,6 +240,7 @@ struct LocalPackageIntermediate {
     constraint: Option<String>,
     binaries: RockBinaries,
     source: RemotePackageSource,
+    source_url: Option<RemotePackageSourceUrl>,
     hashes: LocalPackageHashes,
 }
 
@@ -248,6 +259,7 @@ impl TryFrom<LocalPackageIntermediate> for LocalPackage {
                 value.binaries,
             ),
             source: value.source,
+            source_url: value.source_url,
             hashes: value.hashes,
         })
     }
@@ -263,6 +275,7 @@ impl From<&LocalPackage> for LocalPackageIntermediate {
             constraint: value.spec.constraint.clone(),
             binaries: value.spec.binaries.clone(),
             source: value.source.clone(),
+            source_url: value.source_url.clone(),
             hashes: value.hashes.clone(),
         }
     }
@@ -301,6 +314,7 @@ impl LocalPackage {
         constraint: LockConstraint,
         binaries: RockBinaries,
         source: RemotePackageSource,
+        source_url: Option<RemotePackageSourceUrl>,
         hashes: LocalPackageHashes,
     ) -> Self {
         Self {
@@ -313,6 +327,7 @@ impl LocalPackage {
                 binaries,
             ),
             source,
+            source_url,
             hashes,
         }
     }
@@ -1238,6 +1253,7 @@ mod tests {
             crate::lockfile::LockConstraint::Unconstrained,
             RockBinaries::default(),
             RemotePackageSource::Test,
+            None,
             mock_hashes.clone(),
         );
         lockfile.add(&test_local_package);
@@ -1249,6 +1265,7 @@ mod tests {
             crate::lockfile::LockConstraint::Constrained(">= 1.0.0".parse().unwrap()),
             RockBinaries::default(),
             RemotePackageSource::Test,
+            None,
             mock_hashes.clone(),
         );
         test_local_dep_package.spec.pinned = PinnedState::Pinned;
