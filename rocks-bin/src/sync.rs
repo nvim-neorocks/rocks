@@ -4,7 +4,7 @@ use clap::Args;
 use eyre::{eyre, Context, Result};
 use rocks_lib::{
     config::{Config, LuaVersion},
-    lockfile::Lockfile,
+    lockfile::ProjectLockfile,
     operations,
     package::PackageReq,
     project::{rocks_toml::RocksToml, ROCKS_TOML},
@@ -34,7 +34,7 @@ pub struct Sync {
 pub async fn sync(args: Sync, config: Config) -> Result<()> {
     let tree = config.tree(LuaVersion::from(&config)?)?;
 
-    let mut lockfile = Lockfile::new(args.lockfile.clone())?;
+    let mut lockfile = ProjectLockfile::new(args.lockfile.clone())?;
 
     let mut sync = operations::Sync::new(&tree, &mut lockfile, &config)
         .validate_integrity(!args.no_integrity_check);
@@ -71,7 +71,7 @@ pub async fn sync(args: Sync, config: Config) -> Result<()> {
         sync.add_packages(dependencies);
     }
 
-    sync.sync().await.wrap_err("sync failed.")?;
+    sync.sync_dependencies().await.wrap_err("sync failed.")?;
 
     Ok(())
 }
