@@ -1,10 +1,10 @@
 {self}: final: prev: let
   # can't seem to override the buildType with override or overrideAttrs :(
-  mk-rocks = {buildType ? "release"}:
+  mk-lux = {buildType ? "release"}:
     with final;
       rustPlatform.buildRustPackage {
-        pname = "rocks";
-        version = ((lib.importTOML "${self}/rocks-bin/Cargo.toml").package).version;
+        pname = "lux";
+        version = ((lib.importTOML "${self}/lux-bin/Cargo.toml").package).version;
 
         src = self;
 
@@ -56,22 +56,22 @@
         '';
 
         postInstall = ''
-          installManPage target/dist/rocks.1
-          installShellCompletion target/dist/rocks.{bash,fish} --zsh target/dist/_rocks
+          installManPage target/dist/lux.1
+          installShellCompletion target/dist/lux.{bash,fish} --zsh target/dist/_lux
         '';
 
         env = {
           # disable vendored packages
           LIBGIT2_NO_VENDOR = 1;
           LIBSSH2_SYS_USE_PKG_CONFIG = 1;
-          ROCKS_SKIP_IMPURE_TESTS = 1;
+          LUX_SKIP_IMPURE_TESTS = 1;
         };
 
         inherit buildType;
 
-        meta.mainProgram = "rocks";
+        meta.mainProgram = "lux";
       };
 in {
-  rocks = mk-rocks {};
-  rocks-debug = mk-rocks {buildType = "debug";};
+  lux = mk-lux {};
+  lux-debug = mk-lux {buildType = "debug";};
 }

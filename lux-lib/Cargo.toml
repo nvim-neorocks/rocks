@@ -1,0 +1,75 @@
+[package]
+
+name = "lux-lib"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bytes = "1.10.0"
+cc = { version = "1.2.0", features = ["parallel"] }
+directories = "6.0.0"
+git-url-parse = "0.4.4"
+git2 = "0.20.0"
+html-escape = "0.2.13"
+httpdate = "1.0.3"
+itertools = "0.14.0"
+mlua = { version = "0.10.1", features = ["luajit52", "serialize", "macros", "error-send"] }
+pathdiff = "0.2.1"
+reqwest = { version = "0.12.0", features = ["json", "multipart"] }
+semver = "1.0.22"
+serde = { version = "1.0.197", features = ["derive"] }
+serde_json = { version = "1.0.114", features = ["preserve_order"] }
+serde-enum-str = "0.4.0"
+ssri = "9.2.0"
+strum = { version = "0.27" }
+strum_macros = "0.27"
+tokio = { version = "1.43.0", features = ["full"] }
+tempdir = "0.3.7"
+vfs = "0.12.0"
+walkdir = "2.4.0"
+zip = "2.2.0"
+tar = "0.4.42"
+flate2 = "1.0.34"
+which = "7.0.0"
+lets_find_up = "0.0.4"
+remove_dir_all = "1.0.0"
+openssl = "0.10.70"
+lua-src = "547.0.0"
+luajit-src = "210.5.10"
+target-lexicon = "0.13.0"
+clap = { version = "4.5.3", features = ["derive"], optional = true}
+infer = "0.19.0"
+indicatif = "0.17.8"
+sha2 = "0.10.8"
+hex = { version = "0.4.3" }
+fs_extra = "1.3.0"
+thiserror = "2.0.0"
+gpgme = "0.11.0"
+futures = "0.3.31"
+async-recursion = "1.1.1"
+shell-words = "1.1.0"
+shlex = "1.3.0"
+pkg-config = "0.3.31"
+url = "2.5.4"
+bon = { version = "3.3.2", features = ["implied-bounds"] }
+clean-path = "0.2.1"
+diffy = "0.4.0"
+toml = "0.8.19"
+md5 = "0.7.0"
+toml_edit = "0.22.22"
+nix-nar = "0.3.0"
+
+[dev-dependencies]
+httptest = { version = "0.16.1" }
+serial_test = { version = "3.2.0" }
+proptest = "1.6.0"
+dir-diff = "0.3.3"
+insta = { version = "1.42.0", features = ["redactions", "yaml", "json"] }
+assert_fs = "1.1.2"
+predicates = "3.1.2"
+
+[features]
+clap = ["dep:clap"]
+lua = []

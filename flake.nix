@@ -43,22 +43,22 @@
                 denyWarnings = true;
                 allFeatures = true;
               };
-              extraPackages = pkgs.rocks.buildInputs ++ pkgs.rocks.nativeBuildInputs;
+              extraPackages = pkgs.lux.buildInputs ++ pkgs.lux.nativeBuildInputs;
             };
             cargo-check.enable = true;
           };
-          settings.rust.check.cargoDeps = pkgs.rocks.cargoDeps;
+          settings.rust.check.cargoDeps = pkgs.lux.cargoDeps;
         };
       in {
         packages = with pkgs; {
-          default = rocks;
-          inherit rocks;
+          default = lux;
+          inherit lux;
         };
 
         devShells = let
           mkDevShell = lua_pkg:
             pkgs.mkShell {
-              name = "rocks devShell";
+              name = "lux devShell";
               inherit (git-hooks-check) shellHook;
               buildInputs =
                 (with pkgs; [
@@ -73,8 +73,8 @@
                   zlib
                 ])
                 ++ self.checks.${system}.git-hooks-check.enabledPackages
-                ++ pkgs.rocks.buildInputs
-                ++ pkgs.rocks.nativeBuildInputs;
+                ++ pkgs.lux.buildInputs
+                ++ pkgs.lux.nativeBuildInputs;
             };
         in rec {
           default = lua51;
@@ -90,7 +90,7 @@
           inherit
             git-hooks-check
             ;
-          tests = pkgs.rocks-debug;
+          tests = pkgs.lux-debug;
         };
       };
       flake = {

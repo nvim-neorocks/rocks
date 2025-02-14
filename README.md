@@ -2,10 +2,10 @@
 
 > [!WARNING]
 >
-> **rocks is a work in progress
+> **lux is a work in progress
 > and does not have a stable release yet.**
 
-Rocks serves as an application for:
+Lux serves as an application for:
 - Installing and managing rocks
 - Creating Lua projects with dependencies, build scripts and desired Lua versions
 - Creating and publishing your own rocks
@@ -19,20 +19,20 @@ Rocks serves as an application for:
 ## :books: Usage
 
 ```sh
-rocks <command> <options>
+lux <command> <options>
 ```
 
-To view available options and their descriptions, run `rocks --help`.
+To view available options and their descriptions, run `lux --help`.
 
 ## Comparison with [`luarocks v3.11.1`](https://github.com/luarocks/luarocks)
 
 As this project is still a work in progress, some luarocks features
 have not been (fully) implemented yet.
-On the other hand, rocks has some features that are not present in luarocks.
+On the other hand, lux has some features that are not present in luarocks.
 
 The following table provides a brief (incomplete) comparison:
 
-|                                                                       | `rocks`                      | `luarocks v3.11.1` |
+|                                                                       | `lux`                      | `luarocks v3.11.1` |
 | ---                                                                   | ---                          | ---                |
 | `builtin` build spec                                                  | :white_check_mark:           | :white_check_mark: |
 | `make` build spec                                                     | :white_check_mark:           | :white_check_mark: |
@@ -63,7 +63,7 @@ The following table provides a brief (incomplete) comparison:
 
 ## :book: License
 
-`rocks` is licensed under [MIT](./LICENSE).
+`lux` is licensed under [MIT](./LICENSE).
 
 ## :green_heart: Contributing
 
