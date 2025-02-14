@@ -3,7 +3,7 @@ use mlua::{FromLua, Lua, Value};
 use reqwest::Url;
 use serde::{de, Deserialize, Deserializer};
 use ssri::Integrity;
-use std::{borrow::Cow, convert::Infallible, fs, io, path::PathBuf, str::FromStr};
+use std::{convert::Infallible, fs, io, path::PathBuf, str::FromStr};
 use thiserror::Error;
 
 use super::{
@@ -37,37 +37,16 @@ impl FromPlatformOverridable<RockSourceInternal, Self> for RockSource {
         // This ensures that invalid combinations are caught while parsing.
         let url = SourceUrl::from_str(&internal.url.ok_or(RockSourceError::SourceUrlMissing)?)?;
 
-        let source_spec = match (url, internal.tag, internal.branch, internal.module) {
-            (source, None, None, None) => Ok(RockSourceSpec::default_from_source_url(source)),
-            (SourceUrl::Cvs(url), None, None, Some(module)) => {
-                Ok(RockSourceSpec::Cvs(CvsSource { url, module }))
-            }
-            (SourceUrl::Git(url), Some(tag), None, None) => Ok(RockSourceSpec::Git(GitSource {
+        let source_spec = match (url, internal.tag, internal.branch) {
+            (source, None, None) => Ok(RockSourceSpec::default_from_source_url(source)),
+            (SourceUrl::Git(url), Some(tag), None) => Ok(RockSourceSpec::Git(GitSource {
                 url,
                 checkout_ref: Some(tag),
             })),
-            (SourceUrl::Git(url), None, Some(branch), None) => Ok(RockSourceSpec::Git(GitSource {
+            (SourceUrl::Git(url), None, Some(branch)) => Ok(RockSourceSpec::Git(GitSource {
                 url,
                 checkout_ref: Some(branch),
             })),
-            (SourceUrl::Mercurial(url), Some(tag), None, None) => {
-                Ok(RockSourceSpec::Mercurial(MercurialSource {
-                    url,
-                    checkout_ref: Some(tag),
-                }))
-            }
-            (SourceUrl::Mercurial(url), None, Some(branch), None) => {
-                Ok(RockSourceSpec::Mercurial(MercurialSource {
-                    url,
-                    checkout_ref: Some(branch),
-                }))
-            }
-            (SourceUrl::Sscm(url), None, None, Some(module)) => {
-                Ok(RockSourceSpec::Sscm(SscmSource { url, module }))
-            }
-            (SourceUrl::Svn(url), tag, None, module) => {
-                Ok(RockSourceSpec::Svn(SvnSource { url, tag, module }))
-            }
             _ => Err(RockSourceError::InvalidCombination),
         }?;
 
@@ -89,40 +68,19 @@ impl FromLua for PerPlatform<RockSource> {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum RockSourceSpec {
-    Cvs(CvsSource),
     Git(GitSource),
     File(PathBuf),
     Url(Url),
-    Mercurial(MercurialSource),
-    Sscm(SscmSource),
-    Svn(SvnSource),
 }
 
 impl RockSourceSpec {
     fn default_from_source_url(url: SourceUrl) -> Self {
         match url {
-            SourceUrl::Cvs(url) => Self::Cvs(CvsSource {
-                module: base_name(url.as_str()).into(),
-                url,
-            }),
             SourceUrl::File(path) => Self::File(path),
             SourceUrl::Url(url) => Self::Url(url),
             SourceUrl::Git(url) => Self::Git(GitSource {
                 url,
                 checkout_ref: None,
-            }),
-            SourceUrl::Mercurial(url) => Self::Mercurial(MercurialSource {
-                url,
-                checkout_ref: None,
-            }),
-            SourceUrl::Sscm(url) => Self::Sscm(SscmSource {
-                module: base_name(url.as_str()).into(),
-                url,
-            }),
-            SourceUrl::Svn(url) => Self::Svn(SvnSource {
-                url,
-                module: None,
-                tag: None,
             }),
         }
     }
@@ -141,34 +99,9 @@ impl<'de> Deserialize<'de> for RockSourceSpec {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct CvsSource {
-    pub url: String,
-    pub module: String,
-}
-
-#[derive(Debug, PartialEq, Clone)]
 pub struct GitSource {
     pub url: GitUrl,
     pub checkout_ref: Option<String>,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct MercurialSource {
-    pub url: String,
-    pub checkout_ref: Option<String>,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct SscmSource {
-    pub url: String,
-    pub module: String,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct SvnSource {
-    pub url: String,
-    pub module: Option<String>,
-    pub tag: Option<String>,
 }
 
 /// Used as a helper for Deserialize,
@@ -183,7 +116,6 @@ pub(crate) struct RockSourceInternal {
     pub(crate) dir: Option<PathBuf>,
     pub(crate) tag: Option<String>,
     pub(crate) branch: Option<String>,
-    pub(crate) module: Option<String>,
 }
 
 impl PartialOverride for RockSourceInternal {
@@ -195,16 +127,12 @@ impl PartialOverride for RockSourceInternal {
             hash: override_opt(override_spec.hash.as_ref(), self.hash.as_ref()),
             file: override_opt(override_spec.file.as_ref(), self.file.as_ref()),
             dir: override_opt(override_spec.dir.as_ref(), self.dir.as_ref()),
-            tag: match (&override_spec.branch, &override_spec.module) {
-                (None, None) => override_opt(override_spec.tag.as_ref(), self.tag.as_ref()),
+            tag: match &override_spec.branch {
+                None => override_opt(override_spec.tag.as_ref(), self.tag.as_ref()),
                 _ => None,
             },
-            branch: match (&override_spec.tag, &override_spec.module) {
-                (None, None) => override_opt(override_spec.branch.as_ref(), self.branch.as_ref()),
-                _ => None,
-            },
-            module: match (&override_spec.tag, &override_spec.branch) {
-                (None, None) => override_opt(override_spec.module.as_ref(), self.module.as_ref()),
+            branch: match &override_spec.tag {
+                None => override_opt(override_spec.branch.as_ref(), self.branch.as_ref()),
                 _ => None,
             },
         })
@@ -251,12 +179,6 @@ impl DisplayAsLuaKV for RockSourceInternal {
                 value: DisplayLuaValue::String(branch.clone()),
             });
         }
-        if let Some(module) = &self.module {
-            result.push(DisplayLuaKV {
-                key: "module".to_string(),
-                value: DisplayLuaValue::String(module.clone()),
-            });
-        }
 
         DisplayLuaKV {
             key: "source".to_string(),
@@ -287,20 +209,12 @@ fn override_opt<T: Clone>(override_opt: Option<&T>, base: Option<&T>) -> Option<
 /// Internal helper for parsing
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum SourceUrl {
-    /// For the CVS source control manager
-    Cvs(String),
     /// For URLs in the local filesystem
     File(PathBuf),
     /// Web URLs
     Url(Url),
     /// For the Git source control manager
     Git(GitUrl),
-    /// or the Mercurial source control manager
-    Mercurial(String),
-    /// or the SurroundSCM source control manager
-    Sscm(String),
-    /// or the Subversion source control manager
-    Svn(String),
 }
 
 #[derive(Error, Debug)]
@@ -309,6 +223,14 @@ pub enum SourceUrlError {
     Io(#[from] io::Error),
     Git(#[from] GitUrlParseError),
     Url(#[source] <Url as FromStr>::Err),
+    #[error("rocks does not support rockspecs with CVS sources.")]
+    CVS,
+    #[error("rocks does not support rockspecs with mercurial sources.")]
+    Mercurial,
+    #[error("rocks does not support rockspecs with SSCM sources.")]
+    SSCM,
+    #[error("rocks does not support rockspecs with SVN sources.")]
+    SVN,
     #[error("unsupported source url: {0}")]
     Unsupported(String),
 }
@@ -318,7 +240,6 @@ impl FromStr for SourceUrl {
 
     fn from_str(str: &str) -> Result<Self, Self::Err> {
         match str {
-            s if s.starts_with("cvs://") => Ok(Self::Cvs(s.to_string())),
             s if s.starts_with("file://") => {
                 let path_buf: PathBuf = s.trim_start_matches("file://").into();
                 let path = fs::canonicalize(&path_buf)?;
@@ -335,15 +256,16 @@ impl FromStr for SourceUrl {
             s if starts_with_any(s, ["https://", "http://", "ftp://"].into()) => {
                 Ok(Self::Url(s.parse().map_err(SourceUrlError::Url)?))
             }
+            s if s.starts_with("cvs://") => Err(SourceUrlError::CVS),
             s if starts_with_any(
                 s,
                 ["hg://", "hg+http://", "hg+https://", "hg+ssh://"].into(),
             ) =>
             {
-                Ok(Self::Mercurial(s.to_string()))
+                Err(SourceUrlError::Mercurial)
             }
-            s if s.starts_with("sscm://") => Ok(Self::Sscm(s.to_string())),
-            s if s.starts_with("svn://") => Ok(Self::Svn(s.to_string())),
+            s if s.starts_with("sscm://") => Err(SourceUrlError::SSCM),
+            s if s.starts_with("svn://") => Err(SourceUrlError::SVN),
             s => Err(SourceUrlError::Unsupported(s.to_string())),
         }
     }
@@ -370,16 +292,6 @@ where
     Ok(integrity_opt)
 }
 
-/// Implementation of the luarocks base_name function
-/// Strips the path, so /a/b/c becomes c
-fn base_name(path: &str) -> Cow<'_, str> {
-    let mut pieces = path.rsplit('/');
-    match pieces.next() {
-        Some(p) => p.into(),
-        None => path.into(),
-    }
-}
-
 fn starts_with_any(str: &str, prefixes: Vec<&str>) -> bool {
     prefixes.iter().any(|&prefix| str.starts_with(prefix))
 }
@@ -393,10 +305,6 @@ mod tests {
 
     #[tokio::test]
     async fn parse_source_url() {
-        let url: SourceUrl = "cvs://foo".parse().unwrap();
-        assert_eq!(url, SourceUrl::Cvs("cvs://foo".into()));
-        let url: SourceUrl = "cvs://bar".parse().unwrap();
-        assert_eq!(url, SourceUrl::Cvs("cvs://bar".into()));
         let dir = TempDir::new("rocks-test").unwrap().into_path();
         let url: SourceUrl = format!("file://{}", dir.to_string_lossy()).parse().unwrap();
         assert_eq!(url, SourceUrl::File(dir));
@@ -413,26 +321,9 @@ mod tests {
         let url: SourceUrl = "git+ssh://example.com/foo".parse().unwrap();
         assert!(matches!(url, SourceUrl::Git { .. }));
         let _err = SourceUrl::from_str("git+foo://example.com/foo").unwrap_err();
-        let url: SourceUrl = "hg://example.com/foo".parse().unwrap();
-        assert!(matches!(url, SourceUrl::Mercurial { .. }));
-        let url: SourceUrl = "hg+http://example.com/foo".parse().unwrap();
-        assert!(matches!(url, SourceUrl::Mercurial { .. }));
-        let url: SourceUrl = "hg+https://example.com/foo".parse().unwrap();
-        assert!(matches!(url, SourceUrl::Mercurial { .. }));
-        let url: SourceUrl = "hg+ssh://example.com/foo".parse().unwrap();
-        assert!(matches!(url, SourceUrl::Mercurial { .. }));
-        let _err = SourceUrl::from_str("hg+foo://example.com/foo").unwrap_err();
         let url: SourceUrl = "https://example.com/foo".parse().unwrap();
         assert!(matches!(url, SourceUrl::Url { .. }));
         let url: SourceUrl = "http://example.com/foo".parse().unwrap();
         assert!(matches!(url, SourceUrl::Url { .. }));
-        let url: SourceUrl = "sscm://foo".parse().unwrap();
-        assert_eq!(url, SourceUrl::Sscm("sscm://foo".into()));
-        let url: SourceUrl = "sscm://bar".parse().unwrap();
-        assert_eq!(url, SourceUrl::Sscm("sscm://bar".into()));
-        let url: SourceUrl = "svn://foo".parse().unwrap();
-        assert_eq!(url, SourceUrl::Svn("svn://foo".into()));
-        let url: SourceUrl = "svn://bar".parse().unwrap();
-        assert_eq!(url, SourceUrl::Svn("svn://bar".into()));
     }
 }

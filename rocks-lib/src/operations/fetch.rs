@@ -208,10 +208,6 @@ async fn do_fetch_src<R: Rockspec>(fetch: &FetchSrc<'_, R>) -> Result<Integrity,
             }
             path.hash()?
         }
-        RockSourceSpec::Cvs(_) => unimplemented!(),
-        RockSourceSpec::Mercurial(_) => unimplemented!(),
-        RockSourceSpec::Sscm(_) => unimplemented!(),
-        RockSourceSpec::Svn(_) => unimplemented!(),
     };
     Ok(integrity)
 }
