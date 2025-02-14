@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::{
     config::{Config, LuaVersion},
-    lockfile::{Lockfile, ReadOnly},
+    lockfile::{ProjectLockfile, ReadOnly},
     lua_rockspec::{
         ExternalDependencySpec, LuaRockspec, LuaVersionError, PartialLuaRockspec,
         PartialRockspecError, RockSourceSpec, RockspecError,
@@ -66,9 +66,9 @@ pub enum ProjectTreeError {
 
 #[derive(Clone, Debug)]
 pub struct Project {
-    /// The path where the `project.rockspec` resides.
+    /// The path where the `rocks.toml` resides.
     root: PathBuf,
-    /// The parsed rockspec.
+    /// The parsed rocks.toml.
     rocks: RocksToml,
 }
 
@@ -125,16 +125,16 @@ impl Project {
         self.root.join("rocks.lock")
     }
 
-    /// Get the `rocks.lock` lockfile in the project root, if present.
-    pub fn lockfile(&self) -> Result<Lockfile<ReadOnly>, io::Error> {
-        Lockfile::new(self.lockfile_path())
+    /// Get the `rocks.lock` lockfile in the project root.
+    pub fn lockfile(&self) -> Result<ProjectLockfile<ReadOnly>, io::Error> {
+        ProjectLockfile::new(self.lockfile_path())
     }
 
     /// Get the `rocks.lock` lockfile in the project root, if present.
-    pub fn try_lockfile(&self) -> Result<Option<Lockfile<ReadOnly>>, io::Error> {
+    pub fn try_lockfile(&self) -> Result<Option<ProjectLockfile<ReadOnly>>, io::Error> {
         let path = self.lockfile_path();
         if path.is_file() {
-            Ok(Some(Lockfile::new(path)?))
+            Ok(Some(ProjectLockfile::new(path)?))
         } else {
             Ok(None)
         }
@@ -173,9 +173,17 @@ impl Project {
         Ok(rocks)
     }
 
+    fn tree_root_dir(&self) -> PathBuf {
+        self.root.join(".rocks")
+    }
+
     pub fn tree(&self, config: &Config) -> Result<Tree, ProjectTreeError> {
+        Ok(Tree::new(self.tree_root_dir(), self.lua_version(config)?)?)
+    }
+
+    pub fn test_tree(&self, config: &Config) -> Result<Tree, ProjectTreeError> {
         Ok(Tree::new(
-            self.root.join(".rocks"),
+            self.tree_root_dir().join("test_dependencies"),
             self.lua_version(config)?,
         )?)
     }

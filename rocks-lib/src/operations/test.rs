@@ -6,15 +6,15 @@ use crate::{
     package::{PackageName, PackageReq, PackageVersionReqError},
     path::Paths,
     progress::{MultiProgress, Progress},
-    project::{rocks_toml::RocksTomlValidationError, Project},
-    rockspec::{LuaVersionCompatibility, Rockspec},
+    project::{rocks_toml::RocksTomlValidationError, Project, ProjectTreeError},
+    rockspec::Rockspec,
     tree::Tree,
 };
 use bon::Builder;
 use itertools::Itertools;
 use thiserror::Error;
 
-use super::{Install, InstallError};
+use super::{Install, InstallError, Sync, SyncError};
 
 #[derive(Builder)]
 #[builder(start_fn = new, finish_fn(name = _run, vis = ""))]
@@ -26,6 +26,8 @@ pub struct Test<'a> {
 
     #[builder(field)]
     args: Vec<String>,
+
+    no_lock: Option<bool>,
 
     #[builder(default)]
     env: TestEnv,
@@ -74,28 +76,66 @@ pub enum RunTestsError {
     TestFailure,
     #[error("failed to execute `{0}`: {1}")]
     RunCommandFailure(String, io::Error),
-    #[error("lua version not set! Please provide a version through `--lua-version <ver>` or add it to your rockspec's dependencies.")]
-    LuaVersionUnset,
     #[error(transparent)]
     Io(#[from] io::Error),
     #[error(transparent)]
+    Tree(#[from] ProjectTreeError),
+    #[error(transparent)]
     RocksTomlValidation(#[from] RocksTomlValidationError),
+    #[error("failed to sync dependencies: {0}")]
+    Sync(#[from] SyncError),
 }
 
 async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
     let rocks = test.project.rocks().into_validated_rocks_toml()?;
-    let lua_version = match rocks.lua_version_matches(test.config) {
-        Ok(lua_version) => Ok(lua_version),
-        Err(_) => rocks
-            .test_lua_version()
-            .ok_or(RunTestsError::LuaVersionUnset),
-    }?;
-    let tree = test.config.tree(lua_version)?;
+    let project_tree = test.project.tree(test.config)?;
+    let test_tree = test.project.test_tree(test.config)?;
+    std::fs::create_dir_all(test_tree.root())?;
     // TODO(#204): Only ensure busted if running with busted (e.g. a .busted directory exists)
-    ensure_busted(&tree, test.config, test.progress.clone()).await?;
-    ensure_dependencies(&rocks, &tree, test.config, test.progress).await?;
-    let tree_root = &tree.root().clone();
-    let paths = Paths::new(tree)?;
+    if test.no_lock.unwrap_or(false) {
+        ensure_dependencies(
+            &rocks,
+            &project_tree,
+            &test_tree,
+            test.config,
+            test.progress,
+        )
+        .await?;
+    } else {
+        let mut lockfile = test.project.lockfile()?;
+
+        let test_dependencies = rocks
+            .test_dependencies()
+            .current_platform()
+            .iter()
+            .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
+            .cloned()
+            .collect_vec();
+
+        Sync::new(&test_tree, &mut lockfile, test.config)
+            .progress(test.progress.clone())
+            .packages(test_dependencies)
+            .sync_test_dependencies()
+            .await?;
+
+        let dependencies = rocks
+            .dependencies()
+            .current_platform()
+            .iter()
+            .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
+            .cloned()
+            .collect_vec();
+
+        Sync::new(&project_tree, &mut lockfile, test.config)
+            .progress(test.progress.clone())
+            .packages(dependencies)
+            .sync_dependencies()
+            .await?;
+    }
+    let test_tree_root = &test_tree.root().clone();
+    let mut paths = Paths::new(project_tree)?;
+    let test_tree_paths = Paths::new(test_tree)?;
+    paths.prepend(&test_tree_paths);
     let mut command = Command::new("busted");
     let mut command = command
         .current_dir(test.project.root())
@@ -106,7 +146,7 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
     if let TestEnv::Pure = test.env {
         // isolate the test runner from the user's own config/data files
         // by initialising empty HOME and XDG base directory paths
-        let home = tree_root.join("home");
+        let home = test_tree_root.join("home");
         let xdg = home.join("xdg");
         let _ = std::fs::remove_dir_all(&home);
         let xdg_config_home = xdg.join("config");
@@ -164,18 +204,19 @@ pub async fn ensure_busted(
 /// This defaults to the local project tree if cwd is a project root.
 async fn ensure_dependencies(
     rockspec: &impl Rockspec,
-    tree: &Tree,
+    project_tree: &Tree,
+    test_tree: &Tree,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), InstallTestDependenciesError> {
-    let dependencies = rockspec
+    ensure_busted(test_tree, config, progress.clone()).await?;
+    let test_dependencies = rockspec
         .test_dependencies()
         .current_platform()
         .iter()
-        .chain(rockspec.dependencies().current_platform())
         .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
         .filter_map(|req| {
-            let build_behaviour = if tree
+            let build_behaviour = if test_tree
                 .match_rocks(req)
                 .is_ok_and(|matches| matches.is_found())
             {
@@ -186,7 +227,30 @@ async fn ensure_dependencies(
             build_behaviour.map(|it| (it, req.to_owned()))
         });
 
-    Install::new(tree, config)
+    Install::new(test_tree, config)
+        .packages(test_dependencies)
+        .progress(progress.clone())
+        .install()
+        .await?;
+
+    let dependencies = rockspec
+        .dependencies()
+        .current_platform()
+        .iter()
+        .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
+        .filter_map(|req| {
+            let build_behaviour = if project_tree
+                .match_rocks(req)
+                .is_ok_and(|matches| matches.is_found())
+            {
+                Some(BuildBehaviour::Force)
+            } else {
+                None
+            };
+            build_behaviour.map(|it| (it, req.to_owned()))
+        });
+
+    Install::new(project_tree, config)
         .packages(dependencies)
         .progress(progress)
         .install()

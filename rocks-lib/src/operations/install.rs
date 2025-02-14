@@ -168,7 +168,6 @@ async fn install(
 where
 {
     let lockfile = tree.lockfile()?;
-    let project_lockfile = project.map(|p| p.lockfile()).transpose()?;
     let tree = project.map_or(Ok(tree.clone()), |p| p.tree(config))?;
 
     install_impl(
@@ -178,7 +177,6 @@ where
         config,
         &tree,
         lockfile,
-        project_lockfile,
         progress,
     )
     .await
@@ -193,7 +191,6 @@ async fn install_impl(
     config: &Config,
     tree: &Tree,
     mut lockfile: Lockfile<ReadOnly>,
-    project_lockfile: Option<Lockfile<ReadOnly>>,
     progress_arc: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, InstallError> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -299,16 +296,6 @@ async fn install_impl(
 
         Ok::<_, io::Error>(())
     })?;
-
-    if let Some(mut project_lockfile) = project_lockfile {
-        project_lockfile.map_then_flush(|lockfile| {
-            installed_packages
-                .iter()
-                .for_each(|(id, pkg)| write_dependency(lockfile, id, pkg));
-
-            Ok::<_, io::Error>(())
-        })?;
-    }
 
     Ok(installed_packages.into_values().collect_vec())
 }

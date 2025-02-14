@@ -13,6 +13,10 @@ pub struct Test {
     /// Don't isolate the user environment (keep `HOME` and `XDG` environment variables).
     #[arg(long)]
     impure: bool,
+
+    /// Ignore the project's lockfile and don't create one.
+    #[arg(long)]
+    no_lock: bool,
 }
 
 pub async fn test(test: Test, config: Config) -> Result<()> {
@@ -27,6 +31,7 @@ pub async fn test(test: Test, config: Config) -> Result<()> {
     operations::Test::new(project, &config)
         .args(test_args)
         .env(test_env)
+        .no_lock(test.no_lock)
         .run()
         .await?;
     Ok(())
