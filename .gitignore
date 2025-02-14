@@ -8,13 +8,18 @@
 
 /result*
 
-# Temp test files
-/rocks-lib/resources/test/luatest-0.2-1/
-/rocks-lib/proptest-regressions/
-/*.rockspec
-*.snap.new
+# For compat
 /.rocks
 /rocks.lock
 /rocks.toml
+
+# Temp test files
+/lux-lib/resources/test/luatest-0.2-1/
+/lux-lib/proptest-regressions/
+/*.rockspec
+*.snap.new
+/.lux
+/lux.lock
+/lux.toml
 
 .pre-commit-config.yaml

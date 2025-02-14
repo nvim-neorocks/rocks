@@ -8,7 +8,7 @@ use std::{
 use clap::{CommandFactory, ValueEnum};
 use clap_complete::{generate_to, Shell};
 use clap_mangen::Man;
-use rocks::Cli;
+use lux::Cli;
 
 type DynError = Box<dyn std::error::Error>;
 
@@ -55,9 +55,9 @@ fn dist() -> Result<(), DynError> {
         Err("cargo build failed")?;
     }
 
-    let dst = project_root().join("target/release/rocks");
+    let dst = project_root().join("target/release/lux");
 
-    fs::copy(&dst, dist_dir().join("rocks"))?;
+    fs::copy(&dst, dist_dir().join("lux"))?;
 
     if Command::new("strip")
         .arg("--version")
@@ -83,7 +83,7 @@ fn dist_man() -> Result<(), DynError> {
     let cmd = &mut Cli::command();
 
     Man::new(cmd.clone())
-        .render(&mut File::create(dist_dir().join("rocks.1")).unwrap())
+        .render(&mut File::create(dist_dir().join("lux.1")).unwrap())
         .unwrap();
     Ok(())
 }
@@ -94,7 +94,7 @@ fn dist_completions() -> Result<(), DynError> {
     let cmd = &mut Cli::command();
 
     for shell in Shell::value_variants() {
-        generate_to(*shell, cmd, "rocks", dist_dir()).unwrap();
+        generate_to(*shell, cmd, "lux", dist_dir()).unwrap();
     }
 
     Ok(())

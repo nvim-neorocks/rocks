@@ -1,8 +1,8 @@
 [workspace]
 members = [
-    "rocks-lib",
-    "rocks-bin",
+    "lux-lib",
+    "lux-bin",
     "xtask",
-    # "rocks-lua",
+    # "lux-lua",
 ]
 resolver = "2"
