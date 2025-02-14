@@ -1,21 +1,6 @@
 {
   "version": "1.0.0",
   "rocks": {
-    "aa8d78a5981bc7a1a0ab12216849259a68e41c4203d495051ab57c24074f63f8": {
-      "name": "pathlib.nvim",
-      "version": "2.2.3-1",
-      "pinned": false,
-      "dependencies": [
-        "306b1bc37b09349a902e436efffb1161bbbdb46fafd5dc54b6e071ef5259b68a"
-      ],
-      "constraint": ">=2.2.0, <2.3.0",
-      "binaries": [],
-      "source": "luarocks_rockspec+https://luarocks.org/",
-      "hashes": {
-        "rockspec": "sha256-kdDMqznWlwP9wIqlzPrZ5qEDp6edhlkaasAcQzWTmmM=",
-        "source": "sha256-fNO24tL8wApI8j3rk2mdLf5wbbjlUzsvCxki3n0xRw8="
-      }
-    },
     "028a2b47c550e0e17bd2952c7444b6bf64687b3cd6b59573a066a21f545466b8": {
       "name": "lua-cjson",
       "version": "2.1.0-1",
@@ -32,38 +17,41 @@
         "source": "sha256-23r4ScVV0aR09yn+Sla1Uw6b57JHSet6fEdKfHIHuXI="
       }
     },
-    "fb56666f3cfc66910e00c89bcfa81361660a0a4edfd528baadbedcd4ac89390a": {
-      "name": "lua-utils.nvim",
-      "version": "1.0.2-1",
+    "04bfd5b08a74ba37c05241ef51d7afc47e1f3379c872dca34d99031b1ea7b855": {
+      "name": "neorg",
+      "version": "8.0.0-1",
       "pinned": false,
-      "dependencies": [],
-      "constraint": "=1.0.2",
+      "dependencies": [
+        "99930d308895ccd027772f32eb777cebdb8668c32f4602036e237f0a46fcc0d9",
+        "985b1994517e6433d3e9ed05882a13069e7458f4646eabb451cc3964674c3c11"
+      ],
+      "constraint": "=8.0.0",
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
       "hashes": {
-        "rockspec": "sha256-Kc8mdjLRaL063VWYjGAWSYySYKmFgZXF+Qoa0TaRIWg=",
-        "source": "sha256-fpGplQuldzNCYUMISOfGKgD080JKDxbZNb8Rch00Yxs="
+        "rockspec": "sha256-7FQ1jtFfZQQ9IYtLwS14TcFsTWXM4xMnnpQh80GHpP0=",
+        "source": "sha256-YRQaq7LRoIK6qrc1djC/z4aPVhdcuw1IKxsZuddJKu4="
       }
     },
-    "77a8e249ed3119392da5a9f20c88954cacf7ac6d2ccb7b78e037a218c6afc166": {
-      "name": "nvim-nio",
-      "version": "1.7.0-1",
+    "085d597b2652e6dd9793a12fc57fca6d63575201113ba0bfe197f941264eb83f": {
+      "name": "say",
+      "version": "1.4.1-3",
       "pinned": false,
       "dependencies": [],
-      "constraint": ">=1.7.0, <1.8.0",
+      "constraint": ">=1.4.0",
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
       "hashes": {
-        "rockspec": "sha256-BeisoicovxazR188FBSEKxr5FBrxpIL0Ss+vCdCQ1Aw=",
-        "source": "sha256-xuO1/iMXJnyKI8DkQO80TCTKMYmqOmc/bhlb9pDx6dY="
+        "rockspec": "sha256-WFKt1iWeyjO9A8SG0KUX8tkS9JvMqoVM8CKBUguuK0Y=",
+        "source": "sha256-IjNkK1leVtYgbEjUqguVMjbdW+0BHAOCE0pazrVuF50="
       }
     },
-    "99930d308895ccd027772f32eb777cebdb8668c32f4602036e237f0a46fcc0d9": {
+    "306b1bc37b09349a902e436efffb1161bbbdb46fafd5dc54b6e071ef5259b68a": {
       "name": "nvim-nio",
       "version": "1.10.1-1",
       "pinned": false,
       "dependencies": [],
-      "constraint": null,
+      "constraint": ">=1.8.0",
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
       "hashes": {
@@ -86,17 +74,17 @@
         "source": "sha256-jjdB95Vr5iVsh5T7E84WwZMW6/5H2k2R/ny2VBs2l3I="
       }
     },
-    "306b1bc37b09349a902e436efffb1161bbbdb46fafd5dc54b6e071ef5259b68a": {
+    "77a8e249ed3119392da5a9f20c88954cacf7ac6d2ccb7b78e037a218c6afc166": {
       "name": "nvim-nio",
-      "version": "1.10.1-1",
+      "version": "1.7.0-1",
       "pinned": false,
       "dependencies": [],
-      "constraint": ">=1.8.0",
+      "constraint": ">=1.7.0, <1.8.0",
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
       "hashes": {
-        "rockspec": "sha256-QL5OCZFBGixecdEoriGck4iG83tjM09ewYbWVSbcfa4=",
-        "source": "sha256-5x+iHduNdyVjS6+OrqfDh17g9o2tP2YFFqKEsK6Z5zw="
+        "rockspec": "sha256-BeisoicovxazR188FBSEKxr5FBrxpIL0Ss+vCdCQ1Aw=",
+        "source": "sha256-xuO1/iMXJnyKI8DkQO80TCTKMYmqOmc/bhlb9pDx6dY="
       }
     },
     "985b1994517e6433d3e9ed05882a13069e7458f4646eabb451cc3964674c3c11": {
@@ -112,17 +100,60 @@
         "source": "sha256-fpGplQuldzNCYUMISOfGKgD080JKDxbZNb8Rch00Yxs="
       }
     },
-    "085d597b2652e6dd9793a12fc57fca6d63575201113ba0bfe197f941264eb83f": {
-      "name": "say",
-      "version": "1.4.1-3",
+    "99930d308895ccd027772f32eb777cebdb8668c32f4602036e237f0a46fcc0d9": {
+      "name": "nvim-nio",
+      "version": "1.10.1-1",
       "pinned": false,
       "dependencies": [],
-      "constraint": ">=1.4.0",
+      "constraint": null,
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
       "hashes": {
-        "rockspec": "sha256-WFKt1iWeyjO9A8SG0KUX8tkS9JvMqoVM8CKBUguuK0Y=",
-        "source": "sha256-IjNkK1leVtYgbEjUqguVMjbdW+0BHAOCE0pazrVuF50="
+        "rockspec": "sha256-QL5OCZFBGixecdEoriGck4iG83tjM09ewYbWVSbcfa4=",
+        "source": "sha256-5x+iHduNdyVjS6+OrqfDh17g9o2tP2YFFqKEsK6Z5zw="
+      }
+    },
+    "aa8d78a5981bc7a1a0ab12216849259a68e41c4203d495051ab57c24074f63f8": {
+      "name": "pathlib.nvim",
+      "version": "2.2.3-1",
+      "pinned": false,
+      "dependencies": [
+        "306b1bc37b09349a902e436efffb1161bbbdb46fafd5dc54b6e071ef5259b68a"
+      ],
+      "constraint": ">=2.2.0, <2.3.0",
+      "binaries": [],
+      "source": "luarocks_rockspec+https://luarocks.org/",
+      "hashes": {
+        "rockspec": "sha256-kdDMqznWlwP9wIqlzPrZ5qEDp6edhlkaasAcQzWTmmM=",
+        "source": "sha256-fNO24tL8wApI8j3rk2mdLf5wbbjlUzsvCxki3n0xRw8="
+      }
+    },
+    "b171325ee5f129f7561a01d258ba38164d141e7cfddbf3c740edb28dd848ca2f": {
+      "name": "nui.nvim",
+      "version": "0.3.0-1",
+      "pinned": false,
+      "dependencies": [],
+      "constraint": "=0.3.0",
+      "binaries": [],
+      "source": "luarocks_rockspec+https://luarocks.org/",
+      "hashes": {
+        "rockspec": "sha256-C33kdZVqHui1mOd+J2/HbvmvYOntTMzfJ3YBtj4v51k=",
+        "source": "sha256-L0ebXtv794357HOAgT17xlEJsmpqIHGqGlYfDB20WTo="
+      }
+    },
+    "b49da3f0e8cc9fd87681b92011f04fbe1d9acedcdb1bae652040e5c16d33be29": {
+      "name": "plenary.nvim",
+      "version": "0.1.4-1",
+      "pinned": false,
+      "dependencies": [
+        "735d981050a43b2a36eb5621968fee7e6962ac1f673c9244a18039bf28594316"
+      ],
+      "constraint": "=0.1.4",
+      "binaries": [],
+      "source": "luarocks_rockspec+https://luarocks.org/",
+      "hashes": {
+        "rockspec": "sha256-0EdepFBCsLc5D7HJKX66yMw/NbIgCmQib/+yqpJ9FFE=",
+        "source": "sha256-cJ2EfkbTOiEJ8IPVnoO77alXynBv+nJ2ql/vfYOTSJI="
       }
     },
     "bf813f9f333f9efc8108b86386ea8a2a7aeaff1d5cdf470449d5e5242e3794d3": {
@@ -144,54 +175,23 @@
         "source": "sha256-0sVLXN+aDxmb2lxvhjUGgg8XFyu8DMl2i2RA+TjUbu8="
       }
     },
-    "b49da3f0e8cc9fd87681b92011f04fbe1d9acedcdb1bae652040e5c16d33be29": {
-      "name": "plenary.nvim",
-      "version": "0.1.4-1",
-      "pinned": false,
-      "dependencies": [
-        "735d981050a43b2a36eb5621968fee7e6962ac1f673c9244a18039bf28594316"
-      ],
-      "constraint": "=0.1.4",
-      "binaries": [],
-      "source": "luarocks_rockspec+https://luarocks.org/",
-      "hashes": {
-        "rockspec": "sha256-0EdepFBCsLc5D7HJKX66yMw/NbIgCmQib/+yqpJ9FFE=",
-        "source": "sha256-cJ2EfkbTOiEJ8IPVnoO77alXynBv+nJ2ql/vfYOTSJI="
-      }
-    },
-    "04bfd5b08a74ba37c05241ef51d7afc47e1f3379c872dca34d99031b1ea7b855": {
-      "name": "neorg",
-      "version": "8.0.0-1",
-      "pinned": false,
-      "dependencies": [
-        "99930d308895ccd027772f32eb777cebdb8668c32f4602036e237f0a46fcc0d9",
-        "985b1994517e6433d3e9ed05882a13069e7458f4646eabb451cc3964674c3c11"
-      ],
-      "constraint": "=8.0.0",
-      "binaries": [],
-      "source": "luarocks_rockspec+https://luarocks.org/",
-      "hashes": {
-        "rockspec": "sha256-7FQ1jtFfZQQ9IYtLwS14TcFsTWXM4xMnnpQh80GHpP0=",
-        "source": "sha256-YRQaq7LRoIK6qrc1djC/z4aPVhdcuw1IKxsZuddJKu4="
-      }
-    },
-    "b171325ee5f129f7561a01d258ba38164d141e7cfddbf3c740edb28dd848ca2f": {
-      "name": "nui.nvim",
-      "version": "0.3.0-1",
+    "fb56666f3cfc66910e00c89bcfa81361660a0a4edfd528baadbedcd4ac89390a": {
+      "name": "lua-utils.nvim",
+      "version": "1.0.2-1",
       "pinned": false,
       "dependencies": [],
-      "constraint": "=0.3.0",
+      "constraint": "=1.0.2",
       "binaries": [],
       "source": "luarocks_rockspec+https://luarocks.org/",
       "hashes": {
-        "rockspec": "sha256-C33kdZVqHui1mOd+J2/HbvmvYOntTMzfJ3YBtj4v51k=",
-        "source": "sha256-L0ebXtv794357HOAgT17xlEJsmpqIHGqGlYfDB20WTo="
+        "rockspec": "sha256-Kc8mdjLRaL063VWYjGAWSYySYKmFgZXF+Qoa0TaRIWg=",
+        "source": "sha256-fpGplQuldzNCYUMISOfGKgD080JKDxbZNb8Rch00Yxs="
       }
     }
   },
   "entrypoints": [
-    "bf813f9f333f9efc8108b86386ea8a2a7aeaff1d5cdf470449d5e5242e3794d3",
+    "028a2b47c550e0e17bd2952c7444b6bf64687b3cd6b59573a066a21f545466b8",
     "04bfd5b08a74ba37c05241ef51d7afc47e1f3379c872dca34d99031b1ea7b855",
-    "028a2b47c550e0e17bd2952c7444b6bf64687b3cd6b59573a066a21f545466b8"
+    "bf813f9f333f9efc8108b86386ea8a2a7aeaff1d5cdf470449d5e5242e3794d3"
   ]
 }
