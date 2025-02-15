@@ -11,17 +11,17 @@ use tempdir::TempDir;
 use thiserror::Error;
 
 use crate::{
-    build::{Build, BuildBehaviour, BuildError},
+    build::{Build, BuildBehaviour, RemoteBuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{LocalPackage, LocalPackageId, PinnedState},
     lua_installation::LuaInstallation,
-    lua_rockspec::{RemoteLuaRockspec, RockspecFormat},
+    lua_rockspec::{LuaRockspec, RockspecFormat},
     operations::{get_all_dependencies, SearchAndDownloadError},
     package::PackageReq,
     path::Paths,
     progress::{MultiProgress, Progress, ProgressBar},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
-    rockspec::{LocalRockspec, RemoteRockspec},
+    rockspec::Rockspec,
     tree::Tree,
 };
 
@@ -38,7 +38,7 @@ pub enum LuaRocksInstallError {
     #[error(transparent)]
     Io(#[from] io::Error),
     #[error(transparent)]
-    BuildError(#[from] BuildError),
+    BuildError(#[from] RemoteBuildError),
 }
 
 #[derive(Error, Debug)]
@@ -50,7 +50,7 @@ pub enum InstallBuildDependenciesError {
     #[error(transparent)]
     SearchAndDownloadError(#[from] SearchAndDownloadError),
     #[error(transparent)]
-    BuildError(#[from] BuildError),
+    BuildError(#[from] RemoteBuildError),
 }
 
 #[derive(Error, Debug)]
@@ -114,7 +114,7 @@ impl LuaRocksInstallation {
             PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into())).unwrap();
 
         if !self.tree.match_rocks(&luarocks_req)?.is_found() {
-            let rockspec = RemoteLuaRockspec::new(LUAROCKS_ROCKSPEC).unwrap();
+            let rockspec = LuaRockspec::new(LUAROCKS_ROCKSPEC).unwrap();
             let pkg = Build::new(&rockspec, &self.tree, &self.config, progress)
                 .constraint(luarocks_req.version_req().clone().into())
                 .build()
@@ -125,7 +125,7 @@ impl LuaRocksInstallation {
         Ok(())
     }
 
-    pub async fn install_build_dependencies<R: RemoteRockspec>(
+    pub async fn install_build_dependencies<R: Rockspec>(
         &self,
         build_backend: &str,
         rocks: &R,

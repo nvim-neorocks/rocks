@@ -5,7 +5,7 @@ use lux_lib::{
     config::Config,
     operations::Download,
     progress::{MultiProgress, Progress},
-    rockspec::{LocalRockspec, RemoteRockspec},
+    rockspec::Rockspec,
 };
 
 use crate::unpack::UnpackRemote;
