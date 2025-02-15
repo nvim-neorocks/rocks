@@ -11,7 +11,7 @@ use super::{
     PerPlatform, PerPlatformWrapper, PlatformOverridable,
 };
 
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Default, Deserialize, Clone, Debug, PartialEq)]
 pub struct LocalRockSource {
     pub integrity: Option<Integrity>,
     pub archive_name: Option<String>,
@@ -34,16 +34,16 @@ impl Deref for RemoteRockSource {
 
 #[derive(Error, Debug)]
 pub enum RockSourceError {
-    #[error("source URL missing")]
-    SourceUrlMissing,
     #[error("invalid rockspec source field combination")]
     InvalidCombination,
     #[error(transparent)]
     SourceUrl(#[from] SourceUrlError),
+    #[error("source URL missing")]
+    SourceUrlMissing,
 }
 
 impl FromPlatformOverridable<RockSourceInternal, Self> for LocalRockSource {
-    type Err = RockSourceError;
+    type Err = Infallible;
 
     fn from_platform_overridable(internal: RockSourceInternal) -> Result<Self, Self::Err> {
         Ok(LocalRockSource {
@@ -58,7 +58,7 @@ impl FromPlatformOverridable<RockSourceInternal, Self> for RemoteRockSource {
     type Err = RockSourceError;
 
     fn from_platform_overridable(internal: RockSourceInternal) -> Result<Self, Self::Err> {
-        let local = LocalRockSource::from_platform_overridable(internal.clone())?;
+        let local = LocalRockSource::from_platform_overridable(internal.clone()).unwrap();
 
         // The rockspec.source table allows invalid combinations
         // This ensures that invalid combinations are caught while parsing.

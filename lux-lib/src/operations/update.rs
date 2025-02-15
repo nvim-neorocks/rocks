@@ -16,7 +16,7 @@ use crate::{
     progress::{MultiProgress, Progress},
     project::{Project, ProjectError, ProjectTreeError},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
-    rockspec::LocalRockspec,
+    rockspec::Rockspec,
     tree::Tree,
 };
 

@@ -338,16 +338,8 @@ impl<T> PerPlatform<T> {
         )
     }
 
-    fn set(&mut self, platform: PlatformIdentifier, value: T) {
-        self.per_platform.insert(platform, value);
-    }
-
     pub fn current_platform(&self) -> &T {
         self.get(&get_platform())
-    }
-
-    pub(crate) fn current_platform_set(&mut self, value: T) {
-        self.set(get_platform(), value)
     }
 
     pub fn map<U, F>(self, cb: F) -> PerPlatform<U>
@@ -375,6 +367,22 @@ impl<T> PerPlatform<T> {
                 .per_platform
                 .into_iter()
                 .map(|(identifier, value)| Ok((identifier, cb(value)?)))
+                .try_collect()?,
+        })
+    }
+}
+
+impl<U, E> PerPlatform<Result<U, E>>
+where
+    E: std::error::Error,
+{
+    pub fn transpose(self) -> Result<PerPlatform<U>, E> {
+        Ok(PerPlatform {
+            default: self.default?,
+            per_platform: self
+                .per_platform
+                .into_iter()
+                .map(|(identifier, value)| Ok((identifier, value?)))
                 .try_collect()?,
         })
     }

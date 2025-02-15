@@ -2,7 +2,7 @@ use std::env;
 use std::io::Read;
 
 use crate::project::project_toml::RemoteProjectTomlValidationError;
-use crate::rockspec::LocalRockspec;
+use crate::rockspec::Rockspec;
 use crate::TOOL_VERSION;
 use crate::{config::Config, project::Project};
 use gpgme::{Context, Data};

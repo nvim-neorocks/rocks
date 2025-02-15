@@ -5,6 +5,7 @@ use project_toml::{
 use std::{
     collections::HashMap,
     io,
+    ops::Deref,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -14,12 +15,12 @@ use crate::{
     config::{Config, LuaVersion},
     lockfile::{ProjectLockfile, ReadOnly},
     lua_rockspec::{
-        ExternalDependencySpec, LuaRockspecError, LuaVersionError, PartialLuaRockspec,
-        PartialRockspecError, RemoteLuaRockspec, RockSourceSpec,
+        ExternalDependencySpec, LuaRockspec, LuaRockspecError, LuaVersionError, PartialLuaRockspec,
+        PartialRockspecError,
     },
     package::PackageReq,
     remote_package_db::RemotePackageDB,
-    rockspec::{LuaVersionCompatibility, RemoteRockspec},
+    rockspec::{LuaVersionCompatibility, Rockspec},
     tree::Tree,
 };
 
@@ -66,10 +67,30 @@ pub enum ProjectTreeError {
     LuaVersionError(#[from] LuaVersionError),
 }
 
+/// A newtype for the project root directory.
+/// This is used to ensure that the project root is a valid project directory.
+#[derive(Clone, Debug)]
+#[cfg_attr(test, derive(Default))]
+pub struct ProjectRoot(PathBuf);
+
+impl ProjectRoot {
+    pub(self) fn new() -> Self {
+        Self(PathBuf::new())
+    }
+}
+
+impl Deref for ProjectRoot {
+    type Target = PathBuf;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Project {
     /// The path where the `lux.toml` resides.
-    root: PathBuf,
+    root: ProjectRoot,
     /// The parsed lux.toml.
     toml: PartialProjectToml,
 }
@@ -96,8 +117,8 @@ impl Project {
                 let root = path.parent().unwrap();
 
                 let mut project = Project {
-                    root: root.to_path_buf(),
-                    toml: PartialProjectToml::new(&toml_content)?,
+                    root: ProjectRoot(root.to_path_buf()),
+                    toml: PartialProjectToml::new(&toml_content, ProjectRoot(root.to_path_buf()))?,
                 };
 
                 if let Some(extra_rockspec) = project.extra_rockspec()? {
@@ -142,7 +163,7 @@ impl Project {
         }
     }
 
-    pub fn root(&self) -> &Path {
+    pub fn root(&self) -> &ProjectRoot {
         &self.root
     }
 
@@ -150,8 +171,8 @@ impl Project {
         &self.toml
     }
 
-    pub fn rockspec(&self) -> Result<RemoteLuaRockspec, IntoRockspecError> {
-        Ok(self.toml().into_remote()?.to_rockspec()?)
+    pub fn rockspec(&self) -> Result<LuaRockspec, IntoRockspecError> {
+        Ok(self.toml().into_remote()?.to_lua_rockspec()?)
     }
 
     pub fn extra_rockspec(&self) -> Result<Option<PartialLuaRockspec>, PartialRockspecError> {
@@ -162,17 +183,6 @@ impl Project {
         } else {
             Ok(None)
         }
-    }
-
-    /// Create a RockSpec with the source set to the project root.
-    pub fn new_local_rockspec(&self) -> Result<RemoteLuaRockspec, IntoRockspecError> {
-        let mut rocks = self.rockspec()?;
-        let mut source = rocks.source().current_platform().clone();
-        source.source_spec = RockSourceSpec::File(self.root().to_path_buf());
-        source.local.archive_name = None;
-        source.local.integrity = None;
-        rocks.source_mut().current_platform_set(source);
-        Ok(rocks)
     }
 
     pub(crate) fn default_tree_root_dir(&self) -> PathBuf {
@@ -331,9 +341,10 @@ mod tests {
 
     use super::*;
     use crate::{
+        lua_rockspec::RockSourceSpec,
         manifest::{Manifest, ManifestMetadata},
         package::PackageReq,
-        rockspec::LocalRockspec,
+        rockspec::Rockspec,
     };
 
     #[tokio::test]
@@ -396,7 +407,7 @@ mod tests {
         // Reparse the lux.toml (not usually necessary, but we want to test that the file was
         // written correctly)
         let project = Project::from(&project_root).unwrap().unwrap();
-        let validated_toml = project.toml().into_local().unwrap();
+        let validated_toml = project.toml().into_remote().unwrap();
         assert_eq!(
             strip_lua(validated_toml.dependencies().current_platform()),
             expected_dependencies
