@@ -15,13 +15,13 @@ use crate::{
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{LocalPackage, LocalPackageId, PinnedState},
     lua_installation::LuaInstallation,
-    lua_rockspec::{LuaRockspec, RockspecFormat},
+    lua_rockspec::{RemoteLuaRockspec, RockspecFormat},
     operations::{get_all_dependencies, SearchAndDownloadError},
     package::PackageReq,
     path::Paths,
     progress::{MultiProgress, Progress, ProgressBar},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
-    rockspec::Rockspec,
+    rockspec::{LocalRockspec, RemoteRockspec},
     tree::Tree,
 };
 
@@ -114,7 +114,7 @@ impl LuaRocksInstallation {
             PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into())).unwrap();
 
         if !self.tree.match_rocks(&luarocks_req)?.is_found() {
-            let rockspec = LuaRockspec::new(LUAROCKS_ROCKSPEC).unwrap();
+            let rockspec = RemoteLuaRockspec::new(LUAROCKS_ROCKSPEC).unwrap();
             let pkg = Build::new(&rockspec, &self.tree, &self.config, progress)
                 .constraint(luarocks_req.version_req().clone().into())
                 .build()
@@ -125,7 +125,7 @@ impl LuaRocksInstallation {
         Ok(())
     }
 
-    pub async fn install_build_dependencies<R: Rockspec>(
+    pub async fn install_build_dependencies<R: RemoteRockspec>(
         &self,
         build_backend: &str,
         rocks: &R,

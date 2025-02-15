@@ -7,7 +7,7 @@ use crate::{
     path::Paths,
     progress::{MultiProgress, Progress},
     project::{project_toml::ProjectTomlValidationError, Project, ProjectTreeError},
-    rockspec::Rockspec,
+    rockspec::{LocalRockspec, RemoteRockspec},
     tree::Tree,
 };
 use bon::Builder;
@@ -197,7 +197,7 @@ pub async fn ensure_busted(
 /// Ensure dependencies and test dependencies are installed
 /// This defaults to the local project tree if cwd is a project root.
 async fn ensure_dependencies(
-    rockspec: &impl Rockspec,
+    rockspec: &impl RemoteRockspec,
     project_tree: &Tree,
     test_tree: &Tree,
     config: &Config,

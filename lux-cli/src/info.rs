@@ -5,7 +5,7 @@ use lux_lib::{
     operations::Download,
     package::PackageReq,
     progress::{MultiProgress, Progress},
-    rockspec::Rockspec,
+    rockspec::LocalRockspec,
 };
 
 #[derive(Args)]
