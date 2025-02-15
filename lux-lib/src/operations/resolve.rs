@@ -12,7 +12,7 @@ use crate::{
     package::PackageReq,
     progress::{MultiProgress, Progress},
     remote_package_db::RemotePackageDB,
-    rockspec::LocalRockspec,
+    rockspec::Rockspec,
 };
 
 use super::{Download, RemoteRockDownload, SearchAndDownloadError};
