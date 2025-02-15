@@ -60,6 +60,7 @@ toml = "0.8.19"
 md5 = "0.7.0"
 toml_edit = "0.22.22"
 nix-nar = "0.3.0"
+ambassador = "0.4.1"
 
 [dev-dependencies]
 httptest = { version = "0.16.1" }

@@ -10,16 +10,17 @@ use crate::{
     config::{Config, LuaVersion},
     lua_rockspec::{
         BuildSpec, BuildSpecInternal, BuildSpecInternalError, DisplayAsLuaKV, ExternalDependencies,
-        ExternalDependencySpec, FromPlatformOverridable, LuaRockspec, LuaVersionError,
+        ExternalDependencySpec, FromPlatformOverridable, LuaRockspecError, LuaVersionError,
         PartialLuaRockspec, PerPlatform, PlatformIdentifier, PlatformSupport,
-        PlatformValidationError, RockDescription, RockSource, RockSourceError, RockSourceInternal,
-        RockspecError, RockspecFormat, TestSpec, TestSpecError, TestSpecInternal,
+        PlatformValidationError, RemoteLuaRockspec, RemoteRockSource, RockDescription,
+        RockSourceError, RockSourceInternal, RockspecFormat, TestSpec, TestSpecError,
+        TestSpecInternal,
     },
     package::{
         BuildDependencies, Dependencies, PackageName, PackageReq, PackageVersion,
         PackageVersionReq, TestDependencies,
     },
-    rockspec::{latest_lua_version, LuaVersionCompatibility, Rockspec},
+    rockspec::{latest_lua_version, LocalRockspec, LuaVersionCompatibility, RemoteRockspec},
 };
 
 fn parse_map_to_package_vec_opt<'de, D>(
@@ -98,7 +99,7 @@ pub struct ProjectTomlValidated {
     build_dependencies: PerPlatform<Vec<PackageReq>>,
     external_dependencies: PerPlatform<HashMap<String, ExternalDependencySpec>>,
     test_dependencies: PerPlatform<Vec<PackageReq>>,
-    source: PerPlatform<RockSource>,
+    source: PerPlatform<RemoteRockSource>,
     test: PerPlatform<TestSpec>,
     build: PerPlatform<BuildSpec>,
 
@@ -156,7 +157,7 @@ impl ProjectToml {
                 project.external_dependencies.unwrap_or_default(),
             ),
             test_dependencies: PerPlatform::new(project.test_dependencies.unwrap_or_default()),
-            source: PerPlatform::new(RockSource::from_platform_overridable(
+            source: PerPlatform::new(RemoteRockSource::from_platform_overridable(
                 project.source.ok_or(ProjectTomlValidationError::NoSource)?,
             )?),
             test: PerPlatform::new(TestSpec::from_platform_overridable(
@@ -318,8 +319,8 @@ version = "{}""#,
             .join("\n\n")
     }
 
-    pub fn to_rockspec(&self) -> Result<LuaRockspec, RockspecError> {
-        LuaRockspec::new(&self.to_rockspec_string())
+    pub fn to_rockspec(&self) -> Result<RemoteLuaRockspec, LuaRockspecError> {
+        RemoteLuaRockspec::new(&self.to_rockspec_string())
     }
 }
 
@@ -380,7 +381,7 @@ impl LuaVersionCompatibility for ProjectToml {
     }
 }
 
-impl Rockspec for ProjectTomlValidated {
+impl LocalRockspec for ProjectTomlValidated {
     fn package(&self) -> &PackageName {
         &self.package
     }
@@ -413,20 +414,12 @@ impl Rockspec for ProjectTomlValidated {
         &self.test_dependencies
     }
 
-    fn source(&self) -> &PerPlatform<RockSource> {
-        &self.source
-    }
-
     fn build(&self) -> &PerPlatform<BuildSpec> {
         &self.build
     }
 
     fn test(&self) -> &PerPlatform<TestSpec> {
         &self.test
-    }
-
-    fn source_mut(&mut self) -> &mut PerPlatform<RockSource> {
-        &mut self.source
     }
 
     fn build_mut(&mut self) -> &mut PerPlatform<BuildSpec> {
@@ -437,21 +430,31 @@ impl Rockspec for ProjectTomlValidated {
         &mut self.test
     }
 
-    fn to_rockspec_str(&self) -> String {
-        self.to_rockspec_string()
-    }
-
     fn format(&self) -> &Option<RockspecFormat> {
         &self.rockspec_format
+    }
+}
+
+impl RemoteRockspec for ProjectTomlValidated {
+    fn source(&self) -> &PerPlatform<RemoteRockSource> {
+        &self.source
+    }
+
+    fn source_mut(&mut self) -> &mut PerPlatform<RemoteRockSource> {
+        &mut self.source
+    }
+
+    fn to_rockspec_str(&self) -> String {
+        self.to_rockspec_string()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        lua_rockspec::{LuaRockspec, PartialLuaRockspec, PerPlatform},
+        lua_rockspec::{PartialLuaRockspec, PerPlatform, RemoteLuaRockspec},
         package::PackageReq,
-        rockspec::Rockspec,
+        rockspec::{LocalRockspec, RemoteRockspec},
     };
 
     use super::ProjectToml;
@@ -641,7 +644,7 @@ mod tests {
             }
         "#;
 
-        let expected_rockspec = LuaRockspec::new(expected_rockspec).unwrap();
+        let expected_rockspec = RemoteLuaRockspec::new(expected_rockspec).unwrap();
 
         let project_toml = ProjectToml::new(project_toml).unwrap();
         let rockspec = project_toml
@@ -797,7 +800,7 @@ mod tests {
 
         let project_toml = ProjectToml::new(project_toml).unwrap();
         let partial_rockspec = PartialLuaRockspec::new(mergable_rockspec_content).unwrap();
-        let expected_rockspec = LuaRockspec::new(mergable_rockspec_content).unwrap();
+        let expected_rockspec = RemoteLuaRockspec::new(mergable_rockspec_content).unwrap();
 
         let merged = project_toml
             .merge(partial_rockspec)

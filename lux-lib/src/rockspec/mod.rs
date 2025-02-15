@@ -4,6 +4,7 @@ use std::{
     path::PathBuf,
 };
 
+use ambassador::delegatable_trait;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
@@ -11,13 +12,13 @@ use crate::{
     config::{Config, LuaVersion},
     lua_rockspec::{
         BuildSpec, ExternalDependencySpec, LuaVersionError, PerPlatform, PlatformSupport,
-        RockDescription, RockSource, RockspecFormat, TestSpec,
+        RemoteRockSource, RockDescription, RockspecFormat, TestSpec,
     },
     package::{PackageName, PackageReq, PackageVersion},
 };
 
-/// A trait for querying information about a project from either a rockspec or `lux.toml` file.
-pub trait Rockspec {
+#[delegatable_trait]
+pub trait LocalRockspec {
     fn package(&self) -> &PackageName;
     fn version(&self) -> &PackageVersion;
     fn description(&self) -> &RockDescription;
@@ -27,15 +28,11 @@ pub trait Rockspec {
     fn external_dependencies(&self) -> &PerPlatform<HashMap<String, ExternalDependencySpec>>;
     fn test_dependencies(&self) -> &PerPlatform<Vec<PackageReq>>;
 
-    fn source(&self) -> &PerPlatform<RockSource>;
     fn build(&self) -> &PerPlatform<BuildSpec>;
     fn test(&self) -> &PerPlatform<TestSpec>;
 
-    fn source_mut(&mut self) -> &mut PerPlatform<RockSource>;
     fn build_mut(&mut self) -> &mut PerPlatform<BuildSpec>;
     fn test_mut(&mut self) -> &mut PerPlatform<TestSpec>;
-
-    fn to_rockspec_str(&self) -> String;
 
     fn format(&self) -> &Option<RockspecFormat>;
 
@@ -51,6 +48,14 @@ pub trait Rockspec {
                 .collect(),
         )
     }
+}
+
+/// A trait for querying information about a project from either a rockspec or `lux.toml` file.
+pub trait RemoteRockspec: LocalRockspec {
+    fn source(&self) -> &PerPlatform<RemoteRockSource>;
+    fn source_mut(&mut self) -> &mut PerPlatform<RemoteRockSource>;
+
+    fn to_rockspec_str(&self) -> String;
 }
 
 pub trait LuaVersionCompatibility {
@@ -72,7 +77,7 @@ pub trait LuaVersionCompatibility {
     fn test_lua_version(&self) -> Option<LuaVersion>;
 }
 
-impl<T: Rockspec> LuaVersionCompatibility for T {
+impl<T: RemoteRockspec> LuaVersionCompatibility for T {
     fn validate_lua_version(&self, config: &Config) -> Result<(), LuaVersionError> {
         let _ = self.lua_version_matches(config)?;
         Ok(())

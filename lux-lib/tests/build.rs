@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use lux_lib::{
     build::{Build, BuildBehaviour::Force},
     config::{ConfigBuilder, LuaVersion},
-    lua_rockspec::LuaRockspec,
+    lua_rockspec::RemoteLuaRockspec,
     progress::{MultiProgress, Progress},
 };
 use tempdir::TempDir;
@@ -15,7 +15,7 @@ async fn builtin_build() {
     let content =
         String::from_utf8(std::fs::read("resources/test/lua-cjson-2.1.0-1.rockspec").unwrap())
             .unwrap();
-    let rockspec = LuaRockspec::new(&content).unwrap();
+    let rockspec = RemoteLuaRockspec::new(&content).unwrap();
 
     let config = ConfigBuilder::new()
         .unwrap()
@@ -43,7 +43,7 @@ async fn make_build() {
         std::fs::read("resources/test/make-project/make-project-scm-1.rockspec").unwrap(),
     )
     .unwrap();
-    let rockspec = LuaRockspec::new(&content).unwrap();
+    let rockspec = RemoteLuaRockspec::new(&content).unwrap();
 
     let config = ConfigBuilder::new()
         .unwrap()
@@ -83,7 +83,7 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
     let dir = TempDir::new("lux-test").unwrap();
 
     let content = String::from_utf8(std::fs::read(rockspec_path).unwrap()).unwrap();
-    let rockspec = LuaRockspec::new(&content).unwrap();
+    let rockspec = RemoteLuaRockspec::new(&content).unwrap();
 
     let config = ConfigBuilder::new()
         .unwrap()

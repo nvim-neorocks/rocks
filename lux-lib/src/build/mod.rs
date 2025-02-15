@@ -1,6 +1,6 @@
 use crate::lockfile::RemotePackageSourceUrl;
 use crate::rockspec::LuaVersionCompatibility;
-use crate::{lua_rockspec::LuaVersionError, rockspec::Rockspec};
+use crate::{lua_rockspec::LuaVersionError, rockspec::RemoteRockspec};
 use std::{io, path::Path, process::ExitStatus};
 
 use crate::{
@@ -46,7 +46,7 @@ pub mod variables;
 /// over how a package should be built.
 #[derive(Builder)]
 #[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
-pub struct Build<'a, R: Rockspec + HasIntegrity> {
+pub struct Build<'a, R: RemoteRockspec + HasIntegrity> {
     #[builder(start_fn)]
     rockspec: &'a R,
     #[builder(start_fn)]
@@ -67,7 +67,7 @@ pub struct Build<'a, R: Rockspec + HasIntegrity> {
 }
 
 // Overwrite the `build()` function to use our own instead.
-impl<R: Rockspec + HasIntegrity, State> BuildBuilder<'_, R, State>
+impl<R: RemoteRockspec + HasIntegrity, State> BuildBuilder<'_, R, State>
 where
     State: build_builder::State + build_builder::IsComplete,
 {
@@ -137,7 +137,7 @@ impl From<bool> for BuildBehaviour {
     }
 }
 
-async fn run_build<R: Rockspec>(
+async fn run_build<R: RemoteRockspec>(
     rockspec: &R,
     output_paths: &RockLayout,
     lua: &LuaInstallation,
@@ -182,7 +182,7 @@ async fn run_build<R: Rockspec>(
     )
 }
 
-async fn install<R: Rockspec>(
+async fn install<R: RemoteRockspec>(
     rockspec: &R,
     tree: &Tree,
     output_paths: &RockLayout,
@@ -235,7 +235,7 @@ async fn install<R: Rockspec>(
     Ok(())
 }
 
-async fn do_build<R: Rockspec + HasIntegrity>(
+async fn do_build<R: RemoteRockspec + HasIntegrity>(
     build: Build<'_, R>,
 ) -> Result<LocalPackage, BuildError> {
     build.progress.map(|p| {

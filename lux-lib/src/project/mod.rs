@@ -12,12 +12,12 @@ use crate::{
     config::{Config, LuaVersion},
     lockfile::{ProjectLockfile, ReadOnly},
     lua_rockspec::{
-        ExternalDependencySpec, LuaRockspec, LuaVersionError, PartialLuaRockspec,
-        PartialRockspecError, RockSourceSpec, RockspecError,
+        ExternalDependencySpec, LuaRockspecError, LuaVersionError, PartialLuaRockspec,
+        PartialRockspecError, RemoteLuaRockspec, RockSourceSpec,
     },
     package::PackageReq,
     remote_package_db::RemotePackageDB,
-    rockspec::{LuaVersionCompatibility, Rockspec},
+    rockspec::{LuaVersionCompatibility, RemoteRockspec},
     tree::Tree,
 };
 
@@ -40,7 +40,7 @@ pub enum ProjectError {
 #[error(transparent)]
 pub enum IntoRockspecError {
     RocksTomlValidationError(#[from] ProjectTomlValidationError),
-    RockspecError(#[from] RockspecError),
+    RockspecError(#[from] LuaRockspecError),
 }
 
 #[derive(Error, Debug)]
@@ -148,7 +148,7 @@ impl Project {
         &self.toml
     }
 
-    pub fn rockspec(&self) -> Result<LuaRockspec, IntoRockspecError> {
+    pub fn rockspec(&self) -> Result<RemoteLuaRockspec, IntoRockspecError> {
         Ok(self.toml().into_validated()?.to_rockspec()?)
     }
 
@@ -163,12 +163,12 @@ impl Project {
     }
 
     /// Create a RockSpec with the source set to the project root.
-    pub fn new_local_rockspec(&self) -> Result<LuaRockspec, IntoRockspecError> {
+    pub fn new_local_rockspec(&self) -> Result<RemoteLuaRockspec, IntoRockspecError> {
         let mut rocks = self.rockspec()?;
         let mut source = rocks.source().current_platform().clone();
         source.source_spec = RockSourceSpec::File(self.root().to_path_buf());
-        source.archive_name = None;
-        source.integrity = None;
+        source.local.archive_name = None;
+        source.local.integrity = None;
         rocks.source_mut().current_platform_set(source);
         Ok(rocks)
     }
@@ -332,6 +332,7 @@ mod tests {
     use crate::{
         manifest::{Manifest, ManifestMetadata},
         package::PackageReq,
+        rockspec::LocalRockspec,
     };
 
     #[tokio::test]
