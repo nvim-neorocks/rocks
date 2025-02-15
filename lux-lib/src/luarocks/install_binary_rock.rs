@@ -16,12 +16,12 @@ use crate::{
     config::Config,
     hash::HasIntegrity,
     lockfile::{LocalPackage, LocalPackageHashes, LockConstraint, PinnedState},
-    lua_rockspec::{LuaRockspec, LuaVersionError},
+    lua_rockspec::{LuaVersionError, RemoteLuaRockspec},
     luarocks::rock_manifest::RockManifest,
     package::PackageSpec,
     progress::{Progress, ProgressBar},
     remote_package_source::RemotePackageSource,
-    rockspec::Rockspec,
+    rockspec::LocalRockspec,
 };
 use crate::{lockfile::RemotePackageSourceUrl, rockspec::LuaVersionCompatibility};
 
@@ -44,7 +44,7 @@ pub enum InstallBinaryRockError {
 }
 
 pub(crate) struct BinaryRockInstall<'a> {
-    rockspec: &'a LuaRockspec,
+    rockspec: &'a RemoteLuaRockspec,
     rock_bytes: Bytes,
     source: RemotePackageSource,
     pin: PinnedState,
@@ -56,7 +56,7 @@ pub(crate) struct BinaryRockInstall<'a> {
 
 impl<'a> BinaryRockInstall<'a> {
     pub(crate) fn new(
-        rockspec: &'a LuaRockspec,
+        rockspec: &'a RemoteLuaRockspec,
         source: RemotePackageSource,
         rock_bytes: Bytes,
         config: &'a Config,
