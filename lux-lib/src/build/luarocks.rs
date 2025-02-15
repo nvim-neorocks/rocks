@@ -1,5 +1,5 @@
 use crate::rockspec::LuaVersionCompatibility;
-use crate::rockspec::RemoteRockspec;
+use crate::rockspec::Rockspec;
 use std::{io, path::Path};
 
 use crate::{
@@ -26,7 +26,7 @@ pub enum LuarocksBuildError {
     ExecLuaRocksError(#[from] ExecLuaRocksError),
 }
 
-pub(crate) async fn build<R: RemoteRockspec>(
+pub(crate) async fn build<R: Rockspec>(
     rockspec: &R,
     output_paths: &RockLayout,
     lua: &LuaInstallation,
@@ -47,14 +47,14 @@ pub(crate) async fn build<R: RemoteRockspec>(
         rockspec.package(),
         rockspec.version()
     ));
-    std::fs::write(&rockspec_file, rockspec.to_rockspec_str())?;
+    std::fs::write(&rockspec_file, rockspec.to_lua_rockspec_string())?;
     let luarocks = LuaRocksInstallation::new(config)?;
     let luarocks_tree = TempDir::new("luarocks-compat-tree")?;
     luarocks.make(&rockspec_file, build_dir, luarocks_tree.path(), lua)?;
     install(rockspec, &luarocks_tree.into_path(), output_paths, config)
 }
 
-fn install<R: RemoteRockspec>(
+fn install<R: Rockspec>(
     rockspec: &R,
     luarocks_tree: &Path,
     output_paths: &RockLayout,

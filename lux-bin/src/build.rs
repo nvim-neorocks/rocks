@@ -13,7 +13,7 @@ use lux_lib::{
     package::PackageName,
     progress::MultiProgress,
     project::Project,
-    rockspec::LocalRockspec,
+    rockspec::Rockspec,
 };
 
 #[derive(Args, Default)]
@@ -34,7 +34,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     let progress = Arc::clone(&progress_arc);
 
     let tree = project.tree(&config)?;
-    let rocks = project.new_local_rockspec()?;
+    let rocks = project.toml().into_local()?;
 
     let dependencies = rocks
         .dependencies()

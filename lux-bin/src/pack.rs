@@ -5,7 +5,7 @@ use eyre::{eyre, OptionExt, Result};
 use lux_lib::{
     build::{Build, BuildBehaviour},
     config::{Config, LuaVersion},
-    lua_rockspec::RemoteLuaRockspec,
+    lua_rockspec::LuaRockspec,
     operations::{self, Install},
     package::PackageReq,
     progress::MultiProgress,
@@ -106,7 +106,7 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
                 .unwrap_or("".into())
                 .as_str()
             {
-                ".rockspec" => Ok(RemoteLuaRockspec::new(&content)?),
+                ".rockspec" => Ok(LuaRockspec::new(&content)?),
                 ".toml" => Ok(PartialProjectToml::new(&content)?
                     .into_remote()?
                     .to_rockspec()?),

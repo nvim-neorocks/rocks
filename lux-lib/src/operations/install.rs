@@ -1,7 +1,7 @@
 use std::{collections::HashMap, io, sync::Arc};
 
 use crate::{
-    build::{Build, BuildBehaviour, BuildError},
+    build::{Build, BuildBehaviour, RemoteBuildError},
     config::{Config, LuaVersionUnset},
     lockfile::{
         LocalPackage, LocalPackageId, LockConstraint, Lockfile, PinnedState, ReadOnly, ReadWrite,
@@ -18,7 +18,7 @@ use crate::{
     progress::{MultiProgress, Progress, ProgressBar},
     project::{Project, ProjectTreeError},
     remote_package_db::{RemotePackageDB, RemotePackageDBError, RemotePackageDbIntegrityError},
-    rockspec::LocalRockspec,
+    rockspec::Rockspec,
     tree::Tree,
 };
 
@@ -145,7 +145,7 @@ pub enum InstallError {
     #[error("error installing LuaRocks build dependencies: {0}")]
     InstallBuildDependenciesError(#[from] InstallBuildDependenciesError),
     #[error("failed to build {0}: {1}")]
-    BuildError(PackageName, BuildError),
+    BuildError(PackageName, RemoteBuildError),
     #[error("error initialising remote package DB: {0}")]
     RemotePackageDB(#[from] RemotePackageDBError),
     #[error("failed to install pre-built rock {0}: {1}")]

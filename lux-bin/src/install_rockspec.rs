@@ -8,12 +8,12 @@ use lux_lib::{
     build::{self, BuildBehaviour},
     config::Config,
     lockfile::PinnedState,
-    lua_rockspec::RemoteLuaRockspec,
+    lua_rockspec::LuaRockspec,
     operations::Install,
     package::PackageName,
     progress::MultiProgress,
     project::Project,
-    rockspec::{LocalRockspec, LuaVersionCompatibility},
+    rockspec::{LuaVersionCompatibility, Rockspec},
 };
 
 #[derive(Args, Default)]
@@ -39,7 +39,7 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
         return Err(eyre!("Provided path is not a valid rockspec!"));
     }
     let content = std::fs::read_to_string(path)?;
-    let rockspec = RemoteLuaRockspec::new(&content)?;
+    let rockspec = LuaRockspec::new(&content)?;
     let lua_version = rockspec.lua_version_matches(&config)?;
     let tree = config.tree(lua_version)?;
 

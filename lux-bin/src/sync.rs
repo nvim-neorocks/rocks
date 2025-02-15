@@ -8,7 +8,7 @@ use lux_lib::{
     operations,
     package::PackageReq,
     project::{project_toml::PartialProjectToml, PROJECT_TOML},
-    rockspec::LocalRockspec,
+    rockspec::Rockspec,
 };
 
 #[derive(Args)]

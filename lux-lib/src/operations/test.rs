@@ -1,4 +1,4 @@
-use std::{io, process::Command, sync::Arc};
+use std::{io, ops::Deref, process::Command, sync::Arc};
 
 use crate::{
     build::BuildBehaviour,
@@ -7,7 +7,7 @@ use crate::{
     path::Paths,
     progress::{MultiProgress, Progress},
     project::{project_toml::LocalProjectTomlValidationError, Project, ProjectTreeError},
-    rockspec::LocalRockspec,
+    rockspec::Rockspec,
     tree::Tree,
 };
 use bon::Builder;
@@ -138,7 +138,7 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
     paths.prepend(&test_tree_paths);
     let mut command = Command::new("busted");
     let mut command = command
-        .current_dir(test.project.root())
+        .current_dir(test.project.root().deref())
         .args(test.args)
         .env("PATH", paths.path_prepended().joined())
         .env("LUA_PATH", paths.package_path().joined())
@@ -203,7 +203,7 @@ pub async fn ensure_busted(
 /// Ensure dependencies and test dependencies are installed
 /// This defaults to the local project tree if cwd is a project root.
 async fn ensure_dependencies(
-    rockspec: &impl LocalRockspec,
+    rockspec: &impl Rockspec,
     project_tree: &Tree,
     test_tree: &Tree,
     config: &Config,
