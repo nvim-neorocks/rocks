@@ -84,6 +84,7 @@ impl RemotePackageDB {
                     RemotePackage::new(
                         PackageSpec::new(local_package.spec.name, local_package.spec.version),
                         local_package.source,
+                        local_package.source_url,
                     )
                 }) {
                     Some(package) => Ok(package),

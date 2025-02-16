@@ -13,6 +13,7 @@ pub use version::{
 };
 
 use crate::{
+    lockfile::RemotePackageSourceUrl,
     lua_rockspec::{DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue},
     remote_package_source::RemotePackageSource,
 };
@@ -67,11 +68,21 @@ impl mlua::UserData for PackageSpec {
 pub(crate) struct RemotePackage {
     pub package: PackageSpec,
     pub source: RemotePackageSource,
+    /// `Some` if present in a lockfile
+    pub source_url: Option<RemotePackageSourceUrl>,
 }
 
 impl RemotePackage {
-    pub fn new(package: PackageSpec, source: RemotePackageSource) -> Self {
-        Self { package, source }
+    pub fn new(
+        package: PackageSpec,
+        source: RemotePackageSource,
+        source_url: Option<RemotePackageSourceUrl>,
+    ) -> Self {
+        Self {
+            package,
+            source,
+            source_url,
+        }
     }
 }
 

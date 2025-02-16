@@ -273,7 +273,7 @@ impl Manifest {
                         RemotePackageSource::LuarocksBinaryRock(self.server_url().clone())
                     }
                 };
-                Some(RemotePackage::new(package, remote_source))
+                Some(RemotePackage::new(package, remote_source, None))
             }
         }
     }

@@ -1,6 +1,7 @@
 use bon::Builder;
 use git2::build::RepoBuilder;
 use git2::FetchOptions;
+use git_url_parse::GitUrlParseError;
 use ssri::Integrity;
 use std::fs::File;
 use std::io;
@@ -12,6 +13,7 @@ use thiserror::Error;
 use crate::config::Config;
 use crate::hash::HasIntegrity;
 use crate::lockfile::RemotePackageSourceUrl;
+use crate::lua_rockspec::GitSource;
 use crate::lua_rockspec::RockSourceSpec;
 use crate::operations;
 use crate::package::PackageSpec;
@@ -35,6 +37,18 @@ pub struct FetchSrc<'a, R: Rockspec> {
     config: &'a Config,
     #[builder(start_fn)]
     progress: &'a Progress<ProgressBar>,
+    #[builder(field)]
+    source_url: Option<RemotePackageSourceUrl>,
+}
+
+impl<R: Rockspec, State> FetchSrcBuilder<'_, R, State>
+where
+    State: fetch_src_builder::State,
+{
+    /// Override the source URL with one potentially from a lockfile
+    pub(crate) fn source_url(self, source_url: Option<RemotePackageSourceUrl>) -> Self {
+        Self { source_url, ..self }
+    }
 }
 
 #[derive(Debug)]
@@ -87,6 +101,8 @@ where
 pub enum FetchSrcError {
     #[error("failed to clone rock source: {0}")]
     GitClone(#[from] git2::Error),
+    #[error("failed to parse git URL: {0}")]
+    GitUrlParse(#[from] GitUrlParseError),
     #[error(transparent)]
     Io(#[from] io::Error),
     #[error(transparent)]
@@ -136,7 +152,19 @@ async fn do_fetch_src<R: Rockspec>(
     let rock_source = rockspec.source().current_platform();
     let progress = fetch.progress;
     let dest_dir = fetch.dest_dir;
-    let metadata = match &rock_source.source_spec {
+    // prioritise lockfile source, if present
+    let source_spec = match &fetch.source_url {
+        Some(source_url) => match source_url {
+            RemotePackageSourceUrl::Git { url, checkout_ref } => RockSourceSpec::Git(GitSource {
+                url: url.parse()?,
+                checkout_ref: Some(checkout_ref.clone()),
+            }),
+            RemotePackageSourceUrl::Url { url } => RockSourceSpec::Url(url.clone()),
+            RemotePackageSourceUrl::File { path } => RockSourceSpec::File(path.clone()),
+        },
+        None => rock_source.source_spec.clone(),
+    };
+    let metadata = match &source_spec {
         RockSourceSpec::Git(git) => {
             let url = git.url.to_string();
             progress.map(|p| p.set_message(format!("🦠 Cloning {}", url)));
