@@ -11,6 +11,7 @@ use thiserror::Error;
 
 use crate::config::Config;
 use crate::hash::HasIntegrity;
+use crate::lockfile::RemotePackageSourceUrl;
 use crate::lua_rockspec::RockSourceSpec;
 use crate::operations;
 use crate::package::PackageSpec;
@@ -36,13 +37,25 @@ pub struct FetchSrc<'a, R: Rockspec> {
     progress: &'a Progress<ProgressBar>,
 }
 
+#[derive(Debug)]
+pub(crate) struct RemotePackageSourceMetadata {
+    pub hash: Integrity,
+    pub source_url: RemotePackageSourceUrl,
+}
+
 impl<R: Rockspec, State> FetchSrcBuilder<'_, R, State>
 where
     State: fetch_src_builder::State + fetch_src_builder::IsComplete,
 {
+    /// Fetch and unpack the source into the `dest_dir`.
+    pub async fn fetch(self) -> Result<(), FetchSrcError> {
+        self.fetch_internal().await?;
+        Ok(())
+    }
+
     /// Fetch and unpack the source into the `dest_dir`,
     /// returning the source `Integrity`.
-    pub async fn fetch(self) -> Result<Integrity, FetchSrcError> {
+    pub(crate) async fn fetch_internal(self) -> Result<RemotePackageSourceMetadata, FetchSrcError> {
         let fetch = self._build();
         match do_fetch_src(&fetch).await {
             Err(err) => {
@@ -59,13 +72,13 @@ where
                 fetch
                     .progress
                     .map(|p| p.println("⚠️ Falling back to .src.rock archive"));
-                let integrity =
+                let metadata =
                     FetchSrcRock::new(&package, fetch.dest_dir, fetch.config, fetch.progress)
                         .fetch()
                         .await?;
-                Ok(integrity)
+                Ok(metadata)
             }
-            Ok(integrity) => Ok(integrity),
+            Ok(metadata) => Ok(metadata),
         }
     }
 }
@@ -103,7 +116,7 @@ impl<State> FetchSrcRockBuilder<'_, State>
 where
     State: fetch_src_rock_builder::State + fetch_src_rock_builder::IsComplete,
 {
-    pub async fn fetch(self) -> Result<Integrity, FetchSrcRockError> {
+    pub async fn fetch(self) -> Result<RemotePackageSourceMetadata, FetchSrcRockError> {
         do_fetch_src_rock(self._build()).await
     }
 }
@@ -116,14 +129,16 @@ pub enum FetchSrcRockError {
     Io(#[from] io::Error),
 }
 
-async fn do_fetch_src<R: Rockspec>(fetch: &FetchSrc<'_, R>) -> Result<Integrity, FetchSrcError> {
+async fn do_fetch_src<R: Rockspec>(
+    fetch: &FetchSrc<'_, R>,
+) -> Result<RemotePackageSourceMetadata, FetchSrcError> {
     let rockspec = fetch.rockspec;
     let rock_source = rockspec.source().current_platform();
     let progress = fetch.progress;
     let dest_dir = fetch.dest_dir;
-    let integrity = match &rock_source.source_spec {
+    let metadata = match &rock_source.source_spec {
         RockSourceSpec::Git(git) => {
-            let url = &git.url.to_string();
+            let url = git.url.to_string();
             progress.map(|p| p.set_message(format!("🦠 Cloning {}", url)));
 
             let mut fetch_options = FetchOptions::new();
@@ -133,15 +148,27 @@ async fn do_fetch_src<R: Rockspec>(fetch: &FetchSrc<'_, R>) -> Result<Integrity,
             };
             let mut repo_builder = RepoBuilder::new();
             repo_builder.fetch_options(fetch_options);
-            let repo = repo_builder.clone(url, dest_dir)?;
+            let repo = repo_builder.clone(&url, dest_dir)?;
 
-            if let Some(commit_hash) = &git.checkout_ref {
-                let (object, _) = repo.revparse_ext(commit_hash)?;
-                repo.checkout_tree(&object, None)?;
-            }
+            let checkout_ref = match &git.checkout_ref {
+                Some(checkout_ref) => {
+                    let (object, _) = repo.revparse_ext(checkout_ref)?;
+                    repo.checkout_tree(&object, None)?;
+                    checkout_ref.clone()
+                }
+                None => {
+                    let head = repo.head()?;
+                    let commit = head.peel_to_commit()?;
+                    commit.id().to_string()
+                }
+            };
             // The .git directory is not deterministic
             std::fs::remove_dir_all(dest_dir.join(".git"))?;
-            fetch.dest_dir.hash()?
+            let hash = fetch.dest_dir.hash()?;
+            RemotePackageSourceMetadata {
+                hash,
+                source_url: RemotePackageSourceUrl::Git { url, checkout_ref },
+            }
         }
         RockSourceSpec::Url(url) => {
             progress.map(|p| p.set_message(format!("📥 Downloading {}", url.to_owned())));
@@ -170,7 +197,10 @@ async fn do_fetch_src<R: Rockspec>(fetch: &FetchSrc<'_, R>) -> Result<Integrity,
                 progress,
             )
             .await?;
-            hash
+            RemotePackageSourceMetadata {
+                hash,
+                source_url: RemotePackageSourceUrl::Url { url: url.clone() },
+            }
         }
         RockSourceSpec::File(path) => {
             if path.is_dir() {
@@ -206,19 +236,24 @@ async fn do_fetch_src<R: Rockspec>(fetch: &FetchSrc<'_, R>) -> Result<Integrity,
                 )
                 .await?
             }
-            path.hash()?
+            RemotePackageSourceMetadata {
+                hash: path.hash()?,
+                source_url: RemotePackageSourceUrl::File { path: path.clone() },
+            }
         }
     };
-    Ok(integrity)
+    Ok(metadata)
 }
 
-async fn do_fetch_src_rock(fetch: FetchSrcRock<'_>) -> Result<Integrity, FetchSrcRockError> {
+async fn do_fetch_src_rock(
+    fetch: FetchSrcRock<'_>,
+) -> Result<RemotePackageSourceMetadata, FetchSrcRockError> {
     let package = fetch.package;
     let dest_dir = fetch.dest_dir;
     let config = fetch.config;
     let progress = fetch.progress;
     let src_rock = operations::download_src_rock(package, config.server(), progress).await?;
-    let integrity = src_rock.bytes.hash()?;
+    let hash = src_rock.bytes.hash()?;
     let cursor = Cursor::new(src_rock.bytes);
     let mime_type = infer::get(cursor.get_ref()).map(|file_type| file_type.mime_type());
     operations::unpack::unpack(
@@ -230,5 +265,8 @@ async fn do_fetch_src_rock(fetch: FetchSrcRock<'_>) -> Result<Integrity, FetchSr
         progress,
     )
     .await?;
-    Ok(integrity)
+    Ok(RemotePackageSourceMetadata {
+        hash,
+        source_url: RemotePackageSourceUrl::Url { url: src_rock.url },
+    })
 }
