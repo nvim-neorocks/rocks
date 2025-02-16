@@ -92,7 +92,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                 .await?;
         }
     } else {
-        let mut project_lockfile = project.lockfile()?;
+        let mut project_lockfile = project.lockfile()?.write_guard();
 
         Sync::new(&tree, &mut project_lockfile, &config)
             .progress(progress.clone())

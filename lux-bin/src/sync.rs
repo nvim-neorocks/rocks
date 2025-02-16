@@ -34,7 +34,7 @@ pub struct Sync {
 pub async fn sync(args: Sync, config: Config) -> Result<()> {
     let tree = config.tree(LuaVersion::from(&config)?)?;
 
-    let mut lockfile = ProjectLockfile::new(args.lockfile.clone())?;
+    let mut lockfile = ProjectLockfile::new(args.lockfile.clone())?.write_guard();
 
     let mut sync = operations::Sync::new(&tree, &mut lockfile, &config)
         .validate_integrity(!args.no_integrity_check);

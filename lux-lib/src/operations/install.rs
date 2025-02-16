@@ -190,7 +190,7 @@ async fn install_impl(
     package_db: Arc<RemotePackageDB>,
     config: &Config,
     tree: &Tree,
-    mut lockfile: Lockfile<ReadOnly>,
+    lockfile: Lockfile<ReadOnly>,
     progress_arc: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, InstallError> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();

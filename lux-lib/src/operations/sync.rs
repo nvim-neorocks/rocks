@@ -5,7 +5,7 @@ use crate::{
     config::Config,
     lockfile::{
         LocalPackage, LocalPackageLockType, LockfileIntegrityError, PackageSyncSpec, PinnedState,
-        ProjectLockfile, ReadOnly,
+        ProjectLockfile, ReadWrite,
     },
     luarocks::luarocks_installation::LUAROCKS_VERSION,
     package::{PackageName, PackageReq},
@@ -27,7 +27,7 @@ pub struct Sync<'a> {
     tree: &'a Tree,
     /// The project lockfile to sync the tree with
     #[builder(start_fn)]
-    project_lockfile: &'a mut ProjectLockfile<ReadOnly>,
+    project_lockfile: &'a mut ProjectLockfile<ReadWrite>,
     #[builder(start_fn)]
     config: &'a Config,
     #[builder(field)]
@@ -122,14 +122,10 @@ async fn do_sync(
         None => PackageSyncSpec::default(),
     };
 
-    args.project_lockfile
-        .map_then_flush(|lockfile| -> io::Result<()> {
-            package_sync_spec
-                .to_remove
-                .iter()
-                .for_each(|pkg| lockfile.remove(pkg, lock_type));
-            Ok(())
-        })?;
+    package_sync_spec
+        .to_remove
+        .iter()
+        .for_each(|pkg| args.project_lockfile.remove(pkg, lock_type));
 
     let mut report = SyncReport {
         added: Vec::new(),
@@ -168,7 +164,7 @@ async fn do_sync(
         .await?;
 
     // Read the destination lockfile after installing
-    let mut dest_lockfile = args.tree.lockfile()?.into_temporary();
+    let dest_lockfile = args.tree.lockfile()?;
 
     if args.validate_integrity.unwrap_or(true) {
         for package in &report.added {
@@ -191,7 +187,10 @@ async fn do_sync(
         .remove()
         .await?;
 
-    dest_lockfile.sync(args.project_lockfile.local_pkg_lock(lock_type));
+    dest_lockfile.map_then_flush(|lockfile| -> Result<(), io::Error> {
+        lockfile.sync(args.project_lockfile.local_pkg_lock(lock_type));
+        Ok(())
+    })?;
 
     if !package_sync_spec.to_add.is_empty() {
         // Install missing packages using the default package_db.
@@ -212,10 +211,7 @@ async fn do_sync(
         // Sync the newly added packages back to the source lockfile
         let dest_lockfile = args.tree.lockfile()?;
         args.project_lockfile
-            .map_then_flush(|lockfile| -> io::Result<()> {
-                lockfile.sync(dest_lockfile.local_pkg_lock(), lock_type);
-                Ok(())
-            })?;
+            .sync(dest_lockfile.local_pkg_lock(), lock_type);
     }
 
     Ok(report)
@@ -239,7 +235,9 @@ mod tests {
         }
         let project_lockfile_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/lux.lock");
-        let mut source_lockfile = ProjectLockfile::new(project_lockfile_path.clone()).unwrap();
+        let mut source_lockfile = ProjectLockfile::new(project_lockfile_path.clone())
+            .unwrap()
+            .write_guard();
         let temp_dir = TempDir::new().unwrap();
         let config = ConfigBuilder::new()
             .unwrap()
@@ -268,28 +266,31 @@ mod tests {
         }
         let empty_lockfile_dir = TempDir::new().unwrap();
         let lockfile_path = empty_lockfile_dir.path().join("lux.lock");
-        let mut empty_lockfile = ProjectLockfile::new(lockfile_path.clone()).unwrap();
-        let temp_dir = TempDir::new().unwrap();
-        let config = ConfigBuilder::new()
-            .unwrap()
-            .tree(Some(temp_dir.path().into()))
-            .build()
-            .unwrap();
-        let dest_tree = config.tree(LuaVersion::Lua51).unwrap();
-        let report = Sync::new(&dest_tree, &mut empty_lockfile, &config)
-            .packages(vec![PackageReq::new("toml-edit".into(), None).unwrap()])
-            .sync_dependencies()
-            .await
-            .unwrap();
-        assert!(report.removed.is_empty());
-        assert!(!report.added.is_empty());
-        assert!(!report
-            .added
-            .iter()
-            .filter(|pkg| pkg.name().to_string() == "toml-edit")
-            .collect_vec()
-            .is_empty());
-
+        {
+            let mut empty_lockfile = ProjectLockfile::new(lockfile_path.clone())
+                .unwrap()
+                .write_guard();
+            let temp_dir = TempDir::new().unwrap();
+            let config = ConfigBuilder::new()
+                .unwrap()
+                .tree(Some(temp_dir.path().into()))
+                .build()
+                .unwrap();
+            let dest_tree = config.tree(LuaVersion::Lua51).unwrap();
+            let report = Sync::new(&dest_tree, &mut empty_lockfile, &config)
+                .packages(vec![PackageReq::new("toml-edit".into(), None).unwrap()])
+                .sync_dependencies()
+                .await
+                .unwrap();
+            assert!(report.removed.is_empty());
+            assert!(!report.added.is_empty());
+            assert!(!report
+                .added
+                .iter()
+                .filter(|pkg| pkg.name().to_string() == "toml-edit")
+                .collect_vec()
+                .is_empty());
+        }
         let lockfile_after_sync = ProjectLockfile::new(lockfile_path).unwrap();
         assert!(!lockfile_after_sync
             .rocks(&LocalPackageLockType::Regular)
@@ -304,7 +305,9 @@ mod tests {
         temp_dir.copy_from(&tree_path, &["**"]).unwrap();
         let empty_lockfile_dir = TempDir::new().unwrap();
         let lockfile_path = empty_lockfile_dir.path().join("lux.lock");
-        let mut empty_lockfile = ProjectLockfile::new(lockfile_path.clone()).unwrap();
+        let mut empty_lockfile = ProjectLockfile::new(lockfile_path.clone())
+            .unwrap()
+            .write_guard();
         let config = ConfigBuilder::new()
             .unwrap()
             .tree(Some(temp_dir.path().into()))

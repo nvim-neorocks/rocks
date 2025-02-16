@@ -7,7 +7,7 @@ use std::ops::{Deref, DerefMut};
 use std::{collections::HashMap, fs::File, io::ErrorKind, path::PathBuf};
 
 use itertools::Itertools;
-use serde::{de, Deserialize, Serialize};
+use serde::{de, Deserialize, Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use ssri::Integrity;
 use thiserror::Error;
@@ -206,9 +206,16 @@ impl LocalPackageSpec {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase", tag = "type")]
 pub(crate) enum RemotePackageSourceUrl {
-    Git { url: String }, // GitUrl doesn't have all the trait instances we need
-    Url { url: Url },
-    File { path: PathBuf },
+    Git {
+        url: String,
+    }, // GitUrl doesn't have all the trait instances we need
+    Url {
+        #[serde(deserialize_with = "deserialize_url", serialize_with = "serialize_url")]
+        url: Url,
+    },
+    File {
+        path: PathBuf,
+    },
 }
 
 // TODO(vhyrro): Move to `package/local.rs`
@@ -789,6 +796,18 @@ impl<P: LockfilePermissions> ProjectLockfile<P> {
         }
     }
 
+    pub(crate) fn package_sync_spec(
+        &self,
+        packages: &[PackageReq],
+        deps: &LocalPackageLockType,
+    ) -> PackageSyncSpec {
+        match deps {
+            LocalPackageLockType::Regular => self.dependencies.package_sync_spec(packages),
+            LocalPackageLockType::Test => self.test_dependencies.package_sync_spec(packages),
+            LocalPackageLockType::Build => self.build_dependencies.package_sync_spec(packages),
+        }
+    }
+
     pub(crate) fn local_pkg_lock(&self, deps: &LocalPackageLockType) -> &LocalPackageLock {
         match deps {
             LocalPackageLockType::Regular => &self.dependencies,
@@ -880,7 +899,19 @@ impl Lockfile<ReadOnly> {
     }
 
     /// Creates a temporary, writeable lockfile which can never flush.
-    pub fn into_temporary(self) -> Lockfile<ReadWrite> {
+    #[cfg(feature = "lua")]
+    pub(crate) fn into_temporary(self) -> Lockfile<ReadWrite> {
+        Lockfile::<ReadWrite> {
+            _marker: PhantomData,
+            filepath: self.filepath,
+            version: self.version,
+            lock: self.lock,
+        }
+    }
+
+    /// Creates a temporary, writeable lockfile which can never flush.
+    #[cfg(not(feature = "lua"))]
+    fn into_temporary(self) -> Lockfile<ReadWrite> {
         Lockfile::<ReadWrite> {
             _marker: PhantomData,
             filepath: self.filepath,
@@ -897,13 +928,13 @@ impl Lockfile<ReadOnly> {
 
     /// Converts the current lockfile into a writeable one, executes `cb` and flushes
     /// the lockfile.
-    pub fn map_then_flush<T, F, E>(&mut self, cb: F) -> Result<T, E>
+    pub fn map_then_flush<T, F, E>(self, cb: F) -> Result<T, E>
     where
         F: FnOnce(&mut Lockfile<ReadWrite>) -> Result<T, E>,
         E: Error,
         E: From<io::Error>,
     {
-        let mut writeable_lockfile = self.clone().into_temporary();
+        let mut writeable_lockfile = self.into_temporary();
 
         let result = cb(&mut writeable_lockfile)?;
 
@@ -962,7 +993,7 @@ impl ProjectLockfile<ReadOnly> {
     }
 
     /// Creates a temporary, writeable project lockfile which can never flush.
-    pub fn into_temporary(self) -> ProjectLockfile<ReadWrite> {
+    fn into_temporary(self) -> ProjectLockfile<ReadWrite> {
         ProjectLockfile::<ReadWrite> {
             _marker: PhantomData,
             filepath: self.filepath,
@@ -973,39 +1004,10 @@ impl ProjectLockfile<ReadOnly> {
         }
     }
 
-    /// Converts the current lockfile into a writeable one, executes `cb` and flushes
-    /// the lockfile.
-    pub fn map_then_flush<T, F, E>(&mut self, cb: F) -> Result<T, E>
-    where
-        F: FnOnce(&mut ProjectLockfile<ReadWrite>) -> Result<T, E>,
-        E: Error,
-        E: From<io::Error>,
-    {
-        let mut writeable_lockfile = self.clone().into_temporary();
-
-        let result = cb(&mut writeable_lockfile)?;
-
-        writeable_lockfile.flush()?;
-
-        Ok(result)
-    }
-
     /// Creates a project lockfile guard, flushing the lockfile automatically
     /// once the guard goes out of scope.
     pub fn write_guard(self) -> ProjectLockfileGuard {
         ProjectLockfileGuard(self.into_temporary())
-    }
-
-    pub(crate) fn package_sync_spec(
-        &self,
-        packages: &[PackageReq],
-        deps: &LocalPackageLockType,
-    ) -> PackageSyncSpec {
-        match deps {
-            LocalPackageLockType::Regular => self.dependencies.package_sync_spec(packages),
-            LocalPackageLockType::Test => self.test_dependencies.package_sync_spec(packages),
-            LocalPackageLockType::Build => self.build_dependencies.package_sync_spec(packages),
-        }
     }
 }
 
@@ -1199,6 +1201,21 @@ fn integrity_err_not_found(package: &LocalPackage) -> LockfileIntegrityError {
             .clone()
             .unwrap_or("UNCONSTRAINED".into()),
     )
+}
+
+fn deserialize_url<'de, D>(deserializer: D) -> Result<Url, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    Url::parse(&s).map_err(serde::de::Error::custom)
+}
+
+fn serialize_url<S>(url: &Url, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    url.as_str().serialize(serializer)
 }
 
 #[cfg(test)]

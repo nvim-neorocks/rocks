@@ -71,7 +71,7 @@ mod tests {
             .output()
             .unwrap()
             .stdout;
-        dbg!(String::from_utf8_lossy(&ssri_str)).parse().unwrap()
+        String::from_utf8_lossy(&ssri_str).parse().unwrap()
     }
 
     #[cfg(unix)]
@@ -83,7 +83,7 @@ mod tests {
             .output()
             .unwrap()
             .stdout;
-        dbg!(String::from_utf8_lossy(&ssri_str)).parse().unwrap()
+        String::from_utf8_lossy(&ssri_str).parse().unwrap()
     }
 
     #[test]
