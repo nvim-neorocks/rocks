@@ -2,4 +2,4 @@
 tt = "nextest run --tests --no-fail-fast" # All
 tl = "nextest run --lib --no-fail-fast" # Lib only
 xtask = "run --package xtask --"
-lux = "run --package lux --"
+lx = "run --bin lx --"
