@@ -451,6 +451,13 @@ impl LockConstraint {
             LockConstraint::Constrained(req) => Some(req.to_string()),
         }
     }
+
+    fn matches_version_req(&self, req: &PackageVersionReq) -> bool {
+        match self {
+            LockConstraint::Unconstrained => req.is_any(),
+            LockConstraint::Constrained(package_version_req) => package_version_req == req,
+        }
+    }
 }
 
 impl From<PackageVersionReq> for LockConstraint {
@@ -557,28 +564,41 @@ impl LocalPackageLock {
             .cloned()
     }
 
-    /// Synchronise a list of packages with this lockfile,
-    /// producing a report of packages to add and packages to remove.
+    fn has_rock_with_equal_constraint(&self, req: &PackageReq) -> Option<LocalPackage> {
+        self.list()
+            .get(req.name())
+            .map(|packages| {
+                packages
+                    .iter()
+                    .rev()
+                    .find(|package| package.constraint().matches_version_req(req.version_req()))
+            })?
+            .cloned()
+    }
+
+    /// Synchronise a list of packages with this lock,
+    /// producing a report of packages to add and packages to remove,
+    /// based on the version constraint.
     ///
     /// NOTE: The reason we produce a report and don't add/remove packages
     /// here is because packages need to be installed in order to be added.
     pub(crate) fn package_sync_spec(&self, packages: &[PackageReq]) -> PackageSyncSpec {
-        let (entrypoints_to_keep, entrypoints_to_remove): (
-            HashSet<LocalPackage>,
-            HashSet<LocalPackage>,
-        ) = self
+        let entrypoints_to_keep: HashSet<LocalPackage> = self
             .entrypoints
             .iter()
             .map(|id| {
                 self.get(id)
                     .expect("entrypoint not found in malformed lockfile.")
             })
+            .filter(|local_pkg| {
+                packages.iter().any(|req| {
+                    local_pkg
+                        .constraint()
+                        .matches_version_req(req.version_req())
+                })
+            })
             .cloned()
-            .partition(|local_pkg| {
-                packages
-                    .iter()
-                    .any(|req| req.matches(&local_pkg.as_package_spec()))
-            });
+            .collect();
 
         let packages_to_keep: HashSet<&LocalPackage> = entrypoints_to_keep
             .iter()
@@ -587,14 +607,14 @@ impl LocalPackageLock {
 
         let to_add = packages
             .iter()
-            .filter(|pkg| self.has_rock(pkg, None).is_none())
+            .filter(|pkg| self.has_rock_with_equal_constraint(pkg).is_none())
             .cloned()
             .collect_vec();
 
-        let to_remove = entrypoints_to_remove
-            .iter()
-            .flat_map(|local_pkg| self.get_all_dependencies(&local_pkg.id()))
-            .filter(|dependency| !packages_to_keep.contains(dependency))
+        let to_remove = self
+            .rocks()
+            .values()
+            .filter(|pkg| !packages_to_keep.contains(*pkg))
             .cloned()
             .collect_vec();
 
@@ -1325,7 +1345,7 @@ mod tests {
         let lockfile = get_test_lockfile();
         let packages = vec![
             PackageReq::parse("neorg@8.8.1-1").unwrap(),
-            PackageReq::parse("lua-cjson@2.1.0-1").unwrap(),
+            PackageReq::parse("lua-cjson").unwrap(),
             PackageReq::parse("nonexistent").unwrap(),
         ];
 
@@ -1391,5 +1411,23 @@ mod tests {
         // Should remove all packages
         assert!(sync_spec.to_add.is_empty());
         assert_eq!(sync_spec.to_remove.len(), lockfile.rocks().len());
+    }
+
+    #[test]
+    fn test_sync_spec_different_constraints() {
+        let lockfile = get_test_lockfile();
+        let packages = vec![PackageReq::parse("nvim-nio>=2.0.0").unwrap()];
+        let sync_spec = lockfile.lock.package_sync_spec(&packages);
+
+        let expected: PackageVersionReq = ">=2.0.0".parse().unwrap();
+        assert!(sync_spec
+            .to_add
+            .iter()
+            .any(|req| req.name().to_string() == "nvim-nio" && req.version_req() == &expected));
+
+        assert!(sync_spec
+            .to_remove
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "nvim-nio"));
     }
 }

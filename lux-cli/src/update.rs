@@ -1,31 +1,30 @@
 use clap::Args;
-use eyre::Result;
-use lux_lib::config::LuaVersion;
-use lux_lib::lockfile::PinnedState;
+use eyre::{Context, Result};
 use lux_lib::progress::{MultiProgress, ProgressBar};
 use lux_lib::{config::Config, operations};
 
 #[derive(Args)]
-pub struct Update {}
+pub struct Update {
+    /// Skip the integrity checks for installed rocks when syncing the project lockfile.
+    #[arg(long)]
+    no_integrity_check: bool,
+}
 
-pub async fn update(config: Config) -> Result<()> {
+pub async fn update(args: Update, config: Config) -> Result<()> {
     let progress = MultiProgress::new_arc();
     progress.map(|p| p.add(ProgressBar::from("🔎 Looking for updates...".to_string())));
 
-    let tree = config.tree(LuaVersion::from(&config)?)?;
-    let lockfile = tree.lockfile()?;
-
-    operations::Update::new(&tree, &config)
-        .packages(
-            lockfile
-                .rocks()
-                .values()
-                .filter(|package| package.pinned() == PinnedState::Unpinned)
-                .map(|package| (package.clone(), package.to_package().into_package_req())),
-        )
+    let updated_packages = operations::Update::new(&config)
         .progress(progress)
+        .validate_integrity(!args.no_integrity_check)
         .update()
-        .await?;
+        .await
+        .wrap_err("update failed.")?;
+
+    if updated_packages.is_empty() {
+        println!("Nothing to update.");
+        return Ok(());
+    }
 
     Ok(())
 }

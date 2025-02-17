@@ -84,16 +84,23 @@ where
     }
 
     pub async fn sync_build_dependencies(mut self) -> Result<SyncReport, SyncError> {
-        let luarocks = PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into())).unwrap();
-        self.add_package(luarocks);
+        if self
+            .packages
+            .as_ref()
+            .is_some_and(|packages| !packages.is_empty())
+        {
+            let luarocks =
+                PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into())).unwrap();
+            self.add_package(luarocks);
+        }
         do_sync(self._build(), &LocalPackageLockType::Build).await
     }
 }
 
 #[derive(Debug)]
 pub struct SyncReport {
-    added: Vec<LocalPackage>,
-    removed: Vec<LocalPackage>,
+    pub(crate) added: Vec<LocalPackage>,
+    pub(crate) removed: Vec<LocalPackage>,
 }
 
 #[derive(Error, Debug)]
@@ -208,7 +215,7 @@ async fn do_sync(
 
         report.added.extend(added);
 
-        // Sync the newly added packages back to the source lockfile
+        // Sync the newly added packages back to the project lockfile
         let dest_lockfile = args.tree.lockfile()?;
         args.project_lockfile
             .sync(dest_lockfile.local_pkg_lock(), lock_type);

@@ -71,7 +71,7 @@ async fn main() {
         Commands::Remove(remove_args) => remove::remove(remove_args, config).await.unwrap(),
         Commands::Run(run_args) => run::run(run_args, config).await.unwrap(),
         Commands::Test(test) => test::test(test, config).await.unwrap(),
-        Commands::Update(_update_args) => update::update(config).await.unwrap(),
+        Commands::Update(update_args) => update::update(update_args, config).await.unwrap(),
         Commands::Info(info_data) => info::info(info_data, config).await.unwrap(),
         Commands::Path(path_data) => path::path(path_data, config).await.unwrap(),
         Commands::Pin(pin_data) => pin::set_pinned_state(pin_data, config, Pinned).unwrap(),

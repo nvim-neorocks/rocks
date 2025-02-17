@@ -104,13 +104,7 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
     } else {
         let mut lockfile = test.project.lockfile()?.write_guard();
 
-        let test_dependencies = rocks
-            .test_dependencies()
-            .current_platform()
-            .iter()
-            .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
-            .cloned()
-            .collect_vec();
+        let test_dependencies = rocks.test_dependencies().current_platform().clone();
 
         Sync::new(&test_tree, &mut lockfile, test.config)
             .progress(test.progress.clone())

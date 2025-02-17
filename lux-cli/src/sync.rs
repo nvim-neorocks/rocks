@@ -2,11 +2,12 @@ use std::path::PathBuf;
 
 use clap::Args;
 use eyre::{eyre, Context, Result};
+use itertools::Itertools;
 use lux_lib::{
     config::{Config, LuaVersion},
     lockfile::ProjectLockfile,
     operations,
-    package::PackageReq,
+    package::{PackageName, PackageReq},
     project::{project_toml::ProjectToml, PROJECT_TOML},
     rockspec::Rockspec,
 };
@@ -67,7 +68,10 @@ pub async fn sync(args: Sync, config: Config) -> Result<()> {
                 .into_validated()?
                 .dependencies()
                 .current_platform()
-                .clone())
+                .iter()
+                .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
+                .cloned()
+                .collect_vec())
         })
         .transpose()?
     {
