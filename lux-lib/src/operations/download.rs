@@ -6,7 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use thiserror::Error;
-use url::Url;
+use url::{ParseError, Url};
 
 use crate::{
     config::Config,
@@ -111,6 +111,7 @@ pub struct DownloadedPackedRockBytes {
     pub version: PackageVersion,
     pub bytes: Bytes,
     pub file_name: String,
+    pub url: Url,
 }
 
 pub struct DownloadedPackedRock {
@@ -295,8 +296,12 @@ async fn search_and_download_src_rock(
 }
 
 #[derive(Error, Debug)]
-#[error("failed to download source rock: {0}")]
-pub struct DownloadSrcRockError(#[from] reqwest::Error);
+pub enum DownloadSrcRockError {
+    #[error("failed to download source rock: {0}")]
+    Request(#[from] reqwest::Error),
+    #[error("failed to parse source rock URL: {0}")]
+    Parse(#[from] ParseError),
+}
 
 pub(crate) async fn download_src_rock(
     package: &PackageSpec,
@@ -361,15 +366,14 @@ async fn download_packed_rock_impl(
     });
     let full_rock_name = mk_packed_rock_name(package.name(), package.version(), ext);
 
-    let bytes = reqwest::get(format!("{}/{}", server_url, full_rock_name))
-        .await?
-        .bytes()
-        .await?;
+    let url = server_url.join(&full_rock_name)?;
+    let bytes = reqwest::get(url.clone()).await?.bytes().await?;
     Ok(DownloadedPackedRockBytes {
         name: package.name().clone(),
         version: package.version().clone(),
         bytes,
         file_name: full_rock_name,
+        url,
     })
 }
 

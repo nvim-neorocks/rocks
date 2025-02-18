@@ -1,4 +1,3 @@
-use crate::lockfile::RemotePackageSourceUrl;
 use crate::rockspec::LuaVersionCompatibility;
 use crate::{lua_rockspec::LuaVersionError, rockspec::Rockspec};
 use std::{io, path::Path, process::ExitStatus};
@@ -256,18 +255,18 @@ async fn do_build<R: Rockspec + HasIntegrity>(
 
     let temp_dir = tempdir::TempDir::new(&build.rockspec.package().to_string())?;
 
-    let source_hash = operations::FetchSrc::new(
+    let source_metadata = operations::FetchSrc::new(
         temp_dir.path(),
         build.rockspec,
         build.config,
         build.progress,
     )
-    .fetch()
+    .fetch_internal()
     .await?;
 
     let hashes = LocalPackageHashes {
         rockspec: build.rockspec.hash()?,
-        source: source_hash,
+        source: source_metadata.hash,
     };
 
     if let Some(expected) = &build.rockspec.source().current_platform().integrity {
@@ -279,18 +278,6 @@ async fn do_build<R: Rockspec + HasIntegrity>(
         }
     }
 
-    let source_url = match &build.rockspec.source().current_platform().source_spec {
-        crate::lua_rockspec::RockSourceSpec::Git(git_source) => RemotePackageSourceUrl::Git {
-            url: format!("{}", &git_source.url),
-        },
-        crate::lua_rockspec::RockSourceSpec::File(path) => {
-            RemotePackageSourceUrl::File { path: path.clone() }
-        }
-        crate::lua_rockspec::RockSourceSpec::Url(url) => {
-            RemotePackageSourceUrl::Url { url: url.clone() }
-        }
-    };
-
     let mut package = LocalPackage::from(
         &PackageSpec::new(
             build.rockspec.package().clone(),
@@ -301,7 +288,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
         build.source.unwrap_or_else(|| {
             RemotePackageSource::RockspecContent(build.rockspec.to_rockspec_str())
         }),
-        Some(source_url),
+        Some(source_metadata.source_url),
         hashes,
     );
     package.spec.pinned = build.pin;

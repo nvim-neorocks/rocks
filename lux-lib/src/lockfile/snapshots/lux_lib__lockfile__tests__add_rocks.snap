@@ -1,6 +1,6 @@
 ---
 source: lux-lib/src/lockfile/mod.rs
-assertion_line: 1276
+assertion_line: 1295
 expression: lockfile
 ---
 {
@@ -36,7 +36,8 @@ expression: lockfile
       "source": "luarocks_rockspec+https://luarocks.org/",
       "source_url": {
         "type": "git",
-        "url": "https://github.com/lunarmodules/say.git"
+        "url": "https://github.com/lunarmodules/say.git",
+        "ref": "v1.4.1"
       },
       "hashes": {
         "rockspec": "sha256-WFKt1iWeyjO9A8SG0KUX8tkS9JvMqoVM8CKBUguuK0Y=",
@@ -88,7 +89,8 @@ expression: lockfile
       "source": "luarocks_rockspec+https://luarocks.org/",
       "source_url": {
         "type": "git",
-        "url": "https://github.com/lunarmodules/luassert.git"
+        "url": "https://github.com/lunarmodules/luassert.git",
+        "ref": "v1.9.0"
       },
       "hashes": {
         "rockspec": "sha256-rTPvF/GK/jMnH/q4wbwTCGBFELWh+JcvHeOCFAbIf64=",
@@ -189,7 +191,8 @@ expression: lockfile
       "source": "luarocks_rockspec+https://luarocks.org/",
       "source_url": {
         "type": "git",
-        "url": "https://github.com/MunifTanjim/nui.nvim.git"
+        "url": "https://github.com/MunifTanjim/nui.nvim.git",
+        "ref": "0.3.0"
       },
       "hashes": {
         "rockspec": "sha256-C33kdZVqHui1mOd+J2/HbvmvYOntTMzfJ3YBtj4v51k=",
@@ -251,7 +254,7 @@ expression: lockfile
       "source": "luarocks_rockspec+https://luarocks.org/",
       "source_url": {
         "type": "url",
-        "url": "http://www.kyne.com.au/~mark/software/download/lua-cjson-2.1.0.zip"
+        "url": "https://luarocks.org/lua-cjson-2.1.0-1.src.rock"
       },
       "hashes": {
         "rockspec": "sha256-L/6Yon2ek6NnEeifAy3qsnT2cMCB8IdaCgVeu3+1lvs=",
@@ -268,7 +271,8 @@ expression: lockfile
       "source": "luarocks_rockspec+https://luarocks.org/",
       "source_url": {
         "type": "git",
-        "url": "https://github.com/lunarmodules/say.git"
+        "url": "https://github.com/lunarmodules/say.git",
+        "ref": "v1.4.1"
       },
       "hashes": {
         "rockspec": "sha256-WFKt1iWeyjO9A8SG0KUX8tkS9JvMqoVM8CKBUguuK0Y=",

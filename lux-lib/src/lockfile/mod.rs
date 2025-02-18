@@ -208,6 +208,8 @@ impl LocalPackageSpec {
 pub(crate) enum RemotePackageSourceUrl {
     Git {
         url: String,
+        #[serde(rename = "ref")]
+        checkout_ref: String,
     }, // GitUrl doesn't have all the trait instances we need
     Url {
         #[serde(deserialize_with = "deserialize_url", serialize_with = "serialize_url")]

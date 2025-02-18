@@ -235,6 +235,7 @@ mod test {
             version: "0.6.0-1".parse().unwrap(),
             bytes: rock_bytes,
             file_name: packed_rock_file_name.clone(),
+            url: "https://test.org".parse().unwrap(),
         };
         let rockspec = unpack_rockspec(&rock).await.unwrap();
         let install_root = assert_fs::TempDir::new().unwrap();
@@ -301,6 +302,7 @@ mod test {
             version: "0.6.0-1".parse().unwrap(),
             bytes: rock_bytes,
             file_name: packed_rock_file_name.clone(),
+            url: "https://test.org".parse().unwrap(),
         };
         let rockspec = unpack_rockspec(&rock).await.unwrap();
         let bar = progress.new_bar();
