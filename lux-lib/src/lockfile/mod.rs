@@ -496,6 +496,10 @@ impl LocalPackageLock {
         self.rocks.get(id)
     }
 
+    fn is_empty(&self) -> bool {
+        self.entrypoints.is_empty()
+    }
+
     pub(crate) fn rocks(&self) -> &BTreeMap<LocalPackageId, LocalPackage> {
         &self.rocks
     }
@@ -631,11 +635,11 @@ pub struct ProjectLockfile<P: LockfilePermissions> {
     #[serde(skip)]
     _marker: PhantomData<P>,
     version: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "LocalPackageLock::is_empty")]
     dependencies: LocalPackageLock,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "LocalPackageLock::is_empty")]
     test_dependencies: LocalPackageLock,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "LocalPackageLock::is_empty")]
     build_dependencies: LocalPackageLock,
 }
 

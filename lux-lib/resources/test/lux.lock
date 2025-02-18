@@ -265,13 +265,5 @@
       "e7c4c9fcd3cb6fe33c1c0a2ab8cdbbe8ee81d11334277d1f5631c80317770769",
       "f98575efb520794ce8828bf0f5088047e745c27cd102cde14d4f6ad933efa00d"
     ]
-  },
-  "test_dependencies": {
-    "rocks": {},
-    "entrypoints": []
-  },
-  "build_dependencies": {
-    "rocks": {},
-    "entrypoints": []
   }
 }
