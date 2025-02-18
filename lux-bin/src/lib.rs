@@ -62,7 +62,7 @@ pub mod upload;
 pub mod utils;
 pub mod which;
 
-/// A fast and efficient Lua package manager.
+/// A luxurious package manager for Lua.
 #[derive(Parser)]
 #[command(author, version, about, long_about = None, arg_required_else_help = true)]
 pub struct Cli {
