@@ -446,11 +446,7 @@ mod tests {
     };
 
     use crate::{
-        config::{ConfigBuilder, LuaVersion},
-        lua_installation::LuaInstallation,
-        progress::MultiProgress,
-        project::{project_toml::PartialProjectToml, Project},
-        tree::RockLayout,
+        config::{ConfigBuilder, LuaVersion}, lua_installation::LuaInstallation, progress::MultiProgress, project::Project, tree::RockLayout
     };
 
     #[tokio::test]
@@ -471,15 +467,8 @@ mod tests {
             doc: dest_dir.join("doc"),
         };
         let lua = LuaInstallation::new(config.lua_version().unwrap_or(&LuaVersion::Lua51), &config);
-        let rockspec_content = String::from_utf8(
-            std::fs::read("resources/test/sample-project-no-build-spec/lux.toml").unwrap(),
-        )
-        .unwrap();
         let project = Project::from(&project_root).unwrap().unwrap();
-        let rockspec = PartialProjectToml::new(&rockspec_content, project.root().clone())
-            .unwrap()
-            .into_remote()
-            .unwrap();
+        let rockspec = project.toml().into_remote().unwrap();
         let progress = Progress::Progress(MultiProgress::new());
         run_build(
             &rockspec,

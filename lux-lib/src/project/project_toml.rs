@@ -103,7 +103,7 @@ pub struct PartialProjectToml {
 }
 
 impl PartialProjectToml {
-    pub fn new(str: &str, project_root: ProjectRoot) -> Result<Self, toml::de::Error> {
+    pub(crate) fn new(str: &str, project_root: ProjectRoot) -> Result<Self, toml::de::Error> {
         Ok(Self {
             project_root,
             ..toml::from_str(str)?
