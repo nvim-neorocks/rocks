@@ -21,7 +21,6 @@ use remove::Remove;
 use run::Run;
 use run_lua::RunLua;
 use search::Search;
-use sync::Sync;
 use test::Test;
 use uninstall::Uninstall;
 use update::Update;
@@ -53,7 +52,6 @@ pub mod remove;
 pub mod run;
 pub mod run_lua;
 pub mod search;
-pub mod sync;
 pub mod test;
 pub mod uninstall;
 pub mod unpack;
@@ -181,8 +179,6 @@ pub enum Commands {
     /// Query the luarocks servers.
     #[command(arg_required_else_help = true)]
     Search(Search),
-    /// Synchronise a tree with a lockfile.
-    Sync(Sync),
     /// Run the test suite in the current directory.
     Test(Test),
     /// Uninstall a rock from the system.
