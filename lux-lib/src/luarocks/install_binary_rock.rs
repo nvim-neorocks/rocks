@@ -125,7 +125,7 @@ impl<'a> BinaryRockInstall<'a> {
         match tree.lockfile()?.get(&package.id()) {
             Some(package) if self.behaviour == BuildBehaviour::NoForce => Ok(package.clone()),
             _ => {
-                let unpack_dir = TempDir::new("lux-bin-rock").unwrap().into_path();
+                let unpack_dir = TempDir::new("lux-cli-rock").unwrap().into_path();
                 let cursor = Cursor::new(self.rock_bytes);
                 let mut zip = zip::ZipArchive::new(cursor)?;
                 zip.extract(&unpack_dir)?;

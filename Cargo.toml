@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "lux-lib",
-    "lux-bin",
+    "lux-cli",
     "xtask",
     # "lux-lua",
 ]

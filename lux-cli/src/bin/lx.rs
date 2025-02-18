@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use clap::Parser;
-use lux::{
+use lux_cli::{
     add, build, check, config,
     debug::Debug,
     doc, download, fetch, format, info, install, install_lua, install_rockspec, list, outdated,

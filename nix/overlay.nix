@@ -4,7 +4,7 @@
     with final;
       rustPlatform.buildRustPackage {
         pname = "lux";
-        version = ((lib.importTOML "${self}/lux-bin/Cargo.toml").package).version;
+        version = ((lib.importTOML "${self}/lux-cli/Cargo.toml").package).version;
 
         src = self;
 

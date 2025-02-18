@@ -8,7 +8,7 @@ use std::{
 use clap::{CommandFactory, ValueEnum};
 use clap_complete::{generate_to, Shell};
 use clap_mangen::Man;
-use lux::Cli;
+use lux_cli::Cli;
 
 type DynError = Box<dyn std::error::Error>;
 

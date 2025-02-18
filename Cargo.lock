@@ -2108,8 +2108,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "lux"
-version = "0.1.0"
+name = "lux-cli"
+version = "0.0.0"
 dependencies = [
  "assert_fs",
  "clap 4.5.23",
@@ -4845,7 +4845,7 @@ dependencies = [
  "clap 4.5.23",
  "clap_complete",
  "clap_mangen",
- "lux",
+ "lux-cli",
 ]
 
 [[package]]
