@@ -225,7 +225,7 @@ pub(crate) enum RemotePackageSourceUrl {
 pub struct LocalPackage {
     pub(crate) spec: LocalPackageSpec,
     pub(crate) source: RemotePackageSource,
-    source_url: Option<RemotePackageSourceUrl>,
+    pub(crate) source_url: Option<RemotePackageSourceUrl>,
     hashes: LocalPackageHashes,
 }
 

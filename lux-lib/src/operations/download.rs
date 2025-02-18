@@ -10,6 +10,7 @@ use url::{ParseError, Url};
 
 use crate::{
     config::Config,
+    lockfile::RemotePackageSourceUrl,
     lua_rockspec::{LuaRockspec, RockspecError},
     luarocks,
     package::{PackageName, PackageReq, PackageSpec, PackageVersion, RemotePackageTypeFilterSpec},
@@ -124,6 +125,7 @@ pub struct DownloadedPackedRock {
 pub struct DownloadedRockspec {
     pub rockspec: LuaRockspec,
     pub(crate) source: RemotePackageSource,
+    pub(crate) source_url: Option<RemotePackageSourceUrl>,
 }
 
 #[derive(Clone, Debug)]
@@ -213,6 +215,7 @@ async fn download_remote_rock(
             let rockspec = DownloadedRockspec {
                 rockspec: LuaRockspec::new(&content)?,
                 source: remote_package.source,
+                source_url: remote_package.source_url,
             };
             Ok(RemoteRockDownload::RockspecOnly {
                 rockspec_download: rockspec,
@@ -222,16 +225,25 @@ async fn download_remote_rock(
             let rockspec = DownloadedRockspec {
                 rockspec: LuaRockspec::new(content)?,
                 source: remote_package.source,
+                source_url: remote_package.source_url,
             };
             Ok(RemoteRockDownload::RockspecOnly {
                 rockspec_download: rockspec,
             })
         }
         RemotePackageSource::LuarocksBinaryRock(url) => {
+            // prioritise lockfile source_url
+            let url = if let Some(RemotePackageSourceUrl::Url { url }) = &remote_package.source_url
+            {
+                url
+            } else {
+                url
+            };
             let rock = download_binary_rock(&remote_package.package, url, progress).await?;
             let rockspec = DownloadedRockspec {
                 rockspec: unpack_rockspec(&rock).await?,
                 source: remote_package.source,
+                source_url: remote_package.source_url,
             };
             Ok(RemoteRockDownload::BinaryRock {
                 rockspec_download: rockspec,
@@ -239,10 +251,18 @@ async fn download_remote_rock(
             })
         }
         RemotePackageSource::LuarocksSrcRock(url) => {
+            // prioritise lockfile source_url
+            let url = if let Some(RemotePackageSourceUrl::Url { url }) = &remote_package.source_url
+            {
+                url
+            } else {
+                url
+            };
             let rock = download_src_rock(&remote_package.package, url, progress).await?;
             let rockspec = DownloadedRockspec {
                 rockspec: unpack_rockspec(&rock).await?,
                 source: remote_package.source,
+                source_url: remote_package.source_url,
             };
             Ok(RemoteRockDownload::SrcRock {
                 rockspec_download: rockspec,
