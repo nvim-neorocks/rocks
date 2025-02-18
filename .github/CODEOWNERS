@@ -9,5 +9,5 @@ rocks-bin/ @NTBBloodbath @vhyrro @mrcjkb
 rocks-lib/ @NTBBloodbath @vhyrro @mrcjkb
 
 # Nix
-nix/ @mrcjkb @teto
-flake.* @mrcjkb @teto
+nix/ @mrcjkb
+flake.* @mrcjkb
