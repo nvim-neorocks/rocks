@@ -6,6 +6,7 @@
 > and does not have a stable release yet.**
 
 Lux serves as an application for:
+
 - Installing and managing rocks
 - Creating Lua projects with dependencies, build scripts and desired Lua versions
 - Creating and publishing your own rocks
@@ -19,10 +20,10 @@ Lux serves as an application for:
 ## :books: Usage
 
 ```sh
-lux <command> <options>
+lx <command> <options>
 ```
 
-To view available options and their descriptions, run `lux --help`.
+To view available options and their descriptions, run `lx --help`.
 
 ## Comparison with [`luarocks v3.11.1`](https://github.com/luarocks/luarocks)
 
@@ -32,7 +33,7 @@ On the other hand, lux has some features that are not present in luarocks.
 
 The following table provides a brief (incomplete) comparison:
 
-|                                                                       | `lux`                      | `luarocks v3.11.1` |
+|                                                                       | lux                          | luarocks v3.11.1 |
 | ---                                                                   | ---                          | ---                |
 | `builtin` build spec                                                  | :white_check_mark:           | :white_check_mark: |
 | `make` build spec                                                     | :white_check_mark:           | :white_check_mark: |
@@ -63,7 +64,7 @@ The following table provides a brief (incomplete) comparison:
 
 ## :book: License
 
-`lux` is licensed under [MIT](./LICENSE).
+Lux is licensed under [MIT](./LICENSE).
 
 ## :green_heart: Contributing
 
