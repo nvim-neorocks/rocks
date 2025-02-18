@@ -45,7 +45,8 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
     if !data.package_req.is_empty() {
         // NOTE: We only update the lockfile if one exists.
         // Otherwise, the next `lux build` will install the packages.
-        if let Some(mut lockfile) = project.try_lockfile()? {
+        if let Some(lockfile) = project.try_lockfile()? {
+            let mut lockfile = lockfile.write_guard();
             Sync::new(&tree, &mut lockfile, &config)
                 .progress(progress.clone())
                 .packages(data.package_req.clone())
@@ -65,8 +66,9 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
 
     let build_packages = data.build.unwrap_or_default();
     if !build_packages.is_empty() {
-        if let Some(mut lockfile) = project.try_lockfile()? {
+        if let Some(lockfile) = project.try_lockfile()? {
             let luarocks = LuaRocksInstallation::new(&config)?;
+            let mut lockfile = lockfile.write_guard();
             Sync::new(luarocks.tree(), &mut lockfile, luarocks.config())
                 .progress(progress.clone())
                 .packages(build_packages.clone())
@@ -83,7 +85,8 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
 
     let test_packages = data.test.unwrap_or_default();
     if !test_packages.is_empty() {
-        if let Some(mut lockfile) = project.try_lockfile()? {
+        if let Some(lockfile) = project.try_lockfile()? {
+            let mut lockfile = lockfile.write_guard();
             Sync::new(&tree, &mut lockfile, &config)
                 .progress(progress.clone())
                 .packages(test_packages.clone())

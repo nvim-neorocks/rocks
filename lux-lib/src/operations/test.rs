@@ -102,7 +102,7 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
         )
         .await?;
     } else {
-        let mut lockfile = test.project.lockfile()?;
+        let mut lockfile = test.project.lockfile()?.write_guard();
 
         let test_dependencies = rocks
             .test_dependencies()

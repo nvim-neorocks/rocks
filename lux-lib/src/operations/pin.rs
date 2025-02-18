@@ -37,7 +37,7 @@ pub fn set_pinned_state(
     tree: &Tree,
     pin: PinnedState,
 ) -> Result<(), PinError> {
-    let mut lockfile = tree.lockfile()?;
+    let lockfile = tree.lockfile()?;
     let mut package = lockfile
         .get(package_id)
         .ok_or_else(|| PinError::PackageNotFound(package_id.clone()))?
