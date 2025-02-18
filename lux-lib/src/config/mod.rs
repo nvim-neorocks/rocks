@@ -436,6 +436,18 @@ impl ConfigBuilder {
         let data_dir = self.data_dir.unwrap_or(Config::get_default_data_path()?);
         let cache_dir = self.cache_dir.unwrap_or(Config::get_default_cache_path()?);
         let current_project = Project::current()?;
+        let tree = self.tree.unwrap_or(
+            current_project
+                .as_ref()
+                .map(|project| project.default_tree_root_dir())
+                .unwrap_or(data_dir.join("tree")),
+        );
+        let luarocks_tree = self.luarocks_tree.unwrap_or(
+            current_project
+                .as_ref()
+                .map(|project| project.default_tree_root_dir().join("build_dependencies"))
+                .unwrap_or(data_dir.join(".luarocks")),
+        );
         let lua_version = self
             .lua_version
             .or(current_project
@@ -454,8 +466,8 @@ impl ConfigBuilder {
             namespace: self.namespace,
             lua_dir: self.lua_dir.unwrap_or_else(|| data_dir.join("lua")),
             lua_version,
-            tree: self.tree.unwrap_or_else(|| data_dir.join("tree")),
-            luarocks_tree: self.luarocks_tree.unwrap_or(data_dir.join(".luarocks")),
+            tree,
+            luarocks_tree,
             no_project: self.no_project.unwrap_or(false),
             verbose: self.verbose.unwrap_or(false),
             timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(30)),

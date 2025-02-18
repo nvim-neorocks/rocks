@@ -70,8 +70,8 @@ pub enum ExecLuaRocksError {
 }
 
 pub struct LuaRocksInstallation {
-    pub tree: Tree,
-    pub config: Config,
+    tree: Tree,
+    config: Config,
 }
 
 pub(crate) const LUAROCKS_VERSION: &str = "3.11.1-1";
