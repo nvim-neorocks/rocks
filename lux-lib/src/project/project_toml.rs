@@ -3,7 +3,6 @@
 use crate::hash::HasIntegrity;
 use crate::lua_rockspec::LocalRockSource;
 use crate::lua_rockspec::RockSourceSpec;
-use crate::rockspec::RockBinaries;
 use std::io;
 use std::{collections::HashMap, path::PathBuf};
 
@@ -16,10 +15,10 @@ use crate::{
     config::{Config, LuaVersion},
     lua_rockspec::{
         BuildSpec, BuildSpecInternal, BuildSpecInternalError, DisplayAsLuaKV, ExternalDependencies,
-        ExternalDependencySpec, FromPlatformOverridable, LuaRockspec, LuaRockspecError,
-        LuaVersionError, PartialLuaRockspec, PerPlatform, PlatformIdentifier, PlatformSupport,
-        PlatformValidationError, RemoteRockSource, RockDescription, RockSourceError,
-        RockSourceInternal, RockspecFormat, TestSpec, TestSpecError, TestSpecInternal,
+        ExternalDependencySpec, FromPlatformOverridable, LuaVersionError, PartialLuaRockspec,
+        PerPlatform, PlatformIdentifier, PlatformSupport, PlatformValidationError,
+        RemoteRockSource, RockDescription, RockSourceError, RockSourceInternal, RockspecFormat,
+        TestSpec, TestSpecError, TestSpecInternal,
     },
     package::{
         BuildDependencies, Dependencies, PackageName, PackageReq, PackageVersion,
@@ -28,7 +27,6 @@ use crate::{
     rockspec::{latest_lua_version, LuaVersionCompatibility, Rockspec},
 };
 
-use super::Project;
 use super::ProjectRoot;
 
 fn parse_map_to_package_vec_opt<'de, D>(
@@ -105,7 +103,7 @@ pub struct PartialProjectToml {
 }
 
 impl PartialProjectToml {
-    pub fn new(str: &str, project_root: ProjectRoot) -> Result<Self, toml::de::Error> {
+    pub(crate) fn new(str: &str, project_root: ProjectRoot) -> Result<Self, toml::de::Error> {
         Ok(Self {
             project_root,
             ..toml::from_str(str)?

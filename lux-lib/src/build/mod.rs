@@ -1,10 +1,7 @@
 use crate::lockfile::RemotePackageSourceUrl;
-use crate::lua_rockspec::LuaRockspec;
 use crate::lua_rockspec::LuaVersionError;
-use crate::project::project_toml::{LocalProjectToml, LocalProjectTomlValidationError};
-use crate::project::Project;
+use crate::project::project_toml::LocalProjectTomlValidationError;
 use crate::rockspec::{LuaVersionCompatibility, Rockspec};
-use std::ops::Deref;
 use std::{io, path::Path, process::ExitStatus};
 
 use crate::{
@@ -450,7 +447,7 @@ mod tests {
         config::{ConfigBuilder, LuaVersion},
         lua_installation::LuaInstallation,
         progress::MultiProgress,
-        project::project_toml::PartialProjectToml,
+        project::Project,
         tree::RockLayout,
     };
 
@@ -472,15 +469,8 @@ mod tests {
             doc: dest_dir.join("doc"),
         };
         let lua = LuaInstallation::new(config.lua_version().unwrap_or(&LuaVersion::Lua51), &config);
-        let rockspec_content = String::from_utf8(
-            std::fs::read("resources/test/sample-project-no-build-spec/lux.toml").unwrap(),
-        )
-        .unwrap();
         let project = Project::from(&project_root).unwrap().unwrap();
-        let rockspec = PartialProjectToml::new(&rockspec_content, project.root().clone())
-            .unwrap()
-            .into_remote()
-            .unwrap();
+        let rockspec = project.toml().into_remote().unwrap();
         let progress = Progress::Progress(MultiProgress::new());
         run_build(
             &rockspec,

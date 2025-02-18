@@ -9,7 +9,7 @@ use lux_lib::{
     operations::{self, Install},
     package::PackageReq,
     progress::MultiProgress,
-    project::{project_toml::PartialProjectToml, Project},
+    project::Project,
     tree::Tree,
 };
 use tempdir::TempDir;
@@ -107,11 +107,8 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
                 .as_str()
             {
                 ".rockspec" => Ok(LuaRockspec::new(&content)?),
-                ".toml" => Ok(PartialProjectToml::new(&content)?
-                    .into_remote()?
-                    .to_rockspec()?),
                 _ => Err(eyre!(
-                    "expected a path to a .rockspec or lux.toml or a package requirement."
+                    "expected a path to a .rockspec or a package requirement."
                 )),
             }?;
             let temp_dir = TempDir::new("lux-pack")?.into_path();

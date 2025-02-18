@@ -4,7 +4,6 @@ use std::{
     path::PathBuf,
 };
 
-use ambassador::delegatable_trait;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
@@ -17,7 +16,6 @@ use crate::{
     package::{PackageName, PackageReq, PackageVersion},
 };
 
-#[delegatable_trait]
 pub trait Rockspec {
     fn package(&self) -> &PackageName;
     fn version(&self) -> &PackageVersion;

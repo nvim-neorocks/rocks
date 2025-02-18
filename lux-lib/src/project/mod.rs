@@ -16,7 +16,7 @@ use crate::{
     lockfile::{ProjectLockfile, ReadOnly},
     lua_rockspec::{
         ExternalDependencySpec, LuaRockspec, LuaRockspecError, LuaVersionError, PartialLuaRockspec,
-        PartialRockspecError, RockSourceSpec,
+        PartialRockspecError,
     },
     package::PackageReq,
     remote_package_db::RemotePackageDB,
@@ -342,6 +342,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        lua_rockspec::RockSourceSpec,
         manifest::{Manifest, ManifestMetadata},
         package::PackageReq,
         rockspec::Rockspec,
