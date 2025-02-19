@@ -17,10 +17,10 @@ use crate::{
     tree::RockLayout,
 };
 
-use super::RemoteBuildError;
+use super::BuildError;
 
 impl Build for BuiltinBuildSpec {
-    type Err = RemoteBuildError;
+    type Err = BuildError;
 
     async fn run(
         self,

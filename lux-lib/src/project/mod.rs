@@ -15,12 +15,12 @@ use crate::{
     config::{Config, LuaVersion},
     lockfile::{ProjectLockfile, ReadOnly},
     lua_rockspec::{
-        ExternalDependencySpec, LuaRockspec, LuaRockspecError, LuaVersionError, PartialLuaRockspec,
-        PartialRockspecError,
+        ExternalDependencySpec, LocalLuaRockspec, LuaRockspecError, LuaVersionError,
+        PartialLuaRockspec, PartialRockspecError, RemoteLuaRockspec,
     },
     package::PackageReq,
     remote_package_db::RemotePackageDB,
-    rockspec::{LuaVersionCompatibility, Rockspec},
+    rockspec::LuaVersionCompatibility,
     tree::Tree,
 };
 
@@ -41,7 +41,14 @@ pub enum ProjectError {
 
 #[derive(Error, Debug)]
 #[error(transparent)]
-pub enum IntoRockspecError {
+pub enum IntoLocalRockspecError {
+    LocalProjectTomlValidationError(#[from] LocalProjectTomlValidationError),
+    RockspecError(#[from] LuaRockspecError),
+}
+
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub enum IntoRemoteRockspecError {
     RocksTomlValidationError(#[from] RemoteProjectTomlValidationError),
     RockspecError(#[from] LuaRockspecError),
 }
@@ -74,7 +81,7 @@ pub enum ProjectTreeError {
 pub struct ProjectRoot(PathBuf);
 
 impl ProjectRoot {
-    pub(self) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self(PathBuf::new())
     }
 }
@@ -171,7 +178,11 @@ impl Project {
         &self.toml
     }
 
-    pub fn rockspec(&self) -> Result<LuaRockspec, IntoRockspecError> {
+    pub fn local_rockspec(&self) -> Result<LocalLuaRockspec, IntoLocalRockspecError> {
+        Ok(self.toml().into_local()?.to_lua_rockspec()?)
+    }
+
+    pub fn remote_rockspec(&self) -> Result<RemoteLuaRockspec, IntoRemoteRockspecError> {
         Ok(self.toml().into_remote()?.to_lua_rockspec()?)
     }
 

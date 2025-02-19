@@ -1,5 +1,5 @@
 use crate::{
-    build::RemoteBuildError,
+    build::BuildError,
     config::Config,
     lua_installation::LuaInstallation,
     lua_rockspec::{LuaModule, ModulePaths},
@@ -50,9 +50,9 @@ pub(crate) fn recursive_copy_dir(src: &PathBuf, dest: &Path) -> Result<(), io::E
     }
     Ok(())
 }
-fn validate_output(output: Output) -> Result<(), RemoteBuildError> {
+fn validate_output(output: Output) -> Result<(), BuildError> {
     if !output.status.success() {
-        return Err(RemoteBuildError::CommandFailure {
+        return Err(BuildError::CommandFailure {
             status: output.status,
             stdout: String::from_utf8_lossy(&output.stdout).into(),
             stderr: String::from_utf8_lossy(&output.stderr).into(),
@@ -69,7 +69,7 @@ pub(crate) fn compile_c_files(
     target_module: &LuaModule,
     target_dir: &Path,
     lua: &LuaInstallation,
-) -> Result<(), RemoteBuildError> {
+) -> Result<(), BuildError> {
     let target = target_dir.join(target_module.to_lib_path());
 
     let parent = target.parent().unwrap_or_else(|| {
@@ -170,7 +170,7 @@ pub(crate) fn compile_c_modules(
     target_module: &LuaModule,
     target_dir: &Path,
     lua: &LuaInstallation,
-) -> Result<(), RemoteBuildError> {
+) -> Result<(), BuildError> {
     let target = target_dir.join(target_module.to_lib_path());
 
     let parent = target.parent().unwrap_or_else(|| {

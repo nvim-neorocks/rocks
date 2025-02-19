@@ -26,6 +26,7 @@ use crate::{
     config::{LuaVersion, LuaVersionUnset},
     hash::HasIntegrity,
     package::{PackageName, PackageReq, PackageVersion},
+    project::ProjectRoot,
     rockspec::Rockspec,
 };
 
@@ -41,7 +42,7 @@ pub enum LuaRockspecError {
 
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
-pub struct LuaRockspec {
+pub struct LocalLuaRockspec {
     /// The file format version. Example: "1.0"
     rockspec_format: Option<RockspecFormat>,
     /// The name of the package. Example: "luasocket"
@@ -63,13 +64,16 @@ pub struct LuaRockspec {
     hash: Integrity,
 }
 
-impl LuaRockspec {
-    pub fn new(rockspec_content: &str) -> Result<Self, LuaRockspecError> {
+impl LocalLuaRockspec {
+    pub fn new(
+        rockspec_content: &str,
+        project_root: ProjectRoot,
+    ) -> Result<Self, LuaRockspecError> {
         let lua = Lua::new();
         lua.load(rockspec_content).exec()?;
 
         let globals = lua.globals();
-        let rockspec = LuaRockspec {
+        let rockspec = LocalLuaRockspec {
             rockspec_format: globals.get("rockspec_format")?,
             package: globals.get("package")?,
             version: globals.get("version")?,
@@ -81,9 +85,17 @@ impl LuaRockspec {
             external_dependencies: globals.get("external_dependencies")?,
             build: globals.get("build")?,
             test: globals.get("test")?,
-            source: globals.get("source")?,
             hash: Integrity::from(rockspec_content),
             raw_content: rockspec_content.into(),
+
+            source: globals
+                .get::<Option<PerPlatform<RemoteRockSource>>>("source")?
+                .unwrap_or_else(|| {
+                    PerPlatform::new(RemoteRockSource {
+                        local: LocalRockSource::default(),
+                        source_spec: RockSourceSpec::File(project_root.to_path_buf()),
+                    })
+                }),
         };
 
         let rockspec_file_name = format!("{}-{}.rockspec", rockspec.package(), rockspec.version());
@@ -110,7 +122,7 @@ impl LuaRockspec {
     }
 }
 
-impl Rockspec for LuaRockspec {
+impl Rockspec for LocalLuaRockspec {
     fn package(&self) -> &PackageName {
         &self.package
     }
@@ -121,6 +133,10 @@ impl Rockspec for LuaRockspec {
 
     fn description(&self) -> &RockDescription {
         &self.description
+    }
+
+    fn supported_platforms(&self) -> &PlatformSupport {
+        &self.supported_platforms
     }
 
     fn dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
@@ -147,8 +163,8 @@ impl Rockspec for LuaRockspec {
         &self.test
     }
 
-    fn supported_platforms(&self) -> &PlatformSupport {
-        &self.supported_platforms
+    fn source(&self) -> &PerPlatform<RemoteRockSource> {
+        &self.source
     }
 
     fn build_mut(&mut self) -> &mut PerPlatform<BuildSpec> {
@@ -159,20 +175,112 @@ impl Rockspec for LuaRockspec {
         &mut self.test
     }
 
+    fn source_mut(&mut self) -> &mut PerPlatform<RemoteRockSource> {
+        &mut self.source
+    }
+
     fn format(&self) -> &Option<RockspecFormat> {
         &self.rockspec_format
+    }
+
+    fn to_lua_rockspec_string(&self) -> String {
+        self.raw_content.clone()
+    }
+}
+
+impl HasIntegrity for LocalLuaRockspec {
+    fn hash(&self) -> io::Result<Integrity> {
+        Ok(self.hash.to_owned())
+    }
+}
+
+#[derive(Clone, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct RemoteLuaRockspec {
+    local: LocalLuaRockspec,
+    source: PerPlatform<RemoteRockSource>,
+}
+
+impl RemoteLuaRockspec {
+    pub fn new(rockspec_content: &str) -> Result<Self, LuaRockspecError> {
+        let lua = Lua::new();
+        lua.load(rockspec_content).exec()?;
+
+        let globals = lua.globals();
+        let source = globals.get("source")?;
+
+        let rockspec = RemoteLuaRockspec {
+            local: LocalLuaRockspec::new(rockspec_content, ProjectRoot::new())?,
+            source,
+        };
+
+        Ok(rockspec)
+    }
+}
+
+impl Rockspec for RemoteLuaRockspec {
+    fn package(&self) -> &PackageName {
+        self.local.package()
+    }
+
+    fn version(&self) -> &PackageVersion {
+        self.local.version()
+    }
+
+    fn description(&self) -> &RockDescription {
+        self.local.description()
+    }
+
+    fn supported_platforms(&self) -> &PlatformSupport {
+        self.local.supported_platforms()
+    }
+
+    fn dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+        self.local.dependencies()
+    }
+
+    fn build_dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+        self.local.build_dependencies()
+    }
+
+    fn external_dependencies(&self) -> &PerPlatform<HashMap<String, ExternalDependencySpec>> {
+        self.local.external_dependencies()
+    }
+
+    fn test_dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+        self.local.test_dependencies()
+    }
+
+    fn build(&self) -> &PerPlatform<BuildSpec> {
+        self.local.build()
+    }
+
+    fn test(&self) -> &PerPlatform<TestSpec> {
+        self.local.test()
     }
 
     fn source(&self) -> &PerPlatform<RemoteRockSource> {
         &self.source
     }
 
+    fn build_mut(&mut self) -> &mut PerPlatform<BuildSpec> {
+        self.local.build_mut()
+    }
+
+    fn test_mut(&mut self) -> &mut PerPlatform<TestSpec> {
+        self.local.test_mut()
+    }
+
     fn source_mut(&mut self) -> &mut PerPlatform<RemoteRockSource> {
         &mut self.source
     }
 
+    fn format(&self) -> &Option<RockspecFormat> {
+        self.local.format()
+    }
+
     fn to_lua_rockspec_string(&self) -> String {
-        self.raw_content.clone()
+        self.local.raw_content.clone()
     }
 }
 
@@ -184,9 +292,11 @@ pub enum LuaVersionError {
     LuaVersionUnset(#[from] LuaVersionUnset),
 }
 
-impl HasIntegrity for LuaRockspec {
+impl HasIntegrity for RemoteLuaRockspec {
     fn hash(&self) -> io::Result<Integrity> {
-        Ok(self.hash.to_owned())
+        // FIXME(vhyrro): I don't think we should use a precomputed hash here, but rather compute
+        // it at runtime. What if the rockspec changes? Can it change?
+        Ok(self.local.hash.to_owned())
     }
 }
 
@@ -380,11 +490,11 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
-        assert_eq!(rockspec.rockspec_format, Some("1.0".into()));
-        assert_eq!(rockspec.package, "foo".into());
-        assert_eq!(rockspec.version, "1.0.0-1".parse().unwrap());
-        assert_eq!(rockspec.description, RockDescription::default());
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
+        assert_eq!(rockspec.local.rockspec_format, Some("1.0".into()));
+        assert_eq!(rockspec.local.package, "foo".into());
+        assert_eq!(rockspec.local.version, "1.0.0-1".parse().unwrap());
+        assert_eq!(rockspec.local.description, RockDescription::default());
 
         let rockspec_content = "
         package = 'bar'\n
@@ -395,11 +505,11 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
-        assert_eq!(rockspec.rockspec_format, None);
-        assert_eq!(rockspec.package, "bar".into());
-        assert_eq!(rockspec.version, "2.0.0-1".parse().unwrap());
-        assert_eq!(rockspec.description, RockDescription::default());
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
+        assert_eq!(rockspec.local.rockspec_format, None);
+        assert_eq!(rockspec.local.package, "bar".into());
+        assert_eq!(rockspec.local.version, "2.0.0-1".parse().unwrap());
+        assert_eq!(rockspec.local.description, RockDescription::default());
 
         let rockspec_content = "
         package = 'rocks.nvim'\n
@@ -417,10 +527,10 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
-        assert_eq!(rockspec.rockspec_format, None);
-        assert_eq!(rockspec.package, "rocks.nvim".into());
-        assert_eq!(rockspec.version, "3.0.0-1".parse().unwrap());
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
+        assert_eq!(rockspec.local.rockspec_format, None);
+        assert_eq!(rockspec.local.package, "rocks.nvim".into());
+        assert_eq!(rockspec.local.version, "3.0.0-1".parse().unwrap());
         let expected_description = RockDescription {
             summary: Some("some summary".into()),
             detailed: Some("some detailed description".into()),
@@ -430,7 +540,7 @@ mod tests {
             maintainer: Some("neorocks".into()),
             labels: Vec::new(),
         };
-        assert_eq!(rockspec.description, expected_description);
+        assert_eq!(rockspec.local.description, expected_description);
 
         let rockspec_content = "
         package = 'rocks.nvim'\n
@@ -450,10 +560,10 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
-        assert_eq!(rockspec.rockspec_format, None);
-        assert_eq!(rockspec.package, "rocks.nvim".into());
-        assert_eq!(rockspec.version, "3.0.0-1".parse().unwrap());
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
+        assert_eq!(rockspec.local.rockspec_format, None);
+        assert_eq!(rockspec.local.package, "rocks.nvim".into());
+        assert_eq!(rockspec.local.version, "3.0.0-1".parse().unwrap());
         let expected_description = RockDescription {
             summary: Some("some summary".into()),
             detailed: Some("some detailed description".into()),
@@ -463,9 +573,14 @@ mod tests {
             maintainer: Some("neorocks".into()),
             labels: Vec::new(),
         };
-        assert_eq!(rockspec.description, expected_description);
+        assert_eq!(rockspec.local.description, expected_description);
         assert_eq!(
-            *rockspec.external_dependencies.default.get("FOO").unwrap(),
+            *rockspec
+                .local
+                .external_dependencies
+                .default
+                .get("FOO")
+                .unwrap(),
             ExternalDependencySpec::Library("foo".into())
         );
 
@@ -492,10 +607,10 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
-        assert_eq!(rockspec.rockspec_format, None);
-        assert_eq!(rockspec.package, "rocks.nvim".into());
-        assert_eq!(rockspec.version, "3.0.0-1".parse().unwrap());
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
+        assert_eq!(rockspec.local.rockspec_format, None);
+        assert_eq!(rockspec.local.package, "rocks.nvim".into());
+        assert_eq!(rockspec.local.version, "3.0.0-1".parse().unwrap());
         let expected_description = RockDescription {
             summary: Some("some summary".into()),
             detailed: Some("some detailed description".into()),
@@ -505,31 +620,41 @@ mod tests {
             maintainer: Some("neorocks".into()),
             labels: vec!["package management".into()],
         };
-        assert_eq!(rockspec.description, expected_description);
+        assert_eq!(rockspec.local.description, expected_description);
         assert!(rockspec
+            .local
             .supported_platforms
             .is_supported(&PlatformIdentifier::Unix));
         assert!(!rockspec
+            .local
             .supported_platforms
             .is_supported(&PlatformIdentifier::Windows));
         let neorg = PackageSpec::parse("neorg".into(), "6.0.0".into()).unwrap();
         assert!(rockspec
+            .local
             .dependencies
             .default
             .into_iter()
             .any(|dep| dep.matches(&neorg)));
         let foo = PackageSpec::parse("foo".into(), "1.0.0".into()).unwrap();
         assert!(rockspec
+            .local
             .build_dependencies
             .default
             .into_iter()
             .any(|dep| dep.matches(&foo)));
         let busted = PackageSpec::parse("busted".into(), "2.2.0".into()).unwrap();
         assert_eq!(
-            *rockspec.external_dependencies.default.get("FOO").unwrap(),
+            *rockspec
+                .local
+                .external_dependencies
+                .default
+                .get("FOO")
+                .unwrap(),
             ExternalDependencySpec::Header("foo.h".into())
         );
         assert!(rockspec
+            .local
             .test_dependencies
             .default
             .into_iter()
@@ -545,15 +670,15 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
         assert_eq!(
-            rockspec.source.default.source_spec,
+            rockspec.local.source.default.source_spec,
             RockSourceSpec::Git(GitSource {
                 url: "https://hub.com/example-project/".parse().unwrap(),
                 checkout_ref: Some("bar".into())
             })
         );
-        assert_eq!(rockspec.test, PerPlatform::default());
+        assert_eq!(rockspec.local.test, PerPlatform::default());
         let rockspec_content = "
         rockspec_format = '1.0'\n
         package = 'foo'\n
@@ -564,9 +689,9 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
         assert_eq!(
-            rockspec.source.default.source_spec,
+            rockspec.local.source.default.source_spec,
             RockSourceSpec::Git(GitSource {
                 url: "https://hub.com/example-project/".parse().unwrap(),
                 checkout_ref: Some("bar".into())
@@ -583,7 +708,7 @@ mod tests {
         }\n
         "
         .to_string();
-        let _rockspec = LuaRockspec::new(&rockspec_content).unwrap_err();
+        let _rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap_err();
         let rockspec_content = "
         rockspec_format = '1.0'\n
         package = 'foo'\n
@@ -600,12 +725,19 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
         assert_eq!(
-            rockspec.source.default.archive_name,
+            rockspec.local.source.default.archive_name,
             Some("foo.tar.gz".into())
         );
-        let foo_bar_path = rockspec.build.default.install.conf.get("foo.bar").unwrap();
+        let foo_bar_path = rockspec
+            .local
+            .build
+            .default
+            .install
+            .conf
+            .get("foo.bar")
+            .unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("config/bar.toml"));
         let rockspec_content = "
         rockspec_format = '1.0'\n
@@ -622,12 +754,13 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
         assert!(matches!(
-            rockspec.build.default.build_backend,
+            rockspec.local.build.default.build_backend,
             Some(BuildBackendSpec::Builtin { .. })
         ));
         let foo_bar_path = rockspec
+            .local
             .build
             .default
             .install
@@ -635,7 +768,14 @@ mod tests {
             .get(&LuaModule::from_str("foo.bar").unwrap())
             .unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("src/bar.lua"));
-        let foo_bar_path = rockspec.build.default.install.bin.get("foo.bar").unwrap();
+        let foo_bar_path = rockspec
+            .local
+            .build
+            .default
+            .install
+            .bin
+            .get("foo.bar")
+            .unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("bin/bar"));
         let rockspec_content = "
         rockspec_format = '1.0'\n
@@ -649,7 +789,7 @@ mod tests {
         }\n
         "
         .to_string();
-        let _rockspec = LuaRockspec::new(&rockspec_content).unwrap_err();
+        let _rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap_err();
         let rockspec_content = "
         rockspec_format = '1.0'\n
         package = 'foo'\n
@@ -662,7 +802,7 @@ mod tests {
         }\n
         "
         .to_string();
-        let _rockspec = LuaRockspec::new(&rockspec_content).unwrap_err();
+        let _rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap_err();
         let rockspec_content = "
         rockspec_format = '1.0'\n
         package = 'foo'\n
@@ -675,7 +815,7 @@ mod tests {
         }\n
         "
         .to_string();
-        let _rockspec = LuaRockspec::new(&rockspec_content).unwrap_err();
+        let _rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap_err();
         let rockspec_content = "
         rockspec_format = '1.0'\n
         package = 'foo'\n
@@ -702,13 +842,14 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
-        assert_eq!(rockspec.source.default.unpack_dir, Some("baz".into()));
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
+        assert_eq!(rockspec.local.source.default.unpack_dir, Some("baz".into()));
         assert_eq!(
-            rockspec.build.default.build_backend,
+            rockspec.local.build.default.build_backend,
             Some(BuildBackendSpec::Make(MakeBuildSpec::default()))
         );
         let foo_bar_path = rockspec
+            .local
             .build
             .default
             .install
@@ -716,12 +857,12 @@ mod tests {
             .get(&LuaModule::from_str("foo.bar").unwrap())
             .unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("lib/bar.so"));
-        let copy_directories = rockspec.build.default.copy_directories;
+        let copy_directories = rockspec.local.build.default.copy_directories;
         assert_eq!(
             copy_directories,
             vec![PathBuf::from("plugin"), PathBuf::from("ftplugin")]
         );
-        let patches = rockspec.build.default.patches;
+        let patches = rockspec.local.build.default.patches;
         let _patch = patches.get(&PathBuf::from("lua51-support.diff")).unwrap();
         let rockspec_content = "
         rockspec_format = '1.0'\n
@@ -735,9 +876,9 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
         assert_eq!(
-            rockspec.build.default.build_backend,
+            rockspec.local.build.default.build_backend,
             Some(BuildBackendSpec::CMake(CMakeBuildSpec::default()))
         );
         let rockspec_content = "
@@ -754,9 +895,9 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
         assert!(matches!(
-            rockspec.build.default.build_backend,
+            rockspec.local.build.default.build_backend,
             Some(BuildBackendSpec::Command(CommandBuildSpec { .. }))
         ));
         let rockspec_content = "
@@ -772,7 +913,7 @@ mod tests {
         }\n
         "
         .to_string();
-        let _rockspec = LuaRockspec::new(&rockspec_content).unwrap_err();
+        let _rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap_err();
         let rockspec_content = "
         rockspec_format = '1.0'\n
         package = 'foo'\n
@@ -786,7 +927,7 @@ mod tests {
         }\n
         "
         .to_string();
-        let _rockspec = LuaRockspec::new(&rockspec_content).unwrap_err();
+        let _rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap_err();
         // platform overrides
         let rockspec_content = "
         package = 'rocks'\n
@@ -813,12 +954,12 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
         let neorg_override = PackageSpec::parse("neorg".into(), "5.0.0".into()).unwrap();
         let toml_edit = PackageSpec::parse("toml-edit".into(), "1.0.0".into()).unwrap();
         let toml = PackageSpec::parse("toml".into(), "1.0.0".into()).unwrap();
-        assert_eq!(rockspec.dependencies.default.len(), 2);
-        let per_platform = &rockspec.dependencies.per_platform;
+        assert_eq!(rockspec.local.dependencies.default.len(), 2);
+        let per_platform = &rockspec.local.dependencies.per_platform;
         assert_eq!(
             per_platform
                 .get(&PlatformIdentifier::Windows)
@@ -874,12 +1015,17 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
         assert_eq!(
-            *rockspec.external_dependencies.default.get("FOO").unwrap(),
+            *rockspec
+                .local
+                .external_dependencies
+                .default
+                .get("FOO")
+                .unwrap(),
             ExternalDependencySpec::Library("foo".into())
         );
-        let per_platform = rockspec.external_dependencies.per_platform;
+        let per_platform = rockspec.local.external_dependencies.per_platform;
         assert_eq!(
             *per_platform
                 .get(&PlatformIdentifier::Windows)
@@ -934,9 +1080,9 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
         assert_eq!(
-            rockspec.source.default.source_spec,
+            rockspec.local.source.default.source_spec,
             RockSourceSpec::Git(GitSource {
                 url: "https://hub.com/example-project/.git".parse().unwrap(),
                 checkout_ref: Some("bar".into())
@@ -988,8 +1134,8 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
-        let per_platform = rockspec.build.per_platform;
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
+        let per_platform = rockspec.local.build.per_platform;
         let unix = per_platform.get(&PlatformIdentifier::Unix).unwrap();
         assert_eq!(
             unix.copy_directories,
@@ -1023,8 +1169,8 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
-        let per_platform = &rockspec.build.per_platform;
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
+        let per_platform = &rockspec.local.build.per_platform;
         let win32 = per_platform.get(&PlatformIdentifier::Windows).unwrap();
         assert_eq!(
             win32.build_backend,
@@ -1058,9 +1204,9 @@ mod tests {
         }\n
         "
         .to_string();
-        let rockspec = LuaRockspec::new(&rockspec_content).unwrap();
-        assert_eq!(rockspec.package, "foo".into());
-        assert_eq!(rockspec.version, "scm-1".parse().unwrap());
+        let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
+        assert_eq!(rockspec.local.package, "foo".into());
+        assert_eq!(rockspec.local.version, "scm-1".parse().unwrap());
     }
 
     #[tokio::test]
@@ -1153,8 +1299,8 @@ build = {
   copy_directories = {},
 }
 ";
-        let rockspec = LuaRockspec::new(rockspec_content).unwrap();
-        let build_spec = rockspec.build.current_platform();
+        let rockspec = RemoteLuaRockspec::new(rockspec_content).unwrap();
+        let build_spec = rockspec.local.build.current_platform();
         assert!(matches!(
             build_spec.build_backend,
             Some(BuildBackendSpec::Builtin { .. })
@@ -1240,8 +1386,8 @@ build = {
         features = {'extra', 'features'},
     }
             ";
-        let rockspec = LuaRockspec::new(rockspec_content).unwrap();
-        let build_spec = rockspec.build.current_platform();
+        let rockspec = RemoteLuaRockspec::new(rockspec_content).unwrap();
+        let build_spec = rockspec.local.build.current_platform();
         if let Some(BuildBackendSpec::RustMlua(build_spec)) = build_spec.build_backend.to_owned() {
             assert_eq!(
                 build_spec.modules.get("foo").unwrap(),
