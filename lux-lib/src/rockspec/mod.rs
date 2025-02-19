@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     config::{Config, LuaVersion},
     lua_rockspec::{
-        BuildSpec, ExternalDependencySpec, LuaRockspec, LuaRockspecError, LuaVersionError,
-        PerPlatform, PlatformSupport, RemoteRockSource, RockDescription, RockspecFormat, TestSpec,
+        BuildSpec, ExternalDependencySpec, LuaVersionError, PerPlatform, PlatformSupport,
+        RemoteRockSource, RockDescription, RockspecFormat, TestSpec,
     },
     package::{PackageName, PackageReq, PackageVersion},
 };
@@ -51,10 +51,6 @@ pub trait Rockspec {
 
     /// Converts the rockspec to a string that can be uploaded to a luarocks server.
     fn to_lua_rockspec_string(&self) -> String;
-
-    fn to_lua_rockspec(&self) -> Result<LuaRockspec, LuaRockspecError> {
-        LuaRockspec::new(&self.to_lua_rockspec_string())
-    }
 }
 
 pub trait LuaVersionCompatibility {

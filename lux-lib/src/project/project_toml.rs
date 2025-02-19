@@ -1,7 +1,10 @@
 //! Structs and utilities for `lux.toml`
 
 use crate::hash::HasIntegrity;
+use crate::lua_rockspec::LocalLuaRockspec;
 use crate::lua_rockspec::LocalRockSource;
+use crate::lua_rockspec::LuaRockspecError;
+use crate::lua_rockspec::RemoteLuaRockspec;
 use crate::lua_rockspec::RockSourceSpec;
 use std::io;
 use std::{collections::HashMap, path::PathBuf};
@@ -208,12 +211,20 @@ impl PartialProjectToml {
     /// it ready to be serialized into a rockspec.
     /// A source must be provided for the rockspec to be valid.
     pub fn into_remote(&self) -> Result<RemoteProjectToml, RemoteProjectTomlValidationError> {
+        let source = PerPlatform::new(
+            self.source
+                .clone()
+                .map(RemoteRockSource::from_platform_overridable)
+                .ok_or(RemoteProjectTomlValidationError::NoSource)?
+                .map_err(|err| {
+                    RemoteProjectTomlValidationError::LocalProjectTomlValidationError(
+                        LocalProjectTomlValidationError::RockSourceError(err),
+                    )
+                })?,
+        );
         let local = self.into_local()?;
 
-        let validated = RemoteProjectToml {
-            source: local.source.clone(),
-            local,
-        };
+        let validated = RemoteProjectToml { source, local };
 
         Ok(validated)
     }
@@ -354,9 +365,17 @@ pub struct LocalProjectToml {
     // Used for simpler serialization
     internal: PartialProjectToml,
 
-    // Allows optionally supplying a source to the local toml file.
-    // If not present, the path to the source must be provided.
+    /// A source pointing to the current project's root.
     source: PerPlatform<RemoteRockSource>,
+}
+
+impl LocalProjectToml {
+    pub fn to_lua_rockspec(&self) -> Result<LocalLuaRockspec, LuaRockspecError> {
+        LocalLuaRockspec::new(
+            &self.to_lua_rockspec_string(),
+            self.internal.project_root.clone(),
+        )
+    }
 }
 
 impl Rockspec for LocalProjectToml {
@@ -490,9 +509,18 @@ version = "{}""#,
     }
 }
 
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub enum ProjectTomlIntegrityError {
+    LuaRockspecError(#[from] LuaRockspecError),
+    IoError(#[from] io::Error),
+}
+
 impl HasIntegrity for LocalProjectToml {
     fn hash(&self) -> io::Result<Integrity> {
-        self.to_lua_rockspec().expect("REMOVE ME").hash()
+        self.to_lua_rockspec()
+            .expect("unable to convert local project to rockspec")
+            .hash()
     }
 }
 
@@ -500,6 +528,12 @@ impl HasIntegrity for LocalProjectToml {
 pub struct RemoteProjectToml {
     local: LocalProjectToml,
     source: PerPlatform<RemoteRockSource>,
+}
+
+impl RemoteProjectToml {
+    pub fn to_lua_rockspec(&self) -> Result<RemoteLuaRockspec, LuaRockspecError> {
+        RemoteLuaRockspec::new(&self.to_lua_rockspec_string())
+    }
 }
 
 impl Rockspec for RemoteProjectToml {
@@ -635,14 +669,16 @@ version = "{}""#,
 
 impl HasIntegrity for RemoteProjectToml {
     fn hash(&self) -> io::Result<Integrity> {
-        self.to_lua_rockspec().expect("REMOVE ME").hash()
+        self.to_lua_rockspec()
+            .expect("unable to convert remote project to rockspec")
+            .hash()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        lua_rockspec::{LuaRockspec, PartialLuaRockspec, PerPlatform},
+        lua_rockspec::{PartialLuaRockspec, PerPlatform, RemoteLuaRockspec},
         package::PackageReq,
         project::ProjectRoot,
         rockspec::Rockspec,
@@ -835,7 +871,7 @@ mod tests {
             }
         "#;
 
-        let expected_rockspec = LuaRockspec::new(expected_rockspec).unwrap();
+        let expected_rockspec = RemoteLuaRockspec::new(expected_rockspec).unwrap();
 
         let project_toml = PartialProjectToml::new(project_toml, ProjectRoot::default()).unwrap();
         let rockspec = project_toml
@@ -991,7 +1027,7 @@ mod tests {
 
         let project_toml = PartialProjectToml::new(project_toml, ProjectRoot::default()).unwrap();
         let partial_rockspec = PartialLuaRockspec::new(mergable_rockspec_content).unwrap();
-        let expected_rockspec = LuaRockspec::new(mergable_rockspec_content).unwrap();
+        let expected_rockspec = RemoteLuaRockspec::new(mergable_rockspec_content).unwrap();
 
         let merged = project_toml.merge(partial_rockspec).into_remote().unwrap();
 

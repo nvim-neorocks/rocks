@@ -11,11 +11,11 @@ use tempdir::TempDir;
 use thiserror::Error;
 
 use crate::{
-    build::{Build, BuildBehaviour, RemoteBuildError},
+    build::{Build, BuildBehaviour, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{LocalPackage, LocalPackageId, PinnedState},
     lua_installation::LuaInstallation,
-    lua_rockspec::{LuaRockspec, RockspecFormat},
+    lua_rockspec::{RemoteLuaRockspec, RockspecFormat},
     operations::{get_all_dependencies, SearchAndDownloadError},
     package::PackageReq,
     path::Paths,
@@ -38,7 +38,7 @@ pub enum LuaRocksInstallError {
     #[error(transparent)]
     Io(#[from] io::Error),
     #[error(transparent)]
-    BuildError(#[from] RemoteBuildError),
+    BuildError(#[from] BuildError),
 }
 
 #[derive(Error, Debug)]
@@ -50,7 +50,7 @@ pub enum InstallBuildDependenciesError {
     #[error(transparent)]
     SearchAndDownloadError(#[from] SearchAndDownloadError),
     #[error(transparent)]
-    BuildError(#[from] RemoteBuildError),
+    BuildError(#[from] BuildError),
 }
 
 #[derive(Error, Debug)]
@@ -114,7 +114,7 @@ impl LuaRocksInstallation {
             PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into())).unwrap();
 
         if !self.tree.match_rocks(&luarocks_req)?.is_found() {
-            let rockspec = LuaRockspec::new(LUAROCKS_ROCKSPEC).unwrap();
+            let rockspec = RemoteLuaRockspec::new(LUAROCKS_ROCKSPEC).unwrap();
             let pkg = Build::new(&rockspec, &self.tree, &self.config, progress)
                 .constraint(luarocks_req.version_req().clone().into())
                 .build()
