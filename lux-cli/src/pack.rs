@@ -5,7 +5,7 @@ use eyre::{eyre, OptionExt, Result};
 use lux_lib::{
     build::{Build, BuildBehaviour},
     config::{Config, LuaVersion},
-    lua_rockspec::LuaRockspec,
+    lua_rockspec::RemoteLuaRockspec,
     operations::{self, Install},
     package::PackageReq,
     progress::MultiProgress,
@@ -106,7 +106,7 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
                 .unwrap_or("".into())
                 .as_str()
             {
-                ".rockspec" => Ok(LuaRockspec::new(&content)?),
+                ".rockspec" => Ok(RemoteLuaRockspec::new(&content)?),
                 _ => Err(eyre!(
                     "expected a path to a .rockspec or a package requirement."
                 )),
