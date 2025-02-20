@@ -3,7 +3,7 @@ use mlua::{FromLua, Lua, Value};
 use reqwest::Url;
 use serde::{de, Deserialize, Deserializer};
 use ssri::Integrity;
-use std::{convert::Infallible, fs, io, path::PathBuf, str::FromStr};
+use std::{convert::Infallible, fs, io, ops::Deref, path::PathBuf, str::FromStr};
 use thiserror::Error;
 
 use super::{
@@ -11,28 +11,55 @@ use super::{
     PerPlatform, PerPlatformWrapper, PlatformOverridable,
 };
 
-#[derive(Deserialize, Clone, Debug, PartialEq)]
-pub struct RockSource {
-    pub source_spec: RockSourceSpec,
+#[derive(Default, Deserialize, Clone, Debug, PartialEq)]
+pub struct LocalRockSource {
     pub integrity: Option<Integrity>,
     pub archive_name: Option<String>,
     pub unpack_dir: Option<PathBuf>,
 }
 
+#[derive(Deserialize, Clone, Debug, PartialEq)]
+pub struct RemoteRockSource {
+    pub(crate) local: LocalRockSource,
+    pub source_spec: RockSourceSpec,
+}
+
+impl Deref for RemoteRockSource {
+    type Target = LocalRockSource;
+
+    fn deref(&self) -> &Self::Target {
+        &self.local
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum RockSourceError {
-    #[error("source URL missing")]
-    SourceUrlMissing,
     #[error("invalid rockspec source field combination")]
     InvalidCombination,
     #[error(transparent)]
     SourceUrl(#[from] SourceUrlError),
+    #[error("source URL missing")]
+    SourceUrlMissing,
 }
 
-impl FromPlatformOverridable<RockSourceInternal, Self> for RockSource {
+impl FromPlatformOverridable<RockSourceInternal, Self> for LocalRockSource {
+    type Err = Infallible;
+
+    fn from_platform_overridable(internal: RockSourceInternal) -> Result<Self, Self::Err> {
+        Ok(LocalRockSource {
+            integrity: internal.hash,
+            archive_name: internal.file,
+            unpack_dir: internal.dir,
+        })
+    }
+}
+
+impl FromPlatformOverridable<RockSourceInternal, Self> for RemoteRockSource {
     type Err = RockSourceError;
 
     fn from_platform_overridable(internal: RockSourceInternal) -> Result<Self, Self::Err> {
+        let local = LocalRockSource::from_platform_overridable(internal.clone()).unwrap();
+
         // The rockspec.source table allows invalid combinations
         // This ensures that invalid combinations are caught while parsing.
         let url = SourceUrl::from_str(&internal.url.ok_or(RockSourceError::SourceUrlMissing)?)?;
@@ -50,16 +77,11 @@ impl FromPlatformOverridable<RockSourceInternal, Self> for RockSource {
             _ => Err(RockSourceError::InvalidCombination),
         }?;
 
-        Ok(RockSource {
-            source_spec,
-            integrity: internal.hash,
-            archive_name: internal.file,
-            unpack_dir: internal.dir,
-        })
+        Ok(RemoteRockSource { source_spec, local })
     }
 }
 
-impl FromLua for PerPlatform<RockSource> {
+impl FromLua for PerPlatform<RemoteRockSource> {
     fn from_lua(value: Value, lua: &Lua) -> mlua::Result<Self> {
         let wrapper = PerPlatformWrapper::from_lua(value, lua)?;
         Ok(wrapper.un_per_platform)

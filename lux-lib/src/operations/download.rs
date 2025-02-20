@@ -11,7 +11,7 @@ use url::{ParseError, Url};
 use crate::{
     config::Config,
     lockfile::RemotePackageSourceUrl,
-    lua_rockspec::{LuaRockspec, RockspecError},
+    lua_rockspec::{LuaRockspecError, RemoteLuaRockspec},
     luarocks,
     package::{PackageName, PackageReq, PackageSpec, PackageVersion, RemotePackageTypeFilterSpec},
     progress::{Progress, ProgressBar},
@@ -123,7 +123,7 @@ pub struct DownloadedPackedRock {
 
 #[derive(Clone, Debug)]
 pub struct DownloadedRockspec {
-    pub rockspec: LuaRockspec,
+    pub rockspec: RemoteLuaRockspec,
     pub(crate) source: RemotePackageSource,
     pub(crate) source_url: Option<RemotePackageSourceUrl>,
 }
@@ -144,7 +144,7 @@ pub(crate) enum RemoteRockDownload {
 }
 
 impl RemoteRockDownload {
-    pub fn rockspec(&self) -> &LuaRockspec {
+    pub fn rockspec(&self) -> &RemoteLuaRockspec {
         &self.rockspec_download().rockspec
     }
     pub fn rockspec_download(&self) -> &DownloadedRockspec {
@@ -213,7 +213,7 @@ async fn download_remote_rock(
                 .map_err(DownloadRockspecError::Request)?;
             let content = String::from_utf8(bytes.into())?;
             let rockspec = DownloadedRockspec {
-                rockspec: LuaRockspec::new(&content)?,
+                rockspec: RemoteLuaRockspec::new(&content)?,
                 source: remote_package.source,
                 source_url: remote_package.source_url,
             };
@@ -223,7 +223,7 @@ async fn download_remote_rock(
         }
         RemotePackageSource::RockspecContent(content) => {
             let rockspec = DownloadedRockspec {
-                rockspec: LuaRockspec::new(content)?,
+                rockspec: RemoteLuaRockspec::new(content)?,
                 source: remote_package.source,
                 source_url: remote_package.source_url,
             };
@@ -287,7 +287,7 @@ pub enum SearchAndDownloadError {
     #[error("UTF-8 conversion failed: {0}")]
     Utf8(#[from] FromUtf8Error),
     #[error(transparent)]
-    Rockspec(#[from] RockspecError),
+    Rockspec(#[from] LuaRockspecError),
     #[error("error initialising remote package DB: {0}")]
     RemotePackageDB(#[from] RemotePackageDBError),
     #[error("failed to read packed rock: {0}")]
@@ -403,7 +403,7 @@ fn mk_packed_rock_name(name: &PackageName, version: &PackageVersion, ext: &str) 
 
 pub(crate) async fn unpack_rockspec(
     rock: &DownloadedPackedRockBytes,
-) -> Result<LuaRockspec, SearchAndDownloadError> {
+) -> Result<RemoteLuaRockspec, SearchAndDownloadError> {
     let cursor = Cursor::new(&rock.bytes);
     let rockspec_file_name = format!("{}-{}.rockspec", rock.name, rock.version);
     let mut zip = zip::ZipArchive::new(cursor)?;
@@ -415,6 +415,6 @@ pub(crate) async fn unpack_rockspec(
     let mut rockspec_file = zip.by_index(rockspec_index)?;
     let mut content = String::new();
     rockspec_file.read_to_string(&mut content)?;
-    let rockspec = LuaRockspec::new(&content)?;
+    let rockspec = RemoteLuaRockspec::new(&content)?;
     Ok(rockspec)
 }

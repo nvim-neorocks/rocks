@@ -1,4 +1,4 @@
-use std::{io, process::Command, sync::Arc};
+use std::{io, ops::Deref, process::Command, sync::Arc};
 
 use crate::{
     build::BuildBehaviour,
@@ -6,7 +6,7 @@ use crate::{
     package::{PackageName, PackageReq, PackageVersionReqError},
     path::Paths,
     progress::{MultiProgress, Progress},
-    project::{project_toml::ProjectTomlValidationError, Project, ProjectTreeError},
+    project::{project_toml::LocalProjectTomlValidationError, Project, ProjectTreeError},
     rockspec::Rockspec,
     tree::Tree,
 };
@@ -81,13 +81,13 @@ pub enum RunTestsError {
     #[error(transparent)]
     Tree(#[from] ProjectTreeError),
     #[error(transparent)]
-    ProjectTomlValidation(#[from] ProjectTomlValidationError),
+    ProjectTomlValidation(#[from] LocalProjectTomlValidationError),
     #[error("failed to sync dependencies: {0}")]
     Sync(#[from] SyncError),
 }
 
 async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
-    let rocks = test.project.toml().into_validated()?;
+    let rocks = test.project.toml().into_local()?;
     let project_tree = test.project.tree(test.config)?;
     let test_tree = test.project.test_tree(test.config)?;
     std::fs::create_dir_all(test_tree.root())?;
@@ -132,7 +132,7 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
     paths.prepend(&test_tree_paths);
     let mut command = Command::new("busted");
     let mut command = command
-        .current_dir(test.project.root())
+        .current_dir(test.project.root().deref())
         .args(test.args)
         .env("PATH", paths.path_prepended().joined())
         .env("LUA_PATH", paths.package_path().joined())

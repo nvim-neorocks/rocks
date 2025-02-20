@@ -1,6 +1,6 @@
 use crate::lockfile::RemotePackageSourceUrl;
-use crate::rockspec::LuaVersionCompatibility;
-use crate::{lua_rockspec::LuaVersionError, rockspec::Rockspec};
+use crate::lua_rockspec::LuaVersionError;
+use crate::rockspec::{LuaVersionCompatibility, Rockspec};
 use std::{io, path::Path, process::ExitStatus};
 
 use crate::{
@@ -53,6 +53,7 @@ pub struct Build<'a, R: Rockspec + HasIntegrity> {
     tree: &'a Tree,
     #[builder(start_fn)]
     config: &'a Config,
+
     #[builder(start_fn)]
     progress: &'a Progress<ProgressBar>,
 
@@ -66,6 +67,7 @@ pub struct Build<'a, R: Rockspec + HasIntegrity> {
     #[builder(default)]
     behaviour: BuildBehaviour,
 
+    // TODO(vhyrro): Remove this and enforce that this is provided at a type level.
     source: Option<RemotePackageSource>,
 }
 
@@ -97,11 +99,6 @@ pub enum BuildError {
     SpinnerFailure(#[from] TemplateError),
     #[error(transparent)]
     ExternalDependencyError(#[from] ExternalDependencyError),
-    #[error("source integrity mismatch.\nExpected: {expected},\nbut got: {actual}")]
-    SourceIntegrityMismatch {
-        expected: Integrity,
-        actual: Integrity,
-    },
     #[error(transparent)]
     PatchError(#[from] PatchError),
     #[error("failed to compile build modules: {0}")]
@@ -116,8 +113,6 @@ pub enum BuildError {
     RustError(#[from] RustError),
     #[error(transparent)]
     LuaVersionError(#[from] LuaVersionError),
-    #[error("failed to fetch rock source: {0}")]
-    FetchSrcError(#[from] FetchSrcError),
     #[error("compilation failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
     CommandFailure {
         status: ExitStatus,
@@ -126,6 +121,13 @@ pub enum BuildError {
     },
     #[error(transparent)]
     LuarocksBuildError(#[from] LuarocksBuildError),
+    #[error("source integrity mismatch.\nExpected: {expected},\nbut got: {actual}")]
+    SourceIntegrityMismatch {
+        expected: Integrity,
+        actual: Integrity,
+    },
+    #[error("failed to fetch rock source: {0}")]
+    FetchSrcError(#[from] FetchSrcError),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -150,7 +152,7 @@ impl From<bool> for BuildBehaviour {
     }
 }
 
-async fn run_build<R: Rockspec>(
+async fn run_build<R: Rockspec + HasIntegrity>(
     rockspec: &R,
     output_paths: &RockLayout,
     lua: &LuaInstallation,
@@ -195,7 +197,7 @@ async fn run_build<R: Rockspec>(
     )
 }
 
-async fn install<R: Rockspec>(
+async fn install<R: Rockspec + HasIntegrity>(
     rockspec: &R,
     tree: &Tree,
     output_paths: &RockLayout,
@@ -251,40 +253,38 @@ async fn install<R: Rockspec>(
 async fn do_build<R: Rockspec + HasIntegrity>(
     build: Build<'_, R>,
 ) -> Result<LocalPackage, BuildError> {
+    let rockspec = build.rockspec;
+
     build.progress.map(|p| {
         p.set_message(format!(
             "Building {}@{}...",
-            build.rockspec.package(),
-            build.rockspec.version()
+            rockspec.package(),
+            rockspec.version()
         ))
     });
 
-    for (name, dep) in build.rockspec.external_dependencies().current_platform() {
+    for (name, dep) in rockspec.external_dependencies().current_platform() {
         let _ = ExternalDependencyInfo::detect(name, dep, build.config.external_deps())?;
     }
 
-    let lua_version = build.rockspec.lua_version_matches(build.config)?;
+    let lua_version = rockspec.lua_version_matches(build.config)?;
 
     let tree = build.tree;
 
-    let temp_dir = tempdir::TempDir::new(&build.rockspec.package().to_string())?;
+    let temp_dir = tempdir::TempDir::new(&rockspec.package().to_string())?;
 
-    let source_metadata = operations::FetchSrc::new(
-        temp_dir.path(),
-        build.rockspec,
-        build.config,
-        build.progress,
-    )
-    .source_url(build.source_url)
-    .fetch_internal()
-    .await?;
+    let source_metadata =
+        operations::FetchSrc::new(temp_dir.path(), rockspec, build.config, build.progress)
+            .source_url(build.source_url)
+            .fetch_internal()
+            .await?;
 
     let hashes = LocalPackageHashes {
-        rockspec: build.rockspec.hash()?,
+        rockspec: rockspec.hash()?,
         source: source_metadata.hash,
     };
 
-    if let Some(expected) = &build.rockspec.source().current_platform().integrity {
+    if let Some(expected) = &rockspec.source().current_platform().integrity {
         if expected.matches(&hashes.source).is_none() {
             return Err(BuildError::SourceIntegrityMismatch {
                 expected: expected.clone(),
@@ -294,14 +294,11 @@ async fn do_build<R: Rockspec + HasIntegrity>(
     }
 
     let mut package = LocalPackage::from(
-        &PackageSpec::new(
-            build.rockspec.package().clone(),
-            build.rockspec.version().clone(),
-        ),
+        &PackageSpec::new(rockspec.package().clone(), rockspec.version().clone()),
         build.constraint,
-        build.rockspec.binaries(),
+        rockspec.binaries(),
         build.source.unwrap_or_else(|| {
-            RemotePackageSource::RockspecContent(build.rockspec.to_rockspec_str())
+            RemotePackageSource::RockspecContent(rockspec.to_lua_rockspec_string())
         }),
         Some(source_metadata.source_url),
         hashes,
@@ -315,7 +312,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
 
             let lua = LuaInstallation::new(&lua_version, build.config);
 
-            let rock_source = build.rockspec.source().current_platform();
+            let rock_source = rockspec.source().current_platform();
             let build_dir = match &rock_source.unpack_dir {
                 Some(unpack_dir) => temp_dir.path().join(unpack_dir),
                 None => {
@@ -336,13 +333,13 @@ async fn do_build<R: Rockspec + HasIntegrity>(
 
             Patch::new(
                 &build_dir,
-                &build.rockspec.build().current_platform().patches,
+                &rockspec.build().current_platform().patches,
                 build.progress,
             )
             .apply()?;
 
             let output = run_build(
-                build.rockspec,
+                rockspec,
                 &output_paths,
                 &lua,
                 build.config,
@@ -354,7 +351,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
             package.spec.binaries.extend(output.binaries);
 
             install(
-                build.rockspec,
+                rockspec,
                 tree,
                 &output_paths,
                 &lua,
@@ -363,8 +360,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
             )
             .await?;
 
-            for directory in build
-                .rockspec
+            for directory in rockspec
                 .build()
                 .current_platform()
                 .copy_directories
@@ -381,7 +377,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
 
             std::fs::write(
                 output_paths.rockspec_path(),
-                build.rockspec.to_rockspec_str(),
+                rockspec.to_lua_rockspec_string(),
             )?;
 
             Ok(package)
@@ -413,7 +409,7 @@ mod tests {
         config::{ConfigBuilder, LuaVersion},
         lua_installation::LuaInstallation,
         progress::MultiProgress,
-        project::project_toml::ProjectToml,
+        project::Project,
         tree::RockLayout,
     };
 
@@ -435,14 +431,8 @@ mod tests {
             doc: dest_dir.join("doc"),
         };
         let lua = LuaInstallation::new(config.lua_version().unwrap_or(&LuaVersion::Lua51), &config);
-        let rockspec_content = String::from_utf8(
-            std::fs::read("resources/test/sample-project-no-build-spec/lux.toml").unwrap(),
-        )
-        .unwrap();
-        let rockspec = ProjectToml::new(&rockspec_content)
-            .unwrap()
-            .into_validated()
-            .unwrap();
+        let project = Project::from(&project_root).unwrap().unwrap();
+        let rockspec = project.toml().into_remote().unwrap();
         let progress = Progress::Progress(MultiProgress::new());
         run_build(
             &rockspec,

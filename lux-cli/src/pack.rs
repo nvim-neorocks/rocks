@@ -5,11 +5,11 @@ use eyre::{eyre, OptionExt, Result};
 use lux_lib::{
     build::{Build, BuildBehaviour},
     config::{Config, LuaVersion},
-    lua_rockspec::LuaRockspec,
+    lua_rockspec::RemoteLuaRockspec,
     operations::{self, Install},
     package::PackageReq,
     progress::MultiProgress,
-    project::{project_toml::ProjectToml, Project},
+    project::Project,
     tree::Tree,
 };
 use tempdir::TempDir;
@@ -106,12 +106,9 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
                 .unwrap_or("".into())
                 .as_str()
             {
-                ".rockspec" => Ok(LuaRockspec::new(&content)?),
-                ".toml" => Ok(ProjectToml::new(&content)?
-                    .into_validated()?
-                    .to_rockspec()?),
+                ".rockspec" => Ok(RemoteLuaRockspec::new(&content)?),
                 _ => Err(eyre!(
-                    "expected a path to a .rockspec or lux.toml or a package requirement."
+                    "expected a path to a .rockspec or a package requirement."
                 )),
             }?;
             let temp_dir = TempDir::new("lux-pack")?.into_path();

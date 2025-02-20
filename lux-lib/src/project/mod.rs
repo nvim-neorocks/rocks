@@ -1,8 +1,11 @@
 use lets_find_up::{find_up_with, FindUpKind, FindUpOptions};
-use project_toml::{ProjectToml, ProjectTomlValidationError};
+use project_toml::{
+    LocalProjectTomlValidationError, PartialProjectToml, RemoteProjectTomlValidationError,
+};
 use std::{
     collections::HashMap,
     io,
+    ops::Deref,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -12,12 +15,12 @@ use crate::{
     config::{Config, LuaVersion},
     lockfile::{ProjectLockfile, ReadOnly},
     lua_rockspec::{
-        ExternalDependencySpec, LuaRockspec, LuaVersionError, PartialLuaRockspec,
-        PartialRockspecError, RockSourceSpec, RockspecError,
+        ExternalDependencySpec, LocalLuaRockspec, LuaRockspecError, LuaVersionError,
+        PartialLuaRockspec, PartialRockspecError, RemoteLuaRockspec,
     },
     package::PackageReq,
     remote_package_db::RemotePackageDB,
-    rockspec::{LuaVersionCompatibility, Rockspec},
+    rockspec::LuaVersionCompatibility,
     tree::Tree,
 };
 
@@ -30,7 +33,7 @@ pub const EXTRA_ROCKSPEC: &str = "extra.rockspec";
 #[error(transparent)]
 pub enum ProjectError {
     Io(#[from] io::Error),
-    Project(#[from] ProjectTomlValidationError),
+    Project(#[from] LocalProjectTomlValidationError),
     Toml(#[from] toml::de::Error),
     #[error("error when parsing `extra.rockspec`: {0}")]
     Rockspec(#[from] PartialRockspecError),
@@ -38,9 +41,16 @@ pub enum ProjectError {
 
 #[derive(Error, Debug)]
 #[error(transparent)]
-pub enum IntoRockspecError {
-    RocksTomlValidationError(#[from] ProjectTomlValidationError),
-    RockspecError(#[from] RockspecError),
+pub enum IntoLocalRockspecError {
+    LocalProjectTomlValidationError(#[from] LocalProjectTomlValidationError),
+    RockspecError(#[from] LuaRockspecError),
+}
+
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub enum IntoRemoteRockspecError {
+    RocksTomlValidationError(#[from] RemoteProjectTomlValidationError),
+    RockspecError(#[from] LuaRockspecError),
 }
 
 #[derive(Error, Debug)]
@@ -64,12 +74,32 @@ pub enum ProjectTreeError {
     LuaVersionError(#[from] LuaVersionError),
 }
 
+/// A newtype for the project root directory.
+/// This is used to ensure that the project root is a valid project directory.
+#[derive(Clone, Debug)]
+#[cfg_attr(test, derive(Default))]
+pub struct ProjectRoot(PathBuf);
+
+impl ProjectRoot {
+    pub(crate) fn new() -> Self {
+        Self(PathBuf::new())
+    }
+}
+
+impl Deref for ProjectRoot {
+    type Target = PathBuf;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Project {
     /// The path where the `lux.toml` resides.
-    root: PathBuf,
+    root: ProjectRoot,
     /// The parsed lux.toml.
-    toml: ProjectToml,
+    toml: PartialProjectToml,
 }
 
 impl Project {
@@ -94,8 +124,8 @@ impl Project {
                 let root = path.parent().unwrap();
 
                 let mut project = Project {
-                    root: root.to_path_buf(),
-                    toml: ProjectToml::new(&toml_content)?,
+                    root: ProjectRoot(root.to_path_buf()),
+                    toml: PartialProjectToml::new(&toml_content, ProjectRoot(root.to_path_buf()))?,
                 };
 
                 if let Some(extra_rockspec) = project.extra_rockspec()? {
@@ -140,16 +170,20 @@ impl Project {
         }
     }
 
-    pub fn root(&self) -> &Path {
+    pub fn root(&self) -> &ProjectRoot {
         &self.root
     }
 
-    pub fn toml(&self) -> &ProjectToml {
+    pub fn toml(&self) -> &PartialProjectToml {
         &self.toml
     }
 
-    pub fn rockspec(&self) -> Result<LuaRockspec, IntoRockspecError> {
-        Ok(self.toml().into_validated()?.to_rockspec()?)
+    pub fn local_rockspec(&self) -> Result<LocalLuaRockspec, IntoLocalRockspecError> {
+        Ok(self.toml().into_local()?.to_lua_rockspec()?)
+    }
+
+    pub fn remote_rockspec(&self) -> Result<RemoteLuaRockspec, IntoRemoteRockspecError> {
+        Ok(self.toml().into_remote()?.to_lua_rockspec()?)
     }
 
     pub fn extra_rockspec(&self) -> Result<Option<PartialLuaRockspec>, PartialRockspecError> {
@@ -160,17 +194,6 @@ impl Project {
         } else {
             Ok(None)
         }
-    }
-
-    /// Create a RockSpec with the source set to the project root.
-    pub fn new_local_rockspec(&self) -> Result<LuaRockspec, IntoRockspecError> {
-        let mut rocks = self.rockspec()?;
-        let mut source = rocks.source().current_platform().clone();
-        source.source_spec = RockSourceSpec::File(self.root().to_path_buf());
-        source.archive_name = None;
-        source.integrity = None;
-        rocks.source_mut().current_platform_set(source);
-        Ok(rocks)
     }
 
     pub(crate) fn default_tree_root_dir(&self) -> PathBuf {
@@ -329,8 +352,10 @@ mod tests {
 
     use super::*;
     use crate::{
+        lua_rockspec::RockSourceSpec,
         manifest::{Manifest, ManifestMetadata},
         package::PackageReq,
+        rockspec::Rockspec,
     };
 
     #[tokio::test]
@@ -393,7 +418,7 @@ mod tests {
         // Reparse the lux.toml (not usually necessary, but we want to test that the file was
         // written correctly)
         let project = Project::from(&project_root).unwrap().unwrap();
-        let validated_toml = project.toml().into_validated().unwrap();
+        let validated_toml = project.toml().into_remote().unwrap();
         assert_eq!(
             strip_lua(validated_toml.dependencies().current_platform()),
             expected_dependencies
@@ -428,7 +453,7 @@ mod tests {
 
         assert!(extra_rockspec.is_some());
 
-        let rocks = project.toml().into_validated().unwrap();
+        let rocks = project.toml().into_remote().unwrap();
 
         assert_eq!(rocks.package().to_string(), "custom-package");
         assert_eq!(rocks.version().to_string(), "2.0.0-1");

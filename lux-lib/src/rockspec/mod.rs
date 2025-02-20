@@ -11,12 +11,11 @@ use crate::{
     config::{Config, LuaVersion},
     lua_rockspec::{
         BuildSpec, ExternalDependencySpec, LuaVersionError, PerPlatform, PlatformSupport,
-        RockDescription, RockSource, RockspecFormat, TestSpec,
+        RemoteRockSource, RockDescription, RockspecFormat, TestSpec,
     },
     package::{PackageName, PackageReq, PackageVersion},
 };
 
-/// A trait for querying information about a project from either a rockspec or `lux.toml` file.
 pub trait Rockspec {
     fn package(&self) -> &PackageName;
     fn version(&self) -> &PackageVersion;
@@ -27,15 +26,13 @@ pub trait Rockspec {
     fn external_dependencies(&self) -> &PerPlatform<HashMap<String, ExternalDependencySpec>>;
     fn test_dependencies(&self) -> &PerPlatform<Vec<PackageReq>>;
 
-    fn source(&self) -> &PerPlatform<RockSource>;
     fn build(&self) -> &PerPlatform<BuildSpec>;
     fn test(&self) -> &PerPlatform<TestSpec>;
+    fn source(&self) -> &PerPlatform<RemoteRockSource>;
 
-    fn source_mut(&mut self) -> &mut PerPlatform<RockSource>;
     fn build_mut(&mut self) -> &mut PerPlatform<BuildSpec>;
     fn test_mut(&mut self) -> &mut PerPlatform<TestSpec>;
-
-    fn to_rockspec_str(&self) -> String;
+    fn source_mut(&mut self) -> &mut PerPlatform<RemoteRockSource>;
 
     fn format(&self) -> &Option<RockspecFormat>;
 
@@ -51,6 +48,9 @@ pub trait Rockspec {
                 .collect(),
         )
     }
+
+    /// Converts the rockspec to a string that can be uploaded to a luarocks server.
+    fn to_lua_rockspec_string(&self) -> String;
 }
 
 pub trait LuaVersionCompatibility {
