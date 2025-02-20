@@ -32,6 +32,7 @@ impl LuaInstallation {
         let lib_info = PkgConfig::new()
             .print_system_libs(false)
             .cargo_metadata(false)
+            .env_metadata(false)
             .probe(pkg_name)
             .ok();
 
