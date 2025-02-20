@@ -35,7 +35,7 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
             let mut lockfile = lockfile.write_guard();
             let packages = project
                 .toml()
-                .into_validated()?
+                .into_local()?
                 .dependencies()
                 .current_platform()
                 .clone();
@@ -58,7 +58,7 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
             let mut lockfile = lockfile.write_guard();
             let packages = project
                 .toml()
-                .into_validated()?
+                .into_local()?
                 .build_dependencies()
                 .current_platform()
                 .clone();
@@ -80,7 +80,7 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
             let mut lockfile = lockfile.write_guard();
             let packages = project
                 .toml()
-                .into_validated()?
+                .into_local()?
                 .test_dependencies()
                 .current_platform()
                 .clone();
