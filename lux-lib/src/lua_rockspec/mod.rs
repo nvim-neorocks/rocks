@@ -60,8 +60,6 @@ pub struct LocalLuaRockspec {
     test: PerPlatform<TestSpec>,
     /// The original content of this rockspec, needed by luarocks
     raw_content: String,
-    /// The sha256 of this rockspec
-    hash: Integrity,
 }
 
 impl LocalLuaRockspec {
@@ -85,7 +83,6 @@ impl LocalLuaRockspec {
             external_dependencies: globals.get("external_dependencies")?,
             build: globals.get("build")?,
             test: globals.get("test")?,
-            hash: Integrity::from(rockspec_content),
             raw_content: rockspec_content.into(),
 
             source: globals
@@ -190,7 +187,7 @@ impl Rockspec for LocalLuaRockspec {
 
 impl HasIntegrity for LocalLuaRockspec {
     fn hash(&self) -> io::Result<Integrity> {
-        Ok(self.hash.to_owned())
+        Ok(Integrity::from(self.to_lua_rockspec_string()))
     }
 }
 
@@ -294,9 +291,7 @@ pub enum LuaVersionError {
 
 impl HasIntegrity for RemoteLuaRockspec {
     fn hash(&self) -> io::Result<Integrity> {
-        // FIXME(vhyrro): I don't think we should use a precomputed hash here, but rather compute
-        // it at runtime. What if the rockspec changes? Can it change?
-        Ok(self.local.hash.to_owned())
+        Ok(Integrity::from(self.to_lua_rockspec_string()))
     }
 }
 
