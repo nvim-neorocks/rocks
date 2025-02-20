@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{io, sync::Arc};
 
 use bon::Builder;
 use itertools::Itertools;
@@ -6,76 +6,21 @@ use thiserror::Error;
 
 use crate::{
     build::BuildBehaviour,
-    config::Config,
-    lockfile::{LocalPackage, PinnedState},
-    package::{PackageReq, RockConstraintUnsatisfied},
+    config::{Config, LuaVersion, LuaVersionUnset},
+    lockfile::{
+        LocalPackage, LocalPackageLockType, Lockfile, PinnedState, ProjectLockfile, ReadOnly,
+        ReadWrite,
+    },
+    luarocks::luarocks_installation::{LuaRocksError, LuaRocksInstallation},
+    package::{PackageName, PackageReq, RockConstraintUnsatisfied},
     progress::{MultiProgress, Progress},
+    project::{Project, ProjectError, ProjectTreeError},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
+    rockspec::Rockspec,
     tree::Tree,
 };
 
-use super::{Install, InstallError, Remove, RemoveError};
-
-/// A rocks package updater, providing fine-grained control
-/// over how packages should be updated.
-/// Can update multiple packages in parallel.
-#[derive(Builder)]
-#[builder(start_fn = new, finish_fn(name = _update, vis = ""))]
-pub struct Update<'a> {
-    #[builder(start_fn)]
-    tree: &'a Tree,
-    #[builder(start_fn)]
-    config: &'a Config,
-
-    #[builder(field)]
-    packages: Vec<(LocalPackage, PackageReq)>,
-
-    package_db: Option<RemotePackageDB>,
-
-    #[builder(default = MultiProgress::new_arc())]
-    progress: Arc<Progress<MultiProgress>>,
-}
-
-impl<State: update_builder::State> UpdateBuilder<'_, State> {
-    pub fn package(mut self, package_with_req: (LocalPackage, PackageReq)) -> Self {
-        self.packages.push(package_with_req);
-        self
-    }
-
-    pub fn packages(
-        mut self,
-        packages: impl IntoIterator<Item = (LocalPackage, PackageReq)>,
-    ) -> Self {
-        self.packages.extend(packages);
-        self
-    }
-
-    pub async fn update(self) -> Result<(), UpdateError>
-    where
-        State: update_builder::IsComplete,
-    {
-        let new_self = self._update();
-
-        let package_db = match new_self.package_db {
-            Some(db) => db,
-            None => {
-                let bar = new_self.progress.map(|p| p.new_bar());
-                let db = RemotePackageDB::from_config(new_self.config, &bar).await?;
-                bar.map(|b| b.finish_and_clear());
-                db
-            }
-        };
-
-        update(
-            new_self.packages,
-            package_db,
-            new_self.tree,
-            new_self.config,
-            new_self.progress,
-        )
-        .await
-    }
-}
+use super::{Install, InstallError, Remove, RemoveError, SyncError};
 
 #[derive(Error, Debug)]
 pub enum UpdateError {
@@ -87,6 +32,171 @@ pub enum UpdateError {
     Remove(#[from] RemoveError),
     #[error("error initialising remote package DB: {0}")]
     RemotePackageDB(#[from] RemotePackageDBError),
+    #[error("error loading project: {0}")]
+    Project(#[from] ProjectError),
+    #[error(transparent)]
+    LuaVersionUnset(#[from] LuaVersionUnset),
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error("error initialising project tree: {0}")]
+    ProjectTree(#[from] ProjectTreeError),
+    #[error("error initialising luarocks build backend: {0}")]
+    LuaRocks(#[from] LuaRocksError),
+    #[error("error syncing the project tree: {0}")]
+    Sync(#[from] SyncError),
+}
+
+/// A rocks package updater, providing fine-grained control
+/// over how packages should be updated.
+/// Can update multiple packages in parallel.
+#[derive(Builder)]
+#[builder(start_fn = new, finish_fn(name = _update, vis = ""))]
+pub struct Update<'a> {
+    #[builder(start_fn)]
+    config: &'a Config,
+
+    /// Whether to validate the integrity when syncing the project lockfile.
+    validate_integrity: Option<bool>,
+
+    package_db: Option<RemotePackageDB>,
+
+    #[builder(default = MultiProgress::new_arc())]
+    progress: Arc<Progress<MultiProgress>>,
+}
+
+impl<State: update_builder::State> UpdateBuilder<'_, State> {
+    /// Returns the packages that were installed or removed
+    pub async fn update(self) -> Result<Vec<LocalPackage>, UpdateError>
+    where
+        State: update_builder::IsComplete,
+    {
+        let args = self._update();
+
+        let package_db = match &args.package_db {
+            Some(db) => db.clone(),
+            None => {
+                let bar = args.progress.map(|p| p.new_bar());
+                let db = RemotePackageDB::from_config(args.config, &bar).await?;
+                bar.map(|b| b.finish_and_clear());
+                db
+            }
+        };
+
+        match Project::current()? {
+            Some(project) => update_project(project, args, package_db).await,
+            None => update_install_tree(args, package_db).await,
+        }
+    }
+}
+
+async fn update_project(
+    project: Project,
+    args: Update<'_>,
+    package_db: RemotePackageDB,
+) -> Result<Vec<LocalPackage>, UpdateError> {
+    let toml = project.toml().into_validated().unwrap(); // TODO(mrcjkb): rebase on vhyrro's build refactor
+    let mut project_lockfile = project.lockfile()?.write_guard();
+    let tree = project.tree(args.config)?;
+
+    let dependencies = toml
+        .dependencies()
+        .current_platform()
+        .iter()
+        .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
+        .cloned()
+        .collect_vec();
+    let dep_report = super::Sync::new(&tree, &mut project_lockfile, args.config)
+        .validate_integrity(args.validate_integrity.unwrap_or(false))
+        .packages(dependencies)
+        .sync_dependencies()
+        .await?;
+
+    let updated_dependencies = update_dependency_tree(
+        &tree,
+        &mut project_lockfile,
+        LocalPackageLockType::Regular,
+        package_db.clone(),
+        args.config,
+        args.progress.clone(),
+    )
+    .await?
+    .into_iter()
+    .chain(dep_report.added)
+    .chain(dep_report.removed);
+
+    let test_tree = project.test_tree(args.config)?;
+    let test_dependencies = toml.test_dependencies().current_platform().clone();
+    let dep_report = super::Sync::new(&test_tree, &mut project_lockfile, args.config)
+        .validate_integrity(false)
+        .packages(test_dependencies)
+        .sync_test_dependencies()
+        .await?;
+    let updated_test_dependencies = update_dependency_tree(
+        &test_tree,
+        &mut project_lockfile,
+        LocalPackageLockType::Test,
+        package_db.clone(),
+        args.config,
+        args.progress.clone(),
+    )
+    .await?
+    .into_iter()
+    .chain(dep_report.added)
+    .chain(dep_report.removed);
+
+    let luarocks = LuaRocksInstallation::new(args.config)?;
+    let build_dependencies = toml.build_dependencies().current_platform().clone();
+    let dep_report = super::Sync::new(luarocks.tree(), &mut project_lockfile, luarocks.config())
+        .validate_integrity(false)
+        .packages(build_dependencies)
+        .sync_build_dependencies()
+        .await?;
+    let updated_build_dependencies = update_dependency_tree(
+        luarocks.tree(),
+        &mut project_lockfile,
+        LocalPackageLockType::Build,
+        package_db.clone(),
+        luarocks.config(),
+        args.progress.clone(),
+    )
+    .await?
+    .into_iter()
+    .chain(dep_report.added)
+    .chain(dep_report.removed);
+
+    Ok(updated_dependencies
+        .into_iter()
+        .chain(updated_test_dependencies)
+        .chain(updated_build_dependencies)
+        .collect_vec())
+}
+
+async fn update_dependency_tree(
+    tree: &Tree,
+    project_lockfile: &mut ProjectLockfile<ReadWrite>,
+    lock_type: LocalPackageLockType,
+    package_db: RemotePackageDB,
+    config: &Config,
+    progress: Arc<Progress<MultiProgress>>,
+) -> Result<Vec<LocalPackage>, UpdateError> {
+    let lockfile = tree.lockfile()?;
+    let dependencies = unpinned_packages(&lockfile);
+    let updated_dependencies = update(dependencies, package_db, tree, config, progress).await?;
+    if !updated_dependencies.is_empty() {
+        let updated_lockfile = tree.lockfile()?;
+        project_lockfile.sync(updated_lockfile.local_pkg_lock(), &lock_type);
+    }
+    Ok(updated_dependencies)
+}
+
+async fn update_install_tree(
+    args: Update<'_>,
+    package_db: RemotePackageDB,
+) -> Result<Vec<LocalPackage>, UpdateError> {
+    let tree = args.config.tree(LuaVersion::from(args.config)?)?;
+    let lockfile = tree.lockfile()?;
+    let packages = unpinned_packages(&lockfile);
+    update(packages, package_db, &tree, args.config, args.progress).await
 }
 
 async fn update(
@@ -95,7 +205,7 @@ async fn update(
     tree: &Tree,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
-) -> Result<(), UpdateError> {
+) -> Result<Vec<LocalPackage>, UpdateError> {
     let updatable = packages
         .clone()
         .into_iter()
@@ -110,10 +220,9 @@ async fn update(
         })
         .collect_vec();
     if updatable.is_empty() {
-        println!("Nothing to update.");
-        Ok(())
+        Ok(Vec::new())
     } else {
-        Install::new(tree, config)
+        let updated_packages = Install::new(tree, config)
             .packages(
                 updatable
                     .iter()
@@ -128,6 +237,15 @@ async fn update(
             .progress(progress)
             .remove()
             .await?;
-        Ok(())
+        Ok(updated_packages)
     }
+}
+
+fn unpinned_packages(lockfile: &Lockfile<ReadOnly>) -> Vec<(LocalPackage, PackageReq)> {
+    lockfile
+        .rocks()
+        .values()
+        .filter(|package| package.pinned() == PinnedState::Unpinned)
+        .map(|package| (package.clone(), package.to_package().into_package_req()))
+        .collect_vec()
 }
