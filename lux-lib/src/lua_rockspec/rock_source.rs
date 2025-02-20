@@ -1,5 +1,5 @@
 use git_url_parse::{GitUrl, GitUrlParseError};
-use mlua::{FromLua, Lua, Value};
+use mlua::{FromLua, IntoLua, Lua, UserData, Value};
 use reqwest::Url;
 use serde::{de, Deserialize, Deserializer};
 use ssri::Integrity;
@@ -22,6 +22,21 @@ pub struct LocalRockSource {
 pub struct RemoteRockSource {
     pub(crate) local: LocalRockSource,
     pub source_spec: RockSourceSpec,
+}
+
+impl UserData for RemoteRockSource {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("source_spec", |_, this, _: ()| Ok(this.source_spec.clone()));
+        methods.add_method("integrity", |_, this, _: ()| {
+            Ok(this.local.integrity.clone().map(|i| i.to_string()))
+        });
+        methods.add_method("archive_name", |_, this, _: ()| {
+            Ok(this.local.archive_name.clone())
+        });
+        methods.add_method("unpack_dir", |_, this, _: ()| {
+            Ok(this.local.unpack_dir.clone())
+        });
+    }
 }
 
 impl Deref for RemoteRockSource {
@@ -95,6 +110,26 @@ pub enum RockSourceSpec {
     Url(Url),
 }
 
+impl IntoLua for RockSourceSpec {
+    fn into_lua(self, lua: &Lua) -> mlua::Result<Value> {
+        let table = lua.create_table()?;
+
+        match self {
+            RockSourceSpec::Git(git) => {
+                table.set("git", git.into_lua(lua)?)?;
+            }
+            RockSourceSpec::File(path) => {
+                table.set("file", path.to_string_lossy().to_string())?;
+            }
+            RockSourceSpec::Url(url) => {
+                table.set("url", url.to_string())?;
+            }
+        };
+
+        Ok(Value::Table(table))
+    }
+}
+
 impl RockSourceSpec {
     fn default_from_source_url(url: SourceUrl) -> Self {
         match url {
@@ -124,6 +159,15 @@ impl<'de> Deserialize<'de> for RockSourceSpec {
 pub struct GitSource {
     pub url: GitUrl,
     pub checkout_ref: Option<String>,
+}
+
+impl UserData for GitSource {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("url", |_, this, _: ()| Ok(this.url.to_string()));
+        methods.add_method("checkout_ref", |_, this, _: ()| {
+            Ok(this.checkout_ref.clone())
+        });
+    }
 }
 
 /// Used as a helper for Deserialize,
