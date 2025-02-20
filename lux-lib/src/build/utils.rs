@@ -94,7 +94,10 @@ pub(crate) fn compile_c_files(
     let mut build = cc::Build::new();
     let intermediate_dir = tempdir::TempDir::new(target_module.as_str())?;
     let build = build
+        .cargo_output(false)
         .cargo_metadata(false)
+        .cargo_debug(false)
+        .cargo_warnings(false)
         .debug(false)
         .files(files)
         .host(std::env::consts::OS)
@@ -106,7 +109,7 @@ pub(crate) fn compile_c_files(
         build.flag(&arg);
     }
 
-    let objects = build.compile_intermediates();
+    let objects = build.try_compile_intermediates()?;
     let output = build
         .get_compiler()
         .to_command()
@@ -194,7 +197,10 @@ pub(crate) fn compile_c_modules(
 
     let intermediate_dir = tempdir::TempDir::new(target_module.as_str())?;
     let build = build
+        .cargo_output(false)
         .cargo_metadata(false)
+        .cargo_debug(false)
+        .cargo_warnings(false)
         .debug(false)
         .files(source_files)
         .host(std::env::consts::OS)
@@ -221,7 +227,7 @@ pub(crate) fn compile_c_modules(
         )
     });
     // See https://github.com/rust-lang/cc-rs/issues/594#issuecomment-2110551057
-    let objects = build.compile_intermediates();
+    let objects = build.try_compile_intermediates()?;
 
     let libdir_args = data
         .libdirs
