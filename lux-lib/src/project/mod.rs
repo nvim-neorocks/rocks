@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use lets_find_up::{find_up_with, FindUpKind, FindUpOptions};
+use mlua::{ExternalResult, UserData};
 use project_toml::{
     LocalProjectTomlValidationError, PartialProjectToml, RemoteProjectTomlValidationError,
 };
@@ -108,6 +109,37 @@ pub struct Project {
     root: ProjectRoot,
     /// The parsed lux.toml.
     toml: PartialProjectToml,
+}
+
+impl UserData for Project {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("toml_path", |_, this, ()| Ok(this.toml_path()));
+        methods.add_method("extra_rockspec_path", |_, this, ()| {
+            Ok(this.extra_rockspec_path())
+        });
+        methods.add_method("lockfile_path", |_, this, ()| Ok(this.lockfile_path()));
+        methods.add_method("root", |_, this, ()| Ok(this.root().0.clone()));
+        methods.add_method("toml", |_, this, ()| Ok(this.toml().clone()));
+        methods.add_method("local_rockspec", |_, this, ()| {
+            this.local_rockspec().into_lua_err()
+        });
+        methods.add_method("remote_rockspec", |_, this, ()| {
+            this.remote_rockspec().into_lua_err()
+        });
+        methods.add_method("tree", |_, this, config: Config| {
+            this.tree(&config).into_lua_err()
+        });
+        methods.add_method("test_tree", |_, this, config: Config| {
+            this.test_tree(&config).into_lua_err()
+        });
+        methods.add_method("lua_version", |_, this, config: Config| {
+            this.lua_version(&config).into_lua_err()
+        });
+
+        //methods.add_method("lockfile", |_, this, ()| this.lockfile().into_lua_err());
+        //methods.add_method("extra_rockspec", |_, this, ()| this.extra_rockspec().into_lua_err());
+        //methods.add_method("add")
+    }
 }
 
 impl Project {

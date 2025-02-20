@@ -2209,6 +2209,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lux-lua"
+version = "0.1.0"
+dependencies = [
+ "lux-lib",
+ "mlua",
+]
+
+[[package]]
 name = "lzma-rs"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2326,6 +2334,7 @@ dependencies = [
  "bstr",
  "either",
  "erased-serde",
+ "futures-util",
  "mlua-sys",
  "mlua_derive",
  "num-traits",

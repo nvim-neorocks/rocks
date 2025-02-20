@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use mlua::FromLua;
+use mlua::{ExternalResult, FromLua, IntoLua, LuaSerdeExt};
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{cmp::Ordering, fmt::Display, str::FromStr};
 use thiserror::Error;
@@ -50,7 +50,17 @@ impl PackageSpec {
     }
 }
 
-#[cfg(feature = "lua")]
+impl FromLua for PackageSpec {
+    fn from_lua(
+        value: mlua::prelude::LuaValue,
+        lua: &mlua::prelude::Lua,
+    ) -> mlua::prelude::LuaResult<Self> {
+        let (name, version) = lua.from_value(value)?;
+
+        Self::parse(name, version).into_lua_err()
+    }
+}
+
 impl mlua::UserData for PackageSpec {
     fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("name", |_, this| Ok(this.name.to_string()));
@@ -167,7 +177,6 @@ impl FromStr for PackageSpec {
 /// A lua package requirement with a name and an optional version requirement.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]
-#[cfg_attr(feature = "lua", derive(mlua::FromLua))]
 pub struct PackageReq {
     /// The name of the package.
     pub(crate) name: PackageName,
@@ -226,9 +235,20 @@ impl From<PackageName> for PackageReq {
         }
     }
 }
-#[cfg(feature = "lua")]
+
+impl FromLua for PackageReq {
+    fn from_lua(value: mlua::Value, lua: &mlua::Lua) -> mlua::Result<Self> {
+        let (name, version) = lua.from_value(value)?;
+        Self::new(name, version).into_lua_err()
+    }
+}
+
 impl mlua::UserData for PackageReq {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("name", |_, this, ()| Ok(this.name.to_string()));
+        methods.add_method("version_req", |_, this, ()| {
+            Ok(this.version_req.to_string())
+        });
         methods.add_method("matches", |_, this, package: PackageSpec| {
             Ok(this.matches(&package))
         });
@@ -337,6 +357,12 @@ impl<'de> Deserialize<'de> for PackageReq {
 /// A luarocks package name, which is always lowercase
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct PackageName(String);
+
+impl IntoLua for PackageName {
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        self.0.into_lua(lua)
+    }
+}
 
 impl PackageName {
     pub fn new(name: String) -> Self {
