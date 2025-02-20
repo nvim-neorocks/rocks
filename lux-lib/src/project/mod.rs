@@ -173,19 +173,18 @@ impl Project {
         Ok(rocks)
     }
 
-    fn tree_root_dir(&self) -> PathBuf {
+    pub(crate) fn default_tree_root_dir(&self) -> PathBuf {
         self.root.join(".lux")
     }
 
     pub fn tree(&self, config: &Config) -> Result<Tree, ProjectTreeError> {
-        Ok(Tree::new(self.tree_root_dir(), self.lua_version(config)?)?)
+        Ok(config.tree(self.lua_version(config)?)?)
     }
 
     pub fn test_tree(&self, config: &Config) -> Result<Tree, ProjectTreeError> {
-        Ok(Tree::new(
-            self.tree_root_dir().join("test_dependencies"),
-            self.lua_version(config)?,
-        )?)
+        let tree = self.tree(config)?;
+        let test_tree_root = tree.root().join("test_dependencies");
+        Ok(Tree::new(test_tree_root, self.lua_version(config)?)?)
     }
 
     pub fn lua_version(&self, config: &Config) -> Result<LuaVersion, LuaVersionError> {
