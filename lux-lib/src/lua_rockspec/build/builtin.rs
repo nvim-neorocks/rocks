@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use mlua::{IntoLua, UserData};
 use serde::{de, Deserialize, Deserializer};
 use std::{collections::HashMap, convert::Infallible, fmt::Display, path::PathBuf, str::FromStr};
 use thiserror::Error;
@@ -19,8 +20,20 @@ pub struct BuiltinBuildSpec {
     pub modules: HashMap<LuaModule, ModuleSpec>,
 }
 
+impl IntoLua for BuiltinBuildSpec {
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        self.modules.into_lua(lua)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Deserialize, Default, Clone, Hash)]
 pub struct LuaModule(String);
+
+impl IntoLua for LuaModule {
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        self.0.into_lua(lua)
+    }
+}
 
 impl LuaModule {
     pub fn to_lua_path(&self) -> PathBuf {
@@ -92,6 +105,20 @@ pub enum ModuleSpec {
     /// Pathnames of C sources of a simple module written in C composed of multiple files.
     SourcePaths(Vec<PathBuf>),
     ModulePaths(ModulePaths),
+}
+
+impl IntoLua for ModuleSpec {
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        let table = lua.create_table()?;
+
+        match self {
+            ModuleSpec::SourcePath(path_buf) => table.set("source", path_buf)?,
+            ModuleSpec::SourcePaths(path_bufs) => table.set("sources", path_bufs)?,
+            ModuleSpec::ModulePaths(module_paths) => table.set("modules", module_paths)?,
+        }
+
+        Ok(mlua::Value::Table(table))
+    }
 }
 
 impl ModuleSpec {
@@ -242,6 +269,22 @@ pub struct ModulePaths {
     pub incdirs: Vec<PathBuf>,
     /// Directories to be added to the linker's library lookup directory list.
     pub libdirs: Vec<PathBuf>,
+}
+
+impl UserData for ModulePaths {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("sources", |_, this, _: ()| Ok(this.sources.clone()));
+        methods.add_method("libraries", |_, this, _: ()| Ok(this.libraries.clone()));
+        methods.add_method("defines", |_, this, _: ()| {
+            Ok(this
+                .defines
+                .iter()
+                .cloned()
+                .collect::<HashMap<_, Option<_>>>())
+        });
+        methods.add_method("incdirs", |_, this, _: ()| Ok(this.incdirs.clone()));
+        methods.add_method("libdirs", |_, this, _: ()| Ok(this.libdirs.clone()));
+    }
 }
 
 impl ModulePaths {

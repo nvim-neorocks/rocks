@@ -10,6 +10,8 @@ use std::io;
 use std::{collections::HashMap, path::PathBuf};
 
 use itertools::Itertools;
+use mlua::ExternalResult;
+use mlua::UserData;
 use serde::{Deserialize, Deserializer};
 use ssri::Integrity;
 use thiserror::Error;
@@ -103,6 +105,23 @@ pub struct PartialProjectToml {
     // Used to bind the project TOML to a project root
     #[serde(skip, default = "ProjectRoot::new")]
     pub(crate) project_root: ProjectRoot,
+}
+
+impl UserData for PartialProjectToml {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("package", |_, this, _: ()| Ok(this.package().clone()));
+        methods.add_method("version", |_, this, _: ()| Ok(this.version().clone()));
+        methods.add_method("into_local", |_, this, _: ()| {
+            this.into_local().into_lua_err()
+        });
+        methods.add_method("into_remote", |_, this, _: ()| {
+            this.into_remote().into_lua_err()
+        });
+        //TODO:
+        //methods.add_method("merge", |_, this, other: PartialLuaRockspec| {
+        //    this.merge(other).into_lua_err()
+        //});
+    }
 }
 
 impl PartialProjectToml {
@@ -672,6 +691,76 @@ impl HasIntegrity for RemoteProjectToml {
         self.to_lua_rockspec()
             .expect("unable to convert remote project to rockspec")
             .hash()
+    }
+}
+
+impl UserData for LocalProjectToml {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("package", |_, this, _: ()| Ok(this.package().clone()));
+        methods.add_method("version", |_, this, _: ()| Ok(this.version().clone()));
+        methods.add_method("description", |_, this, _: ()| {
+            Ok(this.description().clone())
+        });
+        methods.add_method("supported_platforms", |_, this, _: ()| {
+            Ok(this.supported_platforms().clone())
+        });
+        methods.add_method("dependencies", |_, this, _: ()| {
+            Ok(this.dependencies().clone())
+        });
+        methods.add_method("build_dependencies", |_, this, _: ()| {
+            Ok(this.build_dependencies().clone())
+        });
+        methods.add_method("external_dependencies", |_, this, _: ()| {
+            Ok(this.external_dependencies().clone())
+        });
+        methods.add_method("test_dependencies", |_, this, _: ()| {
+            Ok(this.test_dependencies().clone())
+        });
+        methods.add_method("build", |_, this, _: ()| Ok(this.build().clone()));
+        methods.add_method("test", |_, this, _: ()| Ok(this.test().clone()));
+        methods.add_method("format", |_, this, _: ()| Ok(this.format().clone()));
+        methods.add_method("source", |_, this, _: ()| Ok(this.source().clone()));
+        methods.add_method("to_lua_rockspec_string", |_, this, _: ()| {
+            Ok(this.to_lua_rockspec_string())
+        });
+        methods.add_method("to_lua_rockspec", |_, this, _: ()| {
+            this.to_lua_rockspec().into_lua_err()
+        });
+    }
+}
+
+impl UserData for RemoteProjectToml {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("package", |_, this, _: ()| Ok(this.package().clone()));
+        methods.add_method("version", |_, this, _: ()| Ok(this.version().clone()));
+        methods.add_method("description", |_, this, _: ()| {
+            Ok(this.description().clone())
+        });
+        methods.add_method("supported_platforms", |_, this, _: ()| {
+            Ok(this.supported_platforms().clone())
+        });
+        methods.add_method("dependencies", |_, this, _: ()| {
+            Ok(this.dependencies().clone())
+        });
+        methods.add_method("build_dependencies", |_, this, _: ()| {
+            Ok(this.build_dependencies().clone())
+        });
+        methods.add_method("external_dependencies", |_, this, _: ()| {
+            Ok(this.external_dependencies().clone())
+        });
+        methods.add_method("test_dependencies", |_, this, _: ()| {
+            Ok(this.test_dependencies().clone())
+        });
+        methods.add_method("build", |_, this, _: ()| Ok(this.build().clone()));
+        methods.add_method("test", |_, this, _: ()| Ok(this.test().clone()));
+        methods.add_method("format", |_, this, _: ()| Ok(this.format().clone()));
+        methods.add_method("source", |_, this, _: ()| Ok(this.source().clone()));
+        methods.add_method("to_lua_rockspec_string", |_, this, _: ()| {
+            Ok(this.to_lua_rockspec_string())
+        });
+        methods.add_method("to_lua_rockspec", |_, this, _: ()| {
+            this.to_lua_rockspec().into_lua_err()
+        });
     }
 }
 

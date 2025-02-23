@@ -15,7 +15,7 @@ use builtin::{
 
 use itertools::Itertools;
 
-use mlua::{FromLua, Lua, LuaSerdeExt, Value};
+use mlua::{FromLua, IntoLua, Lua, LuaSerdeExt, UserData, Value};
 use std::{
     collections::HashMap,
     env::consts::DLL_EXTENSION,
@@ -58,6 +58,19 @@ pub struct BuildSpec {
     // NOTE: This cannot be a diffy::Patch<'a, str>
     // because Lua::from_value requires a DeserializeOwned
     pub patches: HashMap<PathBuf, String>,
+}
+
+impl UserData for BuildSpec {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("build_backend", |_, this, _: ()| {
+            Ok(this.build_backend.clone())
+        });
+        methods.add_method("install", |_, this, _: ()| Ok(this.install.clone()));
+        methods.add_method("copy_directories", |_, this, _: ()| {
+            Ok(this.copy_directories.clone())
+        });
+        methods.add_method("patches", |_, this, _: ()| Ok(this.patches.clone()));
+    }
 }
 
 #[derive(Error, Debug)]
@@ -235,10 +248,34 @@ pub enum BuildBackendSpec {
     RustMlua(RustMluaBuildSpec),
 }
 
+impl IntoLua for BuildBackendSpec {
+    fn into_lua(self, lua: &Lua) -> mlua::Result<Value> {
+        match self {
+            BuildBackendSpec::Builtin(spec) => spec.into_lua(lua),
+            BuildBackendSpec::Make(spec) => spec.into_lua(lua),
+            BuildBackendSpec::CMake(spec) => spec.into_lua(lua),
+            BuildBackendSpec::Command(spec) => spec.into_lua(lua),
+            BuildBackendSpec::LuaRock(s) => s.into_lua(lua),
+            BuildBackendSpec::RustMlua(spec) => spec.into_lua(lua),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct CommandBuildSpec {
     pub build_command: String,
     pub install_command: String,
+}
+
+impl UserData for CommandBuildSpec {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("build_command", |_, this, _: ()| {
+            Ok(this.build_command.clone())
+        });
+        methods.add_method("install_command", |_, this, _: ()| {
+            Ok(this.install_command.clone())
+        });
+    }
 }
 
 /// For packages which don't provide means to install modules
@@ -265,6 +302,15 @@ pub struct InstallSpec {
     // path component, such that targets like `my.binary` are not allowed.
     #[serde(default)]
     pub bin: HashMap<String, PathBuf>,
+}
+
+impl UserData for InstallSpec {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("lua", |_, this, _: ()| Ok(this.lua.clone()));
+        methods.add_method("lib", |_, this, _: ()| Ok(this.lib.clone()));
+        methods.add_method("conf", |_, this, _: ()| Ok(this.conf.clone()));
+        methods.add_method("bin", |_, this, _: ()| Ok(this.bin.clone()));
+    }
 }
 
 fn deserialize_copy_directories<'de, D>(deserializer: D) -> Result<Option<Vec<PathBuf>>, D::Error>

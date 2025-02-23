@@ -1,5 +1,6 @@
 use std::{collections::HashMap, convert::Infallible, path::PathBuf};
 
+use mlua::IntoLua;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -15,6 +16,23 @@ pub enum ExternalDependencySpec {
     Header(PathBuf),
     /// A library file, e.g. "libfoo.so"
     Library(PathBuf),
+}
+
+impl IntoLua for ExternalDependencySpec {
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        let table = lua.create_table()?;
+
+        match self {
+            ExternalDependencySpec::Header(path) => {
+                table.set("header", path.to_string_lossy().to_string())?;
+            }
+            ExternalDependencySpec::Library(path) => {
+                table.set("library", path.to_string_lossy().to_string())?;
+            }
+        };
+
+        Ok(mlua::Value::Table(table))
+    }
 }
 
 #[derive(Error, Debug)]

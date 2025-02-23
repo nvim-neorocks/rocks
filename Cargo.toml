@@ -3,6 +3,6 @@ members = [
     "lux-lib",
     "lux-cli",
     "xtask",
-    # "lux-lua",
+    "lux-lua",
 ]
 resolver = "2"

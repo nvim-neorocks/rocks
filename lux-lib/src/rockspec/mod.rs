@@ -5,6 +5,7 @@ use std::{
 };
 
 use itertools::Itertools;
+use mlua::IntoLua;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -151,5 +152,11 @@ impl Deref for RockBinaries {
 impl DerefMut for RockBinaries {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl IntoLua for RockBinaries {
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        self.0.into_lua(lua)
     }
 }

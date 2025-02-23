@@ -12,6 +12,7 @@ use std::{io, path::PathBuf};
 use itertools::Itertools;
 #[cfg(feature = "lua")]
 use mlua::ExternalResult;
+use mlua::{ExternalResult, IntoLua, UserData};
 
 mod list;
 
@@ -94,7 +95,6 @@ impl HasVariables for RockLayout {
     }
 }
 
-#[cfg(feature = "lua")]
 impl mlua::UserData for RockLayout {
     fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("rock_path", |_, this| Ok(this.rock_path.clone()));
@@ -213,7 +213,6 @@ impl Tree {
     }
 }
 
-#[cfg(feature = "lua")]
 impl mlua::UserData for Tree {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("root", |_, this, ()| Ok(this.root()));
@@ -222,24 +221,15 @@ impl mlua::UserData for Tree {
         });
         methods.add_method("bin", |_, this, ()| Ok(this.bin()));
         methods.add_method("match_rocks", |_, this, req: PackageReq| {
-            this.match_rocks(&req).map_err(|err| {
-                mlua::Error::RuntimeError(format!("IO error while calling 'match_rocks': {}", err))
-            })
+            Ok(this.match_rocks(&req)?)
         });
         methods.add_method(
             "match_rock_and",
             |_, this, (req, callback): (PackageReq, mlua::Function)| {
-                this.match_rocks_and(&req, |package| {
-                    callback
-                        .call(package.clone())
-                        .expect("failed to invoke Lua callback in `Tree::match_rock_and()`")
+                this.match_rocks_and(&req, |package: &LocalPackage| {
+                    callback.call(package.clone()).unwrap_or(false)
                 })
-                .map_err(|err| {
-                    mlua::Error::RuntimeError(format!(
-                        "IO error while calling 'match_rocks_and': {}",
-                        err
-                    ))
-                })
+                .into_lua_err()
             },
         );
         methods.add_method("rock_layout", |_, this, package: LocalPackage| {
@@ -248,9 +238,7 @@ impl mlua::UserData for Tree {
         methods.add_method("rock", |_, this, package: LocalPackage| {
             this.rock(&package).into_lua_err()
         });
-        methods.add_method("lockfile", |_, this, ()| {
-            Ok(this.lockfile().into_lua_err()?.into_temporary())
-        });
+        methods.add_method("lockfile", |_, this, ()| this.lockfile().into_lua_err());
     }
 }
 
@@ -266,52 +254,22 @@ impl RockMatches {
     pub fn is_found(&self) -> bool {
         matches!(self, Self::Single(_) | Self::Many(_))
     }
-
-    #[cfg(feature = "lua")]
-    fn lua_type(&self) -> String {
-        match self {
-            Self::NotFound(_) => "not_found",
-            Self::Single(_) => "local_package",
-            Self::Many(_) => "many",
-        }
-        .into()
-    }
-
-    #[cfg(feature = "lua")]
-    fn lua_type_error(&self, expected: &str) -> mlua::Error {
-        mlua::Error::RuntimeError(format!(
-            "attempted to query field '{}' for type '{}'",
-            expected,
-            self.lua_type()
-        ))
-    }
 }
 
-#[cfg(feature = "lua")]
-impl mlua::UserData for RockMatches {
-    fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("type", |_, this| Ok(this.lua_type()));
-        fields.add_field_method_get("not_found", |_, this| {
-            if let Self::NotFound(package_req) = this {
-                Ok(package_req.to_string())
-            } else {
-                Err(this.lua_type_error("not_found"))
-            }
-        });
-        fields.add_field_method_get("many", |_, this| {
-            if let Self::Many(packages) = this {
-                Ok(packages.clone())
-            } else {
-                Err(this.lua_type_error("many"))
-            }
-        });
-        fields.add_field_method_get("single", |_, this| {
-            if let Self::Single(package) = this {
-                Ok(package.clone())
-            } else {
-                Err(this.lua_type_error("single"))
-            }
-        });
+impl IntoLua for RockMatches {
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        let table = lua.create_table()?;
+        let is_found = self.is_found();
+
+        table.set("is_found", lua.create_function(move |_, ()| Ok(is_found))?)?;
+
+        match self {
+            RockMatches::NotFound(package_req) => table.set("not_found", package_req)?,
+            RockMatches::Single(local_package_id) => table.set("single", local_package_id)?,
+            RockMatches::Many(local_package_ids) => table.set("many", local_package_ids)?,
+        }
+
+        Ok(mlua::Value::Table(table))
     }
 }
 
