@@ -2,11 +2,16 @@ use itertools::Itertools;
 use serde::Serialize;
 use std::{env, fmt::Display, io, path::PathBuf, str::FromStr};
 
-use crate::{build::utils::lua_lib_extension, tree::Tree};
+use crate::{
+    build::utils::lua_lib_extension,
+    config::{Config, LuaVersion},
+    tree::Tree,
+};
 
 const LUA_PATH_SEPARATOR: &str = ";";
+const LUA_INIT: &str = "require('lux').loader()";
 
-#[derive(PartialEq, Eq, Debug, Default, Serialize)]
+#[derive(PartialEq, Eq, Debug, Serialize)]
 pub struct Paths {
     /// Paths for Lua libraries
     src: PackagePath,
@@ -14,11 +19,22 @@ pub struct Paths {
     lib: PackagePath,
     /// Paths for executables
     bin: BinPath,
+
+    version: LuaVersion,
 }
 
 impl Paths {
+    fn default(tree: &Tree) -> Self {
+        Self {
+            src: <_>::default(),
+            lib: <_>::default(),
+            bin: <_>::default(),
+            version: tree.version().clone(),
+        }
+    }
+
     pub fn new(tree: Tree) -> io::Result<Self> {
-        let paths = tree
+        let mut paths = tree
             .list()?
             .into_iter()
             .flat_map(|(_, packages)| {
@@ -27,7 +43,7 @@ impl Paths {
                     .map(|package| tree.rock_layout(&package))
                     .collect_vec()
             })
-            .fold(Self::default(), |mut paths, package| {
+            .fold(Self::default(&tree), |mut paths, package| {
                 paths.src.0.push(package.src.join("?.lua"));
                 paths.src.0.push(package.src.join("?").join("init.lua"));
                 paths
@@ -37,6 +53,20 @@ impl Paths {
                 paths.bin.0.push(package.bin);
                 paths
             });
+
+        let lib_path = option_env!("LUX_LIB_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| Config::get_default_data_path().unwrap())
+            .join(tree.version().to_string())
+            .join("?.so");
+
+        paths.prepend(&Paths {
+            version: tree.version().clone(),
+            src: <_>::default(),
+            bin: <_>::default(),
+            lib: PackagePath(vec![lib_path]),
+        });
+
         Ok(paths)
     }
 
@@ -53,6 +83,11 @@ impl Paths {
     /// Get the `$PATH`
     pub fn path(&self) -> &BinPath {
         &self.bin
+    }
+
+    /// Get `$LUA_INIT`
+    pub fn init(&self) -> String {
+        format!("if _VERSION:find('{}') then {LUA_INIT} end", self.version)
     }
 
     /// Get the `$PATH`, prepended to the existing `$PATH` environment.

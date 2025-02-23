@@ -136,6 +136,17 @@ impl LocalPackageId {
 
         Self(hex::encode(hasher.finalize()))
     }
+
+    /// Constructs a package ID from a hashed string.
+    ///
+    /// # Safety
+    ///
+    /// Ensure that the hash you are providing to this function
+    /// is not malformed and resolves to a valid package ID for the target
+    /// tree you are working with.
+    pub unsafe fn from_unchecked(str: String) -> Self {
+        Self(str)
+    }
 }
 
 impl Display for LocalPackageId {
@@ -545,7 +556,7 @@ impl LockfilePermissions for ReadOnly {}
 impl LockfilePermissions for ReadWrite {}
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub(crate) struct LocalPackageLock {
+pub struct LocalPackageLock {
     // NOTE: We cannot directly serialize to a `Sha256` object as they don't implement serde traits.
     // NOTE: We want to retain ordering of rocks and entrypoints when de/serializing.
     rocks: BTreeMap<LocalPackageId, LocalPackage>,
@@ -580,6 +591,18 @@ impl LocalPackageLock {
     fn remove_by_id(&mut self, target: &LocalPackageId) {
         self.rocks.remove(target);
         self.entrypoints.retain(|x| x != target);
+    }
+
+    pub fn has_entrypoint(&self, req: &PackageReq) -> Option<LocalPackage> {
+        self.entrypoints.iter().find_map(|id| {
+            let rock = self.get(id).unwrap();
+
+            if rock.name() == req.name() && req.version_req().matches(rock.version()) {
+                Some(rock.clone())
+            } else {
+                None
+            }
+        })
     }
 
     pub(crate) fn has_rock(
@@ -695,7 +718,7 @@ pub struct Lockfile<P: LockfilePermissions> {
     lock: LocalPackageLock,
 }
 
-pub(crate) enum LocalPackageLockType {
+pub enum LocalPackageLockType {
     Regular,
     Test,
     Build,
@@ -758,7 +781,7 @@ impl<P: LockfilePermissions> Lockfile<P> {
         self.lock.rocks()
     }
 
-    pub(crate) fn local_pkg_lock(&self) -> &LocalPackageLock {
+    pub fn local_pkg_lock(&self) -> &LocalPackageLock {
         &self.lock
     }
 
@@ -779,7 +802,7 @@ impl<P: LockfilePermissions> Lockfile<P> {
     }
 
     /// Find all rocks that match the requirement
-    pub(crate) fn find_rocks(&self, req: &PackageReq) -> Vec<LocalPackageId> {
+    pub fn find_rocks(&self, req: &PackageReq) -> Vec<LocalPackageId> {
         match self.list().get(req.name()) {
             Some(packages) => packages
                 .iter()
@@ -894,7 +917,7 @@ impl<P: LockfilePermissions> ProjectLockfile<P> {
         }
     }
 
-    pub(crate) fn local_pkg_lock(&self, deps: &LocalPackageLockType) -> &LocalPackageLock {
+    pub fn local_pkg_lock(&self, deps: &LocalPackageLockType) -> &LocalPackageLock {
         match deps {
             LocalPackageLockType::Regular => &self.dependencies,
             LocalPackageLockType::Test => &self.test_dependencies,

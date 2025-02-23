@@ -1,0 +1,10 @@
+Currently, we assume a single version of the loader is used everywhere.
+The `lx path` command should not only generate the code to load the loader, but should also compare against `_VERSION` to see if it even *can*.
+
+Currently, support for searching through dev and build dependencies is unsupported, and we should have some way of detecting when we're in those modes
+(probably through environment variables that lux sets?)
+
+Current, the loader does not isolate dependencies from potentially impure places, as it delegates anything it can't find to further searchers.
+This is a tricky topic - we probably don't want to overwrite the existing searchers as there may be some important ones (?), but we also want to ensure
+that dependencies that shouldn't be found aren't found. I am considering hijacking the `package.searchers` entirely and just making the lux
+loader do all the work.

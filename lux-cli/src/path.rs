@@ -36,6 +36,9 @@ enum PathCmd {
     /// Generate a `PATH` expression for `bin` executables in the lux tree.
     /// (not formatted as a shell command)
     Bin,
+    /// Generate a `LUA_INIT` expression for the lux loader.
+    /// (not formatted as a shell command)
+    Init,
 }
 
 impl Default for PathCmd {
@@ -50,6 +53,11 @@ struct FullArgs {
     #[clap(default_value_t = false)]
     #[arg(long)]
     no_bin: bool,
+
+    /// Do not export `LUA_INIT` (`require('lux').loader()`).
+    #[clap(default_value_t = false)]
+    #[arg(long)]
+    no_init: bool,
 
     /// The shell to format for.
     #[clap(default_value_t = Shell::default())]
@@ -97,11 +105,16 @@ pub async fn path(path_data: Path, config: Config) -> Result<()> {
                     result.push('\n')
                 }
             }
+            if !args.no_init {
+                result.push_str(format_export(&shell, "LUA_INIT", &paths.init()).as_str());
+                result.push('\n')
+            }
             println!("{}", &result);
         }
         PathCmd::Lua => println!("{}", &mk_package_path(&paths, prepend)?),
         PathCmd::C => println!("{}", &mk_package_cpath(&paths, prepend)?),
         PathCmd::Bin => println!("{}", &mk_bin_path(&paths, prepend)?),
+        PathCmd::Init => println!("{}", paths.init()),
     }
     Ok(())
 }

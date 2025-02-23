@@ -124,6 +124,10 @@ impl Tree {
         self.root.join(self.version.to_string())
     }
 
+    pub fn version(&self) -> &LuaVersion {
+        &self.version
+    }
+
     pub fn root_for(&self, package: &LocalPackage) -> PathBuf {
         self.root().join(format!(
             "{}-{}@{}",

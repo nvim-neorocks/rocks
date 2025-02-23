@@ -6,6 +6,8 @@ use lux_lib::{
 };
 use mlua::prelude::*;
 
+mod loader;
+
 fn config(lua: &Lua) -> mlua::Result<LuaTable> {
     let table = lua.create_table()?;
 
@@ -34,9 +36,13 @@ fn project(lua: &Lua) -> mlua::Result<LuaTable> {
 }
 
 #[mlua::lua_module]
-fn liblux_lua(lua: &Lua) -> LuaResult<LuaTable> {
+fn lux(lua: &Lua) -> LuaResult<LuaTable> {
     let exports = lua.create_table()?;
 
+    exports.set(
+        "loader",
+        lua.create_function(|lua, ()| loader::load_loader(lua))?,
+    )?;
     exports.set("config", config(lua)?)?;
     exports.set("project", project(lua)?)?;
 
