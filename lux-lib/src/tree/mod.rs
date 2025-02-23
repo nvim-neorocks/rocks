@@ -209,7 +209,7 @@ impl Tree {
 
     /// Get this tree's lockfile path.
     pub fn lockfile_path(&self) -> PathBuf {
-        self.root().join("lock.json")
+        self.root().join("lux.lock")
     }
 }
 

@@ -1405,7 +1405,7 @@ mod tests {
         let temp = assert_fs::TempDir::new().unwrap();
         temp.copy_from(&tree_path, &["**"]).unwrap();
 
-        remove_file(temp.join("5.1/lock.json")).unwrap();
+        remove_file(temp.join("5.1/lux.lock")).unwrap();
 
         let tree = Tree::new(temp.to_path_buf(), Lua51).unwrap();
 
@@ -1414,7 +1414,7 @@ mod tests {
 
     fn get_test_lockfile() -> Lockfile<ReadOnly> {
         let sample_tree = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("resources/test/sample-tree/5.1/lock.json");
+            .join("resources/test/sample-tree/5.1/lux.lock");
         Lockfile::new(sample_tree).unwrap()
     }
 
