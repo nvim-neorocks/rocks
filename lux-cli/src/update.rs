@@ -1,5 +1,6 @@
 use clap::Args;
 use eyre::{Context, Result};
+use lux_lib::package::PackageReq;
 use lux_lib::progress::{MultiProgress, ProgressBar};
 use lux_lib::{config::Config, operations};
 
@@ -8,6 +9,9 @@ pub struct Update {
     /// Skip the integrity checks for installed rocks when syncing the project lockfile.
     #[arg(long)]
     no_integrity_check: bool,
+
+    /// Packages to update.
+    packages: Option<Vec<PackageReq>>,
 }
 
 pub async fn update(args: Update, config: Config) -> Result<()> {
@@ -16,6 +20,7 @@ pub async fn update(args: Update, config: Config) -> Result<()> {
 
     let updated_packages = operations::Update::new(&config)
         .progress(progress)
+        .packages(args.packages)
         .validate_integrity(!args.no_integrity_check)
         .update()
         .await

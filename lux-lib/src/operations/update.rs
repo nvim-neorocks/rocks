@@ -55,6 +55,10 @@ pub struct Update<'a> {
     #[builder(start_fn)]
     config: &'a Config,
 
+    /// Packages to update.
+    #[builder(field)]
+    packages: Option<Vec<PackageReq>>,
+
     /// Whether to validate the integrity when syncing the project lockfile.
     validate_integrity: Option<bool>,
 
@@ -62,6 +66,13 @@ pub struct Update<'a> {
 
     #[builder(default = MultiProgress::new_arc())]
     progress: Arc<Progress<MultiProgress>>,
+}
+
+impl<State: update_builder::State> UpdateBuilder<'_, State> {
+    pub fn packages(mut self, packages: Option<Vec<PackageReq>>) -> Self {
+        self.packages = packages;
+        self
+    }
 }
 
 impl<State: update_builder::State> UpdateBuilder<'_, State> {
@@ -118,6 +129,7 @@ async fn update_project(
         package_db.clone(),
         args.config,
         args.progress.clone(),
+        &args.packages,
     )
     .await?
     .into_iter()
@@ -138,6 +150,7 @@ async fn update_project(
         package_db.clone(),
         args.config,
         args.progress.clone(),
+        &args.packages,
     )
     .await?
     .into_iter()
@@ -158,6 +171,7 @@ async fn update_project(
         package_db.clone(),
         luarocks.config(),
         args.progress.clone(),
+        &args.packages,
     )
     .await?
     .into_iter()
@@ -178,9 +192,13 @@ async fn update_dependency_tree(
     package_db: RemotePackageDB,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
+    packages: &Option<Vec<PackageReq>>,
 ) -> Result<Vec<LocalPackage>, UpdateError> {
     let lockfile = tree.lockfile()?;
-    let dependencies = unpinned_packages(&lockfile);
+    let dependencies = unpinned_packages(&lockfile)
+        .into_iter()
+        .filter(|pkg| is_included(pkg, packages))
+        .collect_vec();
     let updated_dependencies = update(dependencies, package_db, tree, config, progress).await?;
     if !updated_dependencies.is_empty() {
         let updated_lockfile = tree.lockfile()?;
@@ -189,13 +207,28 @@ async fn update_dependency_tree(
     Ok(updated_dependencies)
 }
 
+fn is_included(
+    (pkg, _): &(LocalPackage, PackageReq),
+    package_reqs: &Option<Vec<PackageReq>>,
+) -> bool {
+    package_reqs.is_none()
+        || package_reqs.as_ref().is_some_and(|packages| {
+            packages
+                .iter()
+                .any(|req| req.matches(&pkg.as_package_spec()))
+        })
+}
+
 async fn update_install_tree(
     args: Update<'_>,
     package_db: RemotePackageDB,
 ) -> Result<Vec<LocalPackage>, UpdateError> {
     let tree = args.config.tree(LuaVersion::from(args.config)?)?;
     let lockfile = tree.lockfile()?;
-    let packages = unpinned_packages(&lockfile);
+    let packages = unpinned_packages(&lockfile)
+        .into_iter()
+        .filter(|pkg| is_included(pkg, &args.packages))
+        .collect_vec();
     update(packages, package_db, &tree, args.config, args.progress).await
 }
 
