@@ -8,6 +8,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    crane.url = "github:ipetkov/crane";
     flake-parts.url = "github:hercules-ci/flake-parts";
     git-hooks = {
       url = "github:cachix/git-hooks.nix";
@@ -43,11 +44,13 @@
                 denyWarnings = true;
                 allFeatures = true;
               };
-              extraPackages = pkgs.lux.buildInputs ++ pkgs.lux.nativeBuildInputs;
+              extraPackages = pkgs.lux-cli.buildInputs ++ pkgs.lux-cli.nativeBuildInputs;
             };
             cargo-check.enable = true;
           };
-          settings.rust.check.cargoDeps = pkgs.lux.cargoDeps;
+          settings.rust.check.cargoDeps = pkgs.rustPlatform.importCargoLock {
+            lockFile = "${self}/Cargo.lock";
+          };
         };
       in {
         packages = with pkgs; {
@@ -90,11 +93,11 @@
           inherit
             git-hooks-check
             ;
-          tests = pkgs.lux-debug;
+          tests = pkgs.lux-nextest;
         };
       };
       flake = {
-        overlays.default = import ./nix/overlay.nix {inherit self;};
+        overlays.default = with inputs; import ./nix/overlay.nix {inherit self crane;};
       };
     };
 }
