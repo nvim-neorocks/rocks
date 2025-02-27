@@ -38,18 +38,7 @@
             # to update CONTRIBUTING.md for non-nix users.
             alejandra.enable = true;
             rustfmt.enable = true;
-            clippy = {
-              enable = true;
-              settings = {
-                denyWarnings = true;
-                allFeatures = true;
-              };
-              extraPackages = pkgs.lux-cli.buildInputs ++ pkgs.lux-cli.nativeBuildInputs;
-            };
-            cargo-check.enable = true;
-          };
-          settings.rust.check.cargoDeps = pkgs.rustPlatform.importCargoLock {
-            lockFile = "${self}/Cargo.lock";
+            taplo.enable = true;
           };
         };
       in {
@@ -68,6 +57,7 @@
                   rust-analyzer
                   ra-multiplex
                   cargo-nextest
+                  clippy
                   lua_pkg
                   # Needed for integration test builds
                   pkg-config
@@ -76,8 +66,8 @@
                   zlib
                 ])
                 ++ self.checks.${system}.git-hooks-check.enabledPackages
-                ++ pkgs.lux.buildInputs
-                ++ pkgs.lux.nativeBuildInputs;
+                ++ pkgs.lux-cli.buildInputs
+                ++ pkgs.lux-cli.nativeBuildInputs;
             };
         in rec {
           default = lua51;
@@ -94,6 +84,7 @@
             git-hooks-check
             ;
           tests = pkgs.lux-nextest;
+          clippy = pkgs.lux-clippy;
         };
       };
       flake = {

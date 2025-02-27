@@ -9,10 +9,7 @@ license = "MIT"
 readme = "../README.md"
 keywords = ["lua", "luarocks", "neovim", "packagemanager", "build"]
 categories = ["development-tools"]
-exclude = [
-    "tests/**",
-    "resources/test/**",
-]
+exclude = ["tests/**", "resources/test/**"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -26,7 +23,12 @@ git2 = "0.20.0"
 html-escape = "0.2.13"
 httpdate = "1.0.3"
 itertools = "0.14.0"
-mlua = { version = "0.10.1", features = ["luajit52", "serialize", "macros", "error-send"] }
+mlua = { version = "0.10.1", features = [
+  "luajit52",
+  "serialize",
+  "macros",
+  "error-send",
+] }
 pathdiff = "0.2.1"
 reqwest = { version = "0.12.0", features = ["json", "multipart"] }
 semver = "1.0.22"
@@ -50,7 +52,7 @@ openssl = "0.10.70"
 lua-src = "547.0.0"
 luajit-src = "210.5.10"
 target-lexicon = "0.13.0"
-clap = { version = "4.5.3", features = ["derive"], optional = true}
+clap = { version = "4.5.3", features = ["derive"], optional = true }
 infer = "0.19.0"
 indicatif = "0.17.8"
 sha2 = "0.10.8"

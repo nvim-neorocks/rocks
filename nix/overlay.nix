@@ -98,4 +98,10 @@ in {
       cargoNextestExtraArgs = "--no-fail-fast --lib"; # Disable integration tests
       cargoNextestPartitionsExtraArgs = "--no-tests=pass";
     });
+
+  lux-clippy = craneLib.cargoClippy (commonArgs
+    // {
+      src = self;
+      cargoArtifacts = lux-deps;
+    });
 }
