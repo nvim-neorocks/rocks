@@ -1,5 +1,5 @@
 [alias]
 tt = "nextest run --tests --no-fail-fast" # All
-tl = "nextest run --lib --no-fail-fast" # Lib only
+tl = "nextest run --lib --no-fail-fast"   # Lib only
 xtask = "run --package xtask --"
 lx = "run --bin lx --"
