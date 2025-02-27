@@ -35,6 +35,7 @@ The following table provides a brief (incomplete) comparison:
 
 |                                                                       | lux                          | luarocks v3.11.1 |
 | ---                                                                   | ---                          | ---                |
+| Project RockSpec format                                               | TOML                         | Lua                |
 | `builtin` build spec                                                  | :white_check_mark:           | :white_check_mark: |
 | `make` build spec                                                     | :white_check_mark:           | :white_check_mark: |
 | `cmake` build spec                                                    | :white_check_mark:           | :white_check_mark: |
