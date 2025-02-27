@@ -7,6 +7,7 @@ use std::{
     str::FromStr,
 };
 use thiserror::Error;
+use toml_edit::{DocumentMut, Item};
 
 use crate::{
     config::{Config, LuaVersion},
@@ -15,7 +16,7 @@ use crate::{
         ExternalDependencySpec, LuaRockspec, LuaVersionError, PartialLuaRockspec,
         PartialRockspecError, RockSourceSpec, RockspecError,
     },
-    package::PackageReq,
+    package::{PackageName, PackageReq},
     remote_package_db::RemotePackageDB,
     rockspec::{LuaVersionCompatibility, Rockspec},
     tree::Tree,
@@ -50,10 +51,10 @@ pub enum ProjectEditError {
     Toml(#[from] toml_edit::TomlError),
 }
 
-pub enum DependencyType {
-    Regular(Vec<PackageReq>),
-    Build(Vec<PackageReq>),
-    Test(Vec<PackageReq>),
+pub enum DependencyType<T> {
+    Regular(Vec<T>),
+    Build(Vec<T>),
+    Test(Vec<T>),
     External(HashMap<String, ExternalDependencySpec>),
 }
 
@@ -193,43 +194,13 @@ impl Project {
 
     pub async fn add(
         &mut self,
-        dependencies: DependencyType,
+        dependencies: DependencyType<PackageReq>,
         package_db: &RemotePackageDB,
     ) -> Result<(), ProjectEditError> {
         let mut project_toml =
             toml_edit::DocumentMut::from_str(&tokio::fs::read_to_string(self.toml_path()).await?)?;
 
-        if !project_toml.contains_table("dependencies") {
-            let mut table = toml_edit::table().into_table().unwrap();
-            table.set_implicit(true);
-
-            project_toml["dependencies"] = toml_edit::Item::Table(table);
-        }
-        if !project_toml.contains_table("build_dependencies") {
-            let mut table = toml_edit::table().into_table().unwrap();
-            table.set_implicit(true);
-
-            project_toml["build_dependencies"] = toml_edit::Item::Table(table);
-        }
-        if !project_toml.contains_table("test_dependencies") {
-            let mut table = toml_edit::table().into_table().unwrap();
-            table.set_implicit(true);
-
-            project_toml["test_dependencies"] = toml_edit::Item::Table(table);
-        }
-        if !project_toml.contains_table("external_dependencies") {
-            let mut table = toml_edit::table().into_table().unwrap();
-            table.set_implicit(true);
-
-            project_toml["external_dependencies"] = toml_edit::Item::Table(table);
-        }
-
-        let table = match dependencies {
-            DependencyType::Regular(_) => &mut project_toml["dependencies"],
-            DependencyType::Build(_) => &mut project_toml["build_dependencies"],
-            DependencyType::Test(_) => &mut project_toml["test_dependencies"],
-            DependencyType::External(_) => &mut project_toml["external_dependencies"],
-        };
+        let table = prepare_dependency_tables(&mut project_toml, &dependencies);
 
         match dependencies {
             DependencyType::Regular(ref deps)
@@ -318,6 +289,126 @@ impl Project {
         };
 
         Ok(())
+    }
+
+    pub async fn remove(
+        &mut self,
+        dependencies: DependencyType<PackageName>,
+    ) -> Result<(), ProjectEditError> {
+        let mut project_toml =
+            toml_edit::DocumentMut::from_str(&tokio::fs::read_to_string(self.toml_path()).await?)?;
+
+        let table = prepare_dependency_tables(&mut project_toml, &dependencies);
+
+        match dependencies {
+            DependencyType::Regular(ref deps)
+            | DependencyType::Build(ref deps)
+            | DependencyType::Test(ref deps) => {
+                for dep in deps {
+                    table[dep.to_string()] = Item::None;
+                }
+            }
+            DependencyType::External(ref deps) => {
+                for (name, dep) in deps {
+                    match dep {
+                        ExternalDependencySpec::Header(_) => {
+                            table[name]["header"] = Item::None;
+                        }
+                        ExternalDependencySpec::Library(_) => {
+                            table[name]["library"] = Item::None;
+                        }
+                    }
+                }
+            }
+        };
+
+        tokio::fs::write(self.toml_path(), project_toml.to_string()).await?;
+
+        match dependencies {
+            DependencyType::Regular(deps) => {
+                self.toml.dependencies = Some(
+                    self.toml
+                        .dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter(|dep| !&deps.iter().any(|d| d == dep.name()))
+                        .collect(),
+                )
+            }
+            DependencyType::Build(deps) => {
+                self.toml.build_dependencies = Some(
+                    self.toml
+                        .build_dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter(|dep| !&deps.iter().any(|d| d == dep.name()))
+                        .collect(),
+                )
+            }
+            DependencyType::Test(deps) => {
+                self.toml.test_dependencies = Some(
+                    self.toml
+                        .test_dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter(|dep| !&deps.iter().any(|d| d == dep.name()))
+                        .collect(),
+                )
+            }
+            DependencyType::External(deps) => {
+                self.toml.external_dependencies = Some(
+                    self.toml
+                        .external_dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter(|(dep, _)| !&deps.iter().any(|(d, _)| d == dep))
+                        .collect(),
+                )
+            }
+        };
+
+        Ok(())
+    }
+}
+
+fn prepare_dependency_tables<'a, T>(
+    project_toml: &'a mut DocumentMut,
+    dependencies: &'a DependencyType<T>,
+) -> &'a mut Item {
+    if !project_toml.contains_table("dependencies") {
+        let mut table = toml_edit::table().into_table().unwrap();
+        table.set_implicit(true);
+
+        project_toml["dependencies"] = toml_edit::Item::Table(table);
+    }
+    if !project_toml.contains_table("build_dependencies") {
+        let mut table = toml_edit::table().into_table().unwrap();
+        table.set_implicit(true);
+
+        project_toml["build_dependencies"] = toml_edit::Item::Table(table);
+    }
+    if !project_toml.contains_table("test_dependencies") {
+        let mut table = toml_edit::table().into_table().unwrap();
+        table.set_implicit(true);
+
+        project_toml["test_dependencies"] = toml_edit::Item::Table(table);
+    }
+    if !project_toml.contains_table("external_dependencies") {
+        let mut table = toml_edit::table().into_table().unwrap();
+        table.set_implicit(true);
+
+        project_toml["external_dependencies"] = toml_edit::Item::Table(table);
+    }
+
+    match dependencies {
+        DependencyType::Regular(_) => &mut project_toml["dependencies"],
+        DependencyType::Build(_) => &mut project_toml["build_dependencies"],
+        DependencyType::Test(_) => &mut project_toml["test_dependencies"],
+        DependencyType::External(_) => &mut project_toml["external_dependencies"],
     }
 }
 
