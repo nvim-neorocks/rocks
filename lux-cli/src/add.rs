@@ -44,7 +44,7 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
 
     if !data.package_req.is_empty() {
         // NOTE: We only update the lockfile if one exists.
-        // Otherwise, the next `lux build` will install the packages.
+        // Otherwise, the next `lx build` will install the packages.
         if let Some(lockfile) = project.try_lockfile()? {
             let mut lockfile = lockfile.write_guard();
             Sync::new(&tree, &mut lockfile, &config)
