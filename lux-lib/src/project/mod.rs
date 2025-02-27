@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use lets_find_up::{find_up_with, FindUpKind, FindUpOptions};
 use project_toml::{ProjectToml, ProjectTomlValidationError};
 use std::{
@@ -56,6 +57,12 @@ pub enum DependencyType<T> {
     Build(Vec<T>),
     Test(Vec<T>),
     External(HashMap<String, ExternalDependencySpec>),
+}
+
+pub enum LuaDependencyType<T> {
+    Regular(Vec<T>),
+    Build(Vec<T>),
+    Test(Vec<T>),
 }
 
 #[derive(Error, Debug)]
@@ -200,7 +207,13 @@ impl Project {
         let mut project_toml =
             toml_edit::DocumentMut::from_str(&tokio::fs::read_to_string(self.toml_path()).await?)?;
 
-        let table = prepare_dependency_tables(&mut project_toml, &dependencies);
+        prepare_dependency_tables(&mut project_toml);
+        let table = match dependencies {
+            DependencyType::Regular(_) => &mut project_toml["dependencies"],
+            DependencyType::Build(_) => &mut project_toml["build_dependencies"],
+            DependencyType::Test(_) => &mut project_toml["test_dependencies"],
+            DependencyType::External(_) => &mut project_toml["external_dependencies"],
+        };
 
         match dependencies {
             DependencyType::Regular(ref deps)
@@ -298,7 +311,13 @@ impl Project {
         let mut project_toml =
             toml_edit::DocumentMut::from_str(&tokio::fs::read_to_string(self.toml_path()).await?)?;
 
-        let table = prepare_dependency_tables(&mut project_toml, &dependencies);
+        prepare_dependency_tables(&mut project_toml);
+        let table = match dependencies {
+            DependencyType::Regular(_) => &mut project_toml["dependencies"],
+            DependencyType::Build(_) => &mut project_toml["build_dependencies"],
+            DependencyType::Test(_) => &mut project_toml["test_dependencies"],
+            DependencyType::External(_) => &mut project_toml["external_dependencies"],
+        };
 
         match dependencies {
             DependencyType::Regular(ref deps)
@@ -373,12 +392,75 @@ impl Project {
 
         Ok(())
     }
+
+    pub async fn upgrade(
+        &mut self,
+        dependencies: LuaDependencyType<PackageName>,
+        package_db: &RemotePackageDB,
+    ) -> Result<(), ProjectEditError> {
+        let mut project_toml =
+            toml_edit::DocumentMut::from_str(&tokio::fs::read_to_string(self.toml_path()).await?)?;
+
+        prepare_dependency_tables(&mut project_toml);
+        let table = match dependencies {
+            LuaDependencyType::Regular(_) => &mut project_toml["dependencies"],
+            LuaDependencyType::Build(_) => &mut project_toml["build_dependencies"],
+            LuaDependencyType::Test(_) => &mut project_toml["test_dependencies"],
+        };
+
+        match dependencies {
+            LuaDependencyType::Regular(ref deps)
+            | LuaDependencyType::Build(ref deps)
+            | LuaDependencyType::Test(ref deps) => {
+                for dep in deps {
+                    let dep_version_str = package_db
+                        .latest_version(dep)
+                        .expect("unable to query latest version for package")
+                        .to_string();
+                    table[dep.to_string()] = toml_edit::value(dep_version_str);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn upgrade_all(
+        &mut self,
+        package_db: &RemotePackageDB,
+    ) -> Result<(), ProjectEditError> {
+        if let Some(dependencies) = &self.toml().dependencies {
+            let packages = dependencies
+                .iter()
+                .map(|dep| dep.name())
+                .cloned()
+                .collect_vec();
+            self.upgrade(LuaDependencyType::Regular(packages), package_db)
+                .await?;
+        }
+        if let Some(dependencies) = &self.toml().build_dependencies {
+            let packages = dependencies
+                .iter()
+                .map(|dep| dep.name())
+                .cloned()
+                .collect_vec();
+            self.upgrade(LuaDependencyType::Build(packages), package_db)
+                .await?;
+        }
+        if let Some(dependencies) = &self.toml().test_dependencies {
+            let packages = dependencies
+                .iter()
+                .map(|dep| dep.name())
+                .cloned()
+                .collect_vec();
+            self.upgrade(LuaDependencyType::Test(packages), package_db)
+                .await?;
+        }
+        Ok(())
+    }
 }
 
-fn prepare_dependency_tables<'a, T>(
-    project_toml: &'a mut DocumentMut,
-    dependencies: &'a DependencyType<T>,
-) -> &'a mut Item {
+fn prepare_dependency_tables(project_toml: &mut DocumentMut) {
     if !project_toml.contains_table("dependencies") {
         let mut table = toml_edit::table().into_table().unwrap();
         table.set_implicit(true);
@@ -402,13 +484,6 @@ fn prepare_dependency_tables<'a, T>(
         table.set_implicit(true);
 
         project_toml["external_dependencies"] = toml_edit::Item::Table(table);
-    }
-
-    match dependencies {
-        DependencyType::Regular(_) => &mut project_toml["dependencies"],
-        DependencyType::Build(_) => &mut project_toml["build_dependencies"],
-        DependencyType::Test(_) => &mut project_toml["test_dependencies"],
-        DependencyType::External(_) => &mut project_toml["external_dependencies"],
     }
 }
 

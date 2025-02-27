@@ -59,6 +59,14 @@ pub struct Update<'a> {
     #[builder(field)]
     packages: Option<Vec<PackageReq>>,
 
+    /// Test dependencies to update.
+    #[builder(field)]
+    test_dependencies: Option<Vec<PackageReq>>,
+
+    /// Build dependencies to update.
+    #[builder(field)]
+    build_dependencies: Option<Vec<PackageReq>>,
+
     /// Whether to validate the integrity when syncing the project lockfile.
     validate_integrity: Option<bool>,
 
@@ -71,6 +79,14 @@ pub struct Update<'a> {
 impl<State: update_builder::State> UpdateBuilder<'_, State> {
     pub fn packages(mut self, packages: Option<Vec<PackageReq>>) -> Self {
         self.packages = packages;
+        self
+    }
+    pub fn build_dependencies(mut self, packages: Option<Vec<PackageReq>>) -> Self {
+        self.build_dependencies = packages;
+        self
+    }
+    pub fn test_dependencies(mut self, packages: Option<Vec<PackageReq>>) -> Self {
+        self.test_dependencies = packages;
         self
     }
 }
@@ -150,7 +166,7 @@ async fn update_project(
         package_db.clone(),
         args.config,
         args.progress.clone(),
-        &args.packages,
+        &args.test_dependencies,
     )
     .await?
     .into_iter()
@@ -171,7 +187,7 @@ async fn update_project(
         package_db.clone(),
         luarocks.config(),
         args.progress.clone(),
-        &args.packages,
+        &args.build_dependencies,
     )
     .await?
     .into_iter()
