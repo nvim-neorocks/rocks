@@ -102,3 +102,31 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
         .await
         .unwrap();
 }
+
+#[tokio::test]
+async fn treesitter_parser_build() {
+    let dir = TempDir::new("lux-test").unwrap();
+
+    let content = String::from_utf8(
+        std::fs::read("resources/test/tree-sitter-rust-0.0.43.rockspec").unwrap(),
+    )
+    .unwrap();
+    let rockspec = RemoteLuaRockspec::new(&content).unwrap();
+
+    let config = ConfigBuilder::new()
+        .unwrap()
+        .tree(Some(dir.into_path()))
+        .build()
+        .unwrap();
+
+    let progress = MultiProgress::new();
+    let bar = progress.new_bar();
+
+    let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
+
+    Build::new(&rockspec, &tree, &config, &Progress::Progress(bar))
+        .behaviour(Force)
+        .build()
+        .await
+        .unwrap();
+}

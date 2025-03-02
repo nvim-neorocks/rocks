@@ -2,11 +2,13 @@ mod builtin;
 mod cmake;
 mod make;
 mod rust_mlua;
+mod tree_sitter;
 
 pub use builtin::{BuiltinBuildSpec, LuaModule, ModulePaths, ModuleSpec};
 pub use cmake::*;
 pub use make::*;
 pub use rust_mlua::*;
+pub use tree_sitter::*;
 
 use builtin::{
     ModulePathsMissingSources, ModuleSpecAmbiguousPlatformOverride, ModuleSpecInternal,
@@ -70,6 +72,8 @@ pub enum BuildSpecInternalError {
     NoInstallCommand,
     #[error("no 'modules' specified for the 'rust-mlua' build backend")]
     NoModulesSpecified,
+    #[error("no 'lang' specified for 'treesitter-parser' build backend")]
+    NoTreesitterParserLanguageSpecified,
     #[error("invalid 'rust-mlua' modules format")]
     InvalidRustMLuaFormat,
     #[error(transparent)]
@@ -175,6 +179,17 @@ impl BuildSpec {
                     .collect(),
                 features: internal.features.unwrap_or_default(),
             })),
+            BuildType::TreesitterParser => Some(BuildBackendSpec::TreesitterParser(
+                TreesitterParserBuildSpec {
+                    lang: internal
+                        .lang
+                        .ok_or(BuildSpecInternalError::NoTreesitterParserLanguageSpecified)?,
+                    parser: internal.parser.unwrap_or(false),
+                    generate: internal.generate.unwrap_or(false),
+                    location: internal.location,
+                    queries: internal.queries.unwrap_or_default(),
+                },
+            )),
         };
         Ok(Self {
             build_backend,
@@ -233,6 +248,7 @@ pub enum BuildBackendSpec {
     Command(CommandBuildSpec),
     LuaRock(String),
     RustMlua(RustMluaBuildSpec),
+    TreesitterParser(TreesitterParserBuildSpec),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -366,6 +382,17 @@ pub(crate) struct BuildSpecInternal {
     pub(crate) include: Option<HashMap<LuaTableKey, PathBuf>>,
     #[serde(default)]
     pub(crate) features: Option<Vec<String>>,
+    // treesitter-parser fields
+    #[serde(default)]
+    pub(crate) lang: Option<String>,
+    #[serde(default)]
+    pub(crate) parser: Option<bool>,
+    #[serde(default)]
+    pub(crate) generate: Option<bool>,
+    #[serde(default)]
+    pub(crate) location: Option<PathBuf>,
+    #[serde(default)]
+    pub(crate) queries: Option<HashMap<PathBuf, String>>,
 }
 
 impl FromLua for PerPlatform<BuildSpecInternal> {
@@ -500,6 +527,11 @@ fn override_build_spec_internal(
         default_features: override_opt(&override_spec.default_features, &base.default_features),
         features: override_opt(&override_spec.features, &base.features),
         include: merge_map_opts(&override_spec.include, &base.include),
+        lang: override_opt(&override_spec.lang, &base.lang),
+        parser: override_opt(&override_spec.parser, &base.parser),
+        generate: override_opt(&override_spec.generate, &base.generate),
+        location: override_opt(&override_spec.location, &base.location),
+        queries: merge_map_opts(&override_spec.queries, &base.queries),
     })
 }
 
@@ -717,6 +749,44 @@ impl DisplayAsLuaKV for BuildSpecInternal {
                 ),
             });
         }
+        if let Some(lang) = &self.lang {
+            result.push(DisplayLuaKV {
+                key: "lang".to_string(),
+                value: DisplayLuaValue::String(lang.to_string()),
+            });
+        }
+        if let Some(parser) = &self.parser {
+            result.push(DisplayLuaKV {
+                key: "parser".to_string(),
+                value: DisplayLuaValue::Boolean(*parser),
+            });
+        }
+        if let Some(generate) = &self.generate {
+            result.push(DisplayLuaKV {
+                key: "generate".to_string(),
+                value: DisplayLuaValue::Boolean(*generate),
+            });
+        }
+        if let Some(location) = &self.location {
+            result.push(DisplayLuaKV {
+                key: "location".to_string(),
+                value: DisplayLuaValue::String(location.to_string_lossy().to_string()),
+            });
+        }
+        if let Some(queries) = &self.queries {
+            result.push(DisplayLuaKV {
+                key: "queries".to_string(),
+                value: DisplayLuaValue::Table(
+                    queries
+                        .iter()
+                        .map(|(key, value)| DisplayLuaKV {
+                            key: key.to_string_lossy().to_string(),
+                            value: DisplayLuaValue::String(value.to_string()),
+                        })
+                        .collect(),
+                ),
+            });
+        }
 
         DisplayLuaKV {
             key: "build".to_string(),
@@ -743,6 +813,8 @@ pub(crate) enum BuildType {
     LuaRock(String),
     #[serde(rename = "rust-mlua")]
     RustMlua,
+    #[serde(rename = "treesitter-parser")]
+    TreesitterParser,
 }
 
 // Special Deserialize case for BuildType:
@@ -774,6 +846,7 @@ impl Display for BuildType {
             BuildType::None => write!(f, "none"),
             BuildType::LuaRock(s) => write!(f, "{}", s),
             BuildType::RustMlua => write!(f, "rust-mlua"),
+            BuildType::TreesitterParser => write!(f, "treesitter-parser"),
         }
     }
 }

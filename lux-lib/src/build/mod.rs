@@ -29,6 +29,7 @@ use patch::{Patch, PatchError};
 use rust_mlua::RustError;
 use ssri::Integrity;
 use thiserror::Error;
+use treesitter_parser::TreesitterBuildError;
 use utils::recursive_copy_dir;
 
 mod builtin;
@@ -38,6 +39,7 @@ mod luarocks;
 mod make;
 mod patch;
 mod rust_mlua;
+mod treesitter_parser;
 
 pub mod external_dependency;
 pub mod variables;
@@ -111,6 +113,8 @@ pub enum BuildError {
     CommandError(#[from] CommandError),
     #[error(transparent)]
     RustError(#[from] RustError),
+    #[error(transparent)]
+    TreesitterBuild(#[from] TreesitterBuildError),
     #[error(transparent)]
     LuaVersionError(#[from] LuaVersionError),
     #[error("compilation failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
@@ -186,6 +190,11 @@ async fn run_build<R: Rockspec + HasIntegrity>(
             }
             Some(BuildBackendSpec::RustMlua(rust_mlua_spec)) => {
                 rust_mlua_spec
+                    .run(output_paths, false, lua, config, build_dir, progress)
+                    .await?
+            }
+            Some(BuildBackendSpec::TreesitterParser(treesitter_parser_spec)) => {
+                treesitter_parser_spec
                     .run(output_paths, false, lua, config, build_dir, progress)
                     .await?
             }
