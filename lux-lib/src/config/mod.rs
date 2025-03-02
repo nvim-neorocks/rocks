@@ -1,6 +1,7 @@
 use directories::ProjectDirs;
 use external_deps::ExternalDependencySearchConfig;
 use itertools::Itertools;
+use mlua::{ExternalError, FromLua, IntoLua, UserData};
 use serde::{Deserialize, Serialize, Serializer};
 use std::{
     collections::HashMap, env, fmt::Display, io, path::PathBuf, str::FromStr, time::Duration,
@@ -39,6 +40,12 @@ pub enum LuaVersion {
     LuaJIT52,
     // TODO(vhyrro): Support luau?
     // LuaU,
+}
+
+impl IntoLua for LuaVersion {
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        self.to_string().into_lua(lua)
+    }
 }
 
 #[derive(Debug, Error)]
@@ -155,7 +162,7 @@ impl Display for LuaVersion {
 #[error("could not find a valid home directory")]
 pub struct NoValidHomeDirectory;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, FromLua)]
 pub struct Config {
     enable_development_packages: bool,
     server: Url,
@@ -561,5 +568,17 @@ where
             serializer.serialize_some(&url_strings)
         }
         None => serializer.serialize_none(),
+    }
+}
+
+impl UserData for Config {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_function("default", |_, _: ()| {
+            ConfigBuilder::default()
+                .build()
+                .map_err(|err| err.into_lua_err())
+        });
+
+        // TODO: Implement builder with `require("lux").config.build()`
     }
 }

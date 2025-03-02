@@ -2,9 +2,9 @@
   self,
   crane,
 }: final: prev: let
-  cleanCargoSrc = craneLib.cleanCargoSource self;
-
   craneLib = crane.mkLib prev;
+
+  cleanCargoSrc = craneLib.cleanCargoSource self;
 
   commonArgs = with final; {
     inherit (craneLib.crateNameFromCargoToml {cargoToml = "${self}/lux-cli/Cargo.toml";}) version pname;

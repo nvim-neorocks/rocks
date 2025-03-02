@@ -7,6 +7,7 @@ use std::ops::{Deref, DerefMut};
 use std::{collections::HashMap, fs::File, io::ErrorKind, path::PathBuf};
 
 use itertools::Itertools;
+use mlua::{ExternalResult, FromLua, Function, IntoLua, UserData};
 use serde::{de, Deserialize, Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use ssri::Integrity;
@@ -20,13 +21,22 @@ use crate::package::{
 use crate::remote_package_source::RemotePackageSource;
 use crate::rockspec::RockBinaries;
 
-#[cfg(feature = "lua")]
-use mlua::{ExternalResult, FromLua};
-
 #[derive(Copy, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub enum PinnedState {
     Unpinned,
     Pinned,
+}
+
+impl FromLua for PinnedState {
+    fn from_lua(value: mlua::Value, lua: &mlua::Lua) -> mlua::Result<Self> {
+        Ok(Self::from(bool::from_lua(value, lua)?))
+    }
+}
+
+impl IntoLua for PinnedState {
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        self.as_bool().into_lua(lua)
+    }
 }
 
 impl Default for PinnedState {
@@ -98,6 +108,12 @@ pub(crate) struct LocalPackageSpec {
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, Clone)]
 pub struct LocalPackageId(String);
 
+impl FromLua for LocalPackageId {
+    fn from_lua(value: mlua::Value, lua: &mlua::Lua) -> mlua::Result<Self> {
+        Ok(Self(String::from_lua(value, lua)?))
+    }
+}
+
 impl LocalPackageId {
     pub fn new(
         name: &PackageName,
@@ -120,6 +136,17 @@ impl LocalPackageId {
 
         Self(hex::encode(hasher.finalize()))
     }
+
+    /// Constructs a package ID from a hashed string.
+    ///
+    /// # Safety
+    ///
+    /// Ensure that the hash you are providing to this function
+    /// is not malformed and resolves to a valid package ID for the target
+    /// tree you are working with.
+    pub unsafe fn from_unchecked(str: String) -> Self {
+        Self(str)
+    }
 }
 
 impl Display for LocalPackageId {
@@ -128,7 +155,6 @@ impl Display for LocalPackageId {
     }
 }
 
-#[cfg(feature = "lua")]
 impl mlua::IntoLua for LocalPackageId {
     fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
         self.0.into_lua(lua)
@@ -221,12 +247,32 @@ pub(crate) enum RemotePackageSourceUrl {
 }
 
 // TODO(vhyrro): Move to `package/local.rs`
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, FromLua)]
 pub struct LocalPackage {
     pub(crate) spec: LocalPackageSpec,
     pub(crate) source: RemotePackageSource,
     pub(crate) source_url: Option<RemotePackageSourceUrl>,
     hashes: LocalPackageHashes,
+}
+
+impl UserData for LocalPackage {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("id", |_, this, _: ()| Ok(this.id()));
+        methods.add_method("name", |_, this, _: ()| Ok(this.name().clone()));
+        methods.add_method("version", |_, this, _: ()| Ok(this.version().clone()));
+        methods.add_method("pinned", |_, this, _: ()| Ok(this.pinned()));
+        methods.add_method("dependencies", |_, this, _: ()| {
+            Ok(this.spec.dependencies.clone())
+        });
+        methods.add_method("constraint", |_, this, _: ()| {
+            Ok(this.spec.constraint.clone())
+        });
+        methods.add_method("hashes", |_, this, _: ()| Ok(this.hashes.clone()));
+        methods.add_method("to_package", |_, this, _: ()| Ok(this.to_package()));
+        methods.add_method("into_package_req", |_, this, _: ()| {
+            Ok(this.clone().into_package_req())
+        });
+    }
 }
 
 impl LocalPackage {
@@ -239,7 +285,6 @@ impl LocalPackage {
     }
 }
 
-#[cfg_attr(feature = "lua", derive(FromLua,))]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct LocalPackageIntermediate {
     name: PackageName,
@@ -306,14 +351,6 @@ impl Serialize for LocalPackage {
         S: serde::Serializer,
     {
         LocalPackageIntermediate::from(self).serialize(serializer)
-    }
-}
-
-#[cfg(feature = "lua")]
-impl FromLua for LocalPackage {
-    fn from_lua(value: mlua::Value, lua: &mlua::Lua) -> mlua::Result<Self> {
-        LocalPackage::try_from(LocalPackageIntermediate::from_lua(value, lua)?)
-            .map_err(|err| mlua::Error::DeserializeError(format!("{}", err)))
     }
 }
 
@@ -424,11 +461,10 @@ impl PartialOrd for LocalPackageHashes {
     }
 }
 
-#[cfg(feature = "lua")]
 impl mlua::UserData for LocalPackageHashes {
-    fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("rockspec", |_, this| Ok(this.rockspec.to_string()));
-        fields.add_field_method_get("source", |_, this| Ok(this.source.to_string()));
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("rockspec", |_, this, ()| Ok(this.rockspec.to_hex().1));
+        methods.add_method("source", |_, this, ()| Ok(this.source.to_hex().1));
     }
 }
 
@@ -436,6 +472,26 @@ impl mlua::UserData for LocalPackageHashes {
 pub enum LockConstraint {
     Unconstrained,
     Constrained(PackageVersionReq),
+}
+
+impl IntoLua for LockConstraint {
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        match self {
+            LockConstraint::Unconstrained => Ok("*".into_lua(lua).unwrap()),
+            LockConstraint::Constrained(req) => req.into_lua(lua),
+        }
+    }
+}
+
+impl FromLua for LockConstraint {
+    fn from_lua(value: mlua::Value, lua: &mlua::Lua) -> mlua::Result<Self> {
+        let str = String::from_lua(value, lua)?;
+
+        match str.as_str() {
+            "*" => Ok(LockConstraint::Unconstrained),
+            _ => Ok(LockConstraint::Constrained(str.parse().into_lua_err()?)),
+        }
+    }
 }
 
 impl Default for LockConstraint {
@@ -500,7 +556,7 @@ impl LockfilePermissions for ReadOnly {}
 impl LockfilePermissions for ReadWrite {}
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub(crate) struct LocalPackageLock {
+pub struct LocalPackageLock {
     // NOTE: We cannot directly serialize to a `Sha256` object as they don't implement serde traits.
     // NOTE: We want to retain ordering of rocks and entrypoints when de/serializing.
     rocks: BTreeMap<LocalPackageId, LocalPackage>,
@@ -535,6 +591,18 @@ impl LocalPackageLock {
     fn remove_by_id(&mut self, target: &LocalPackageId) {
         self.rocks.remove(target);
         self.entrypoints.retain(|x| x != target);
+    }
+
+    pub fn has_entrypoint(&self, req: &PackageReq) -> Option<LocalPackage> {
+        self.entrypoints.iter().find_map(|id| {
+            let rock = self.get(id).unwrap();
+
+            if rock.name() == req.name() && req.version_req().matches(rock.version()) {
+                Some(rock.clone())
+            } else {
+                None
+            }
+        })
     }
 
     pub(crate) fn has_rock(
@@ -650,7 +718,7 @@ pub struct Lockfile<P: LockfilePermissions> {
     lock: LocalPackageLock,
 }
 
-pub(crate) enum LocalPackageLockType {
+pub enum LocalPackageLockType {
     Regular,
     Test,
     Build,
@@ -689,6 +757,21 @@ pub(crate) struct PackageSyncSpec {
     pub to_remove: Vec<LocalPackage>,
 }
 
+impl UserData for Lockfile<ReadOnly> {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("version", |_, this, _: ()| Ok(this.version().clone()));
+        methods.add_method("rocks", |_, this, _: ()| Ok(this.rocks().clone()));
+        methods.add_method("get", |_, this, id: LocalPackageId| {
+            Ok(this.get(&id).cloned())
+        });
+        methods.add_method("map_then_flush", |_, this, f: mlua::Function| {
+            let lockfile = this.clone().write_guard();
+            f.call::<()>(lockfile)?;
+            Ok(())
+        });
+    }
+}
+
 impl<P: LockfilePermissions> Lockfile<P> {
     pub fn version(&self) -> &String {
         &self.version
@@ -698,7 +781,7 @@ impl<P: LockfilePermissions> Lockfile<P> {
         self.lock.rocks()
     }
 
-    pub(crate) fn local_pkg_lock(&self) -> &LocalPackageLock {
+    pub fn local_pkg_lock(&self) -> &LocalPackageLock {
         &self.lock
     }
 
@@ -719,7 +802,7 @@ impl<P: LockfilePermissions> Lockfile<P> {
     }
 
     /// Find all rocks that match the requirement
-    pub(crate) fn find_rocks(&self, req: &PackageReq) -> Vec<LocalPackageId> {
+    pub fn find_rocks(&self, req: &PackageReq) -> Vec<LocalPackageId> {
         match self.list().get(req.name()) {
             Some(packages) => packages
                 .iter()
@@ -834,7 +917,7 @@ impl<P: LockfilePermissions> ProjectLockfile<P> {
         }
     }
 
-    pub(crate) fn local_pkg_lock(&self, deps: &LocalPackageLockType) -> &LocalPackageLock {
+    pub fn local_pkg_lock(&self, deps: &LocalPackageLockType) -> &LocalPackageLock {
         match deps {
             LocalPackageLockType::Regular => &self.dependencies,
             LocalPackageLockType::Test => &self.test_dependencies,
@@ -1101,6 +1184,24 @@ pub struct LockfileGuard(Lockfile<ReadWrite>);
 
 pub struct ProjectLockfileGuard(ProjectLockfile<ReadWrite>);
 
+impl UserData for LockfileGuard {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("version", |_, this, _: ()| Ok(this.version().clone()));
+        methods.add_method("rocks", |_, this, _: ()| Ok(this.rocks().clone()));
+        methods.add_method("get", |_, this, id: LocalPackageId| {
+            Ok(this.get(&id).cloned())
+        });
+        methods.add_method_mut("add", |_, this, package: LocalPackage| {
+            this.add(&package);
+            Ok(())
+        });
+        methods.add_method_mut("add_dependency", |_, this, (target, dependency)| {
+            this.add_dependency(&target, &dependency);
+            Ok(())
+        });
+    }
+}
+
 impl Serialize for LockfileGuard {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -1327,7 +1428,7 @@ mod tests {
         let temp = assert_fs::TempDir::new().unwrap();
         temp.copy_from(&tree_path, &["**"]).unwrap();
 
-        remove_file(temp.join("5.1/lock.json")).unwrap();
+        remove_file(temp.join("5.1/lux.lock")).unwrap();
 
         let tree = Tree::new(temp.to_path_buf(), Lua51).unwrap();
 
@@ -1336,7 +1437,7 @@ mod tests {
 
     fn get_test_lockfile() -> Lockfile<ReadOnly> {
         let sample_tree = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("resources/test/sample-tree/5.1/lock.json");
+            .join("resources/test/sample-tree/5.1/lux.lock");
         Lockfile::new(sample_tree).unwrap()
     }
 

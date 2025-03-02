@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use mlua::{FromLua, Lua, LuaSerdeExt, Value};
+use mlua::{FromLua, IntoLua, IntoLuaMulti, Lua, LuaSerdeExt, UserData, Value};
 use std::{cmp::Ordering, collections::HashMap, convert::Infallible, marker::PhantomData};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -50,6 +50,15 @@ impl PartialOrd for PlatformIdentifier {
             _ if self == other => Some(Ordering::Equal),
             _ => None,
         }
+    }
+}
+
+impl FromLua for PlatformIdentifier {
+    fn from_lua(value: Value, lua: &Lua) -> mlua::Result<Self> {
+        let string = String::from_lua(value, lua)?;
+        Ok(string
+            .parse()
+            .unwrap_or(PlatformIdentifier::Unknown(string)))
     }
 }
 
@@ -116,6 +125,17 @@ impl Default for PlatformSupport {
                 .map(|identifier| (identifier, true))
                 .collect(),
         }
+    }
+}
+
+impl UserData for PlatformSupport {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("is_supported", |_, this, platform: PlatformIdentifier| {
+            Ok(this.is_supported(&platform))
+        });
+        methods.add_method("is_current_platform_supported", |_, this, _: ()| {
+            Ok(this.is_current_platform_supported())
+        });
     }
 }
 
@@ -463,6 +483,20 @@ where
                 val.type_name()
             ))),
         }
+    }
+}
+
+impl<T> UserData for PerPlatform<T>
+where
+    T: IntoLuaMulti + Clone,
+{
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("current_platform", |_, this, _: ()| {
+            Ok(this.current_platform().clone())
+        });
+        methods.add_method("get", |_, this, platform: PlatformIdentifier| {
+            Ok(this.get(&platform).clone())
+        });
     }
 }
 

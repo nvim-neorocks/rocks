@@ -1,5 +1,8 @@
 [alias]
-tt = "nextest run --tests --no-fail-fast" # All
-tl = "nextest run --lib --no-fail-fast"   # Lib only
-xtask = "run --package xtask --"
+tt = "nextest run --tests --no-fail-fast"                  # All
+tl = "nextest run --lib --no-fail-fast"                    # Lib only
 lx = "run --bin lx --"
+xtask = "run --package xtask --"
+build-all = "run --package xtask -- build"
+build-all-release = "run --package xtask -- build-release"
+dist = "run --package xtask -- dist"

@@ -1,0 +1,20 @@
+[package]
+name = "lux-lua"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+lets_find_up = "0.0.4"
+lux-lib = { version = "0.1.0", path = "../lux-lib", default-features = false }
+mlua = { version = "0.10.1", features = ["module", "async"] }
+path-absolutize = "3.1.1"
+pathdiff = "0.2.3"
+
+[features]
+lua51 = ["mlua/lua51", "lux-lib/lua51"]
+lua52 = ["mlua/lua52", "lux-lib/lua52"]
+lua53 = ["mlua/lua53", "lux-lib/lua53"]
+lua54 = ["mlua/lua54", "lux-lib/lua54"]

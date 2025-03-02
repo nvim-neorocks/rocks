@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use mlua::IntoLua;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 use url::Url;
@@ -18,6 +19,25 @@ pub(crate) enum RemotePackageSource {
     RockspecContent(String),
     #[cfg(test)]
     Test,
+}
+
+impl IntoLua for RemotePackageSource {
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        let table = lua.create_table()?;
+
+        match self {
+            RemotePackageSource::LuarocksRockspec(url) => table.set("rockspec", url.to_string())?,
+            RemotePackageSource::LuarocksSrcRock(url) => table.set("src_rock", url.to_string())?,
+            RemotePackageSource::LuarocksBinaryRock(url) => table.set("rock", url.to_string())?,
+            RemotePackageSource::RockspecContent(content) => {
+                table.set("rockspec_content", content)?
+            }
+            #[cfg(test)]
+            RemotePackageSource::Test => unreachable!(),
+        };
+
+        Ok(mlua::Value::Table(table))
+    }
 }
 
 impl RemotePackageSource {
