@@ -42,6 +42,7 @@ The following table provides a brief (incomplete) comparison:
 | `command` build spec                                                  | :white_check_mark:           | :white_check_mark: |
 | custom build backends                                                 | :white_check_mark:[^1]       | :white_check_mark: |
 | `rust-mlua` build spec                                                | :white_check_mark: (builtin) | :white_check_mark: (external build backend) |
+| `treesitter-parser` build spec                                        | :white_check_mark: (builtin) | :white_check_mark: (external build backend) |
 | RockSpecs with CVS/Mercurial/SVN/SSCM sources                         | :x: (YAGNI[^2])              | :white_check_mark: |
 | install pre-built binary rocks                                        | :white_check_mark:           | :white_check_mark: |
 | parallel builds/installs                                              | :white_check_mark:           | :x:                |
