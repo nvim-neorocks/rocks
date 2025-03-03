@@ -45,6 +45,7 @@
         packages = with pkgs; {
           default = lux;
           inherit lux;
+          inherit lux-lib;
         };
 
         devShells = let

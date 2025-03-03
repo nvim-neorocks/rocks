@@ -7,7 +7,6 @@
   craneLib = crane.mkLib prev;
 
   commonArgs = with final; {
-    inherit (craneLib.crateNameFromCargoToml {cargoToml = "${self}/lux-cli/Cargo.toml";}) version pname;
     strictDeps = true;
 
     nativeBuildInputs = [
@@ -39,6 +38,8 @@
 
   lux-deps = craneLib.buildDepsOnly (commonArgs
     // {
+      pname = "lux";
+      version = "0.1.0";
       src = cleanCargoSrc;
     });
 
@@ -51,12 +52,34 @@
       doCheck = false;
     };
 
+  fileSetForCrate = with final; crate: lib.fileset.toSource {
+    root = ../.;
+    fileset = lib.fileset.unions [
+      /./${crate}/Cargo.toml
+      # (craneLib.fileset.commonCargoSources ../lux-hack)
+      (craneLib.fileset.commonCargoSources crate)
+    ];
+  };
+
+  mk-lux-lib = {buildType ? "release"}:
+    craneLib.buildPackage (individualCrateArgs
+      // {
+        pname = "lux-lib";
+        inherit (craneLib.crateNameFromCargoToml { src = ../lux-lib; }) version;
+        src = fileSetForCrate ../lux-lib;
+        cargoExtraArgs = "-p lux-lib";
+
+        inherit buildType;
+      });
+
   # can't seem to override the buildType with override or overrideAttrs :(
   mk-lux-cli = {buildType ? "release"}:
     craneLib.buildPackage (individualCrateArgs
       // {
         pname = "lux-cli";
-        cargoExtrArgs = "-p lux-cli";
+        inherit (craneLib.crateNameFromCargoToml { src = ../lux-cli; }) version;
+        src = fileSetForCrate ../lux-cli;
+        cargoExtraArgs = "-p lux-cli";
 
         postBuild = ''
           cargo xtask dist-man
@@ -72,8 +95,29 @@
 
         meta.mainProgram = "lux";
       });
+
+   # Ensure that cargo-hakari is up to date
+   # lux-hakari = craneLib.mkCargoDerivation {
+   #   src = self;
+   #   pname = "lux-hakari";
+   #   cargoArtifacts = null;
+   #   doInstallCargoArtifacts = false;
+   #
+   #   buildPhaseCargoCommand = ''
+   #     cargo hakari generate --diff  # workspace-hack Cargo.toml is up-to-date
+   #     cargo hakari manage-deps --dry-run  # all workspace crates depend on workspace-hack
+   #     cargo hakari verify
+   #   '';
+   #
+   #   nativeBuildInputs = with final; [
+   #     cargo-hakari
+   #   ];
+   # };
 in {
-  inherit lux-deps;
+  inherit lux-deps; # lux-hakari;
+  lux-lib = mk-lux-lib {};
+  lux-lib-debug = mk-lux-lib {buildType = "debug";};
+
   lux-cli = mk-lux-cli {};
   lux-cli-debug = mk-lux-cli {buildType = "debug";};
 
